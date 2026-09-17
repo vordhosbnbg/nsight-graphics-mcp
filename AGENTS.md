@@ -55,9 +55,9 @@ GPU pipelines using NVIDIA Nsight Graphics.
 - Evaluate and record the stack in [docs/TECH_STACK.md](docs/TECH_STACK.md), outside
   the roadmap. The user prioritizes extensive native Vulkan/tooling integration
   and prefers C++ throughout. Use that as the implementation direction, with
-  fastmcpp as the preferred MCP library based on the user's prior success. The
-  library revision and client interoperability are still to be validated;
-  supporting components remain under evaluation.
+  fastmcpp as the MCP library based on the user's prior success. R-003 validates
+  its pinned revision with Codex over stdio; supporting choices for subsequent
+  components remain under evaluation.
 - The initial requirements interview is complete through round 10: first-release
   scope/exclusions, priorities, dependencies, acceptance checks, validation, and
   delivery are recorded. Keep user decisions distinct from implementation choices.
@@ -76,9 +76,13 @@ manifest, or test suite. R-013 now supplies CMake/Ninja presets, pinned source
 dependencies, a source-built glslang compiler, CPU-only checks, and server/fixture
 entry points with version/help reporting. See [README.md](README.md) and
 [docs/BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) for verified commands and limits.
-Rendering and MCP serving are not implemented yet. The architecture below remains
-the direction for those subsequent items. Update these instructions as the project
-develops.
+R-003/R-005 complete the first build/basic-fixture group at version 0.1.0 with a
+real Codex capability query, a windowed Vulkan fixture, and an isolated C++
+experiment runner. Fresh-context reviews, CPU checks, and local GPU validation
+are recorded in docs/BUILD_VALIDATION.md, docs/MCP.md, and docs/FIXTURE.md.
+Nsight capture, the job coordinator, and managed artifact storage are the next
+implementation group; no real Nsight capture is validated yet. Update these
+instructions as the project develops.
 
 Local baseline, inspected on 2026-09-17:
 

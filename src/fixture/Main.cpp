@@ -1,8 +1,38 @@
-#include "ngm/Bootstrap.hpp"
+#include "Fixture.hpp"
+#include "ngm/Version.hpp"
 
 #include <cstddef>
+#include <iostream>
+#include <string_view>
 
 int main(int argc, char** argv) {
-    return ngm::bootstrap({argv + 1, static_cast<std::size_t>(argc - 1)}, "ngm-vulkan-fixture",
-                          "Rendering is not implemented yet (R-005). Only build/version queries are available.");
+    if(argc == 2 && std::string_view(argv[1]) == "--version") {
+        std::cout << "ngm-vulkan-fixture " << ngm::project_version() << '\n';
+        return 0;
+    }
+    if(argc == 2 && std::string_view(argv[1]) == "--help") {
+        std::cout << "Usage: ngm-vulkan-fixture --scenario NAME --seed UINT --width UINT --height UINT\n"
+                     "                          --frame UINT --output NEW_DIRECTORY [--shader-dir DIRECTORY]\n"
+                     "       ngm-vulkan-fixture [--version | --help]\n"
+                     "Scenarios: reference, shader-error, binding-error, pipeline-error.\n"
+                     "All six inputs are required. Frame is zero-based (0..600); dimensions are 32..4096.\n"
+                     "Uses an existing X11/Xwayland desktop through DISPLAY, a Vulkan 1.3 device,\n"
+                     "and verified diagnostic GLSL/SPIR-V artifacts. Each launch presents frames 0..frame\n"
+                     "and saves the selected frame as application readback in image.ppm and result.json.\n";
+        return 0;
+    }
+    try {
+        const auto options = ngm::fixture::parse_arguments({argv + 1, static_cast<std::size_t>(argc - 1)});
+        ngm::fixture::run(options);
+        return 0;
+    } catch(const std::invalid_argument& error) {
+        std::cerr << "ngm-vulkan-fixture: unsupported arguments: " << error.what() << "; use --help.\n";
+        return 2;
+    } catch(const ngm::fixture::Unsupported& error) {
+        std::cerr << "ngm-vulkan-fixture: unsupported prerequisite: " << error.what() << '\n';
+        return 3;
+    } catch(const std::exception& error) {
+        std::cerr << "ngm-vulkan-fixture: " << error.what() << '\n';
+        return 1;
+    }
 }

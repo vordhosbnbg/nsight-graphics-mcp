@@ -6,7 +6,7 @@ All sources are unmodified submodules under `external/`.
 
 | Path | Upstream/version | Exact commit | Purpose and linkage |
 | --- | --- | --- | --- |
-| `external/fastmcpp` | [0xeb/fastmcpp](https://github.com/0xeb/fastmcpp), 3.4.7.1 | `29144985f51f41247584efe0c9cd2064de01b6fa` | Static MCP library; build validated, client interoperability pending R-003. |
+| `external/fastmcpp` | [0xeb/fastmcpp](https://github.com/0xeb/fastmcpp), 3.4.7.1 | `29144985f51f41247584efe0c9cd2064de01b6fa` | Static MCP library; source build and real Codex capability query validated; see MCP.md. |
 | `external/json` | [nlohmann/json](https://github.com/nlohmann/json), v3.11.3 | `9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03` | Header-only JSON used by fastmcpp and first-party checks. |
 | `external/cpp-httplib` | [yhirose/cpp-httplib](https://github.com/yhirose/cpp-httplib), v0.15.3 | `5c00bbf36ba8ff47b4fb97712fc38cb2884e5b98` | Header-only transitive fastmcpp dependency; no optional TLS/compression libraries. |
 | `external/glslang` | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang), 16.4.0 | `168d452a4f460d24b588fed08477a81c44ee27a1` | Static compiler libraries plus source-built `glslang` executable. |
@@ -37,13 +37,13 @@ though upstream's general README describes Python as optional in some builds.
 
 The build invokes `$<TARGET_FILE:glslang-standalone>` with
 `-V --target-env vulkan1.3 -g -Od`. The CPU probe confirms SPIR-V 1.6, embedded
-GLSL 460 source, and line instructions. This target version is a build probe;
-R-005 must validate its actual rendering features, and R-006 must establish useful
-Nsight source inspection. No system `glslangValidator` is consulted.
+GLSL 460 source, and line instructions. R-005's basic renderer also exercises these
+shader artifacts on the GPU; R-006 must establish useful Nsight source inspection.
+No system `glslangValidator` is consulted.
 
 Vulkan-Headers and volk use matching SDK tags. volk's system Vulkan discovery is
-disabled; it links to `Vulkan::Headers` from the local tree. This establishes the
-native build boundary without choosing a window-system library for R-005.
+disabled; it links to `Vulkan::Headers` from the local tree. R-005 selects the
+system XCB library for X11/Xwayland presentation as a desktop runtime exception.
 
 ## Acquisition and configuration
 
@@ -66,30 +66,51 @@ the corresponding sources or compiled code.
 
 ## Actual linkage and external runtimes
 
-The current ELF audit covers both entry points, the dependency check (which
-actually calls fastmcpp and volk), and the shader compiler. It inspects `DT_NEEDED`
+The ELF audit covers the server, fixture, experiment runner, dependency check
+(which actually calls fastmcpp and volk), and shader compiler. It inspects `DT_NEEDED`
 with `readelf`, checks the static archives with `ar`, and rejects shared libraries
-outside the documented compiler/OS runtime families. It does not merely check
+outside the documented compiler/OS and fixture-only XCB runtime families. It does not merely check
 `BUILD_SHARED_LIBS=OFF`. Header-only dependencies become part of their consumers.
-The bootstrap entry points do not yet exercise MCP or Vulkan; the dependency check
-ensures that real library calls also link successfully.
+The actual server and renderer now use their respective libraries; CPU dependency
+checks still avoid Vulkan initialization.
 
 On the tested x86-64 GNU/Linux builds, runtime requirements are glibc, libstdc++,
 libgcc, libm, and the ELF dynamic loader (`ld-linux-x86-64.so.2`). Older glibc setups
 may expose `libpthread`, `libdl`, or `librt` separately; these are allowed OS
 exceptions. No vendored shared library, OpenSSL, curl, or installed glslang library
-appeared in `DT_NEEDED`. Runtime file-open tracing of the version executable and
-dependency check loaded only these OS/compiler libraries.
+appeared in `DT_NEEDED`. R-013 runtime file-open tracing loaded only these
+OS/compiler libraries. The fixture now also links `libxcb.so.1`; local `ldd`
+inspection identifies its transitive `libXau.so.6` and `libXdmcp.so.6` desktop
+dependencies. pkg-config and XCB development headers are required at build time.
 
 Runtime-loaded libraries also matter: volk's Linux implementation opens
 `libvulkan.so.1` (falling back to `libvulkan.so`) when `volkInitialize()` is called.
 That is the separately installed Vulkan loader, which in turn discovers installed
-driver ICDs and any enabled layers. The current executables/checks never call that
-initializer; this is a source-verified future runtime requirement, not a successful
-GPU run. Nsight's own binaries/injection libraries and the NVIDIA driver are also
+driver ICDs and any enabled layers. The fixture now exercises this path during
+explicit GPU runs; ordinary CPU checks continue to avoid it. Nsight's own binaries/injection libraries and the NVIDIA driver are also
 separate runtime inputs, not vendored sources.
 
-Desktop libraries, the actual window-system path, driver/layer libraries, and
-Nsight injection must be audited again when R-005/R-001 exercise them. These CPU
-checks cannot qualify that runtime closure or two-release Nsight compatibility.
+The fixture uses the development machine's existing KDE Wayland session through
+Xwayland, with system XCB 1.17.0. GPU validation and provenance are recorded in
+[FIXTURE.md](FIXTURE.md). Nsight injection remains to be audited with R-001.
+CPU checks cannot qualify GPU runtime behavior or two-release Nsight compatibility.
 The binaries are not fully static or independent of system/runtime/GPU software.
+
+On 2026-09-18, a successful reference run under `strace -f -e trace=openat`
+recorded the actual fixture runtime path at product version 0.1.0. Besides the
+OS/compiler libraries above, it opened Vulkan loader 1.4.357, NVIDIA 615.71.09
+libraries (`libGLX_nvidia`, `libnvidia-glcore`, `libnvidia-glsi`,
+`libnvidia-glvkspirv`, `libnvidia-gpucomp`, `libnvidia-rtcore`, `libnvidia-tls`, and
+`libnvidia-allocator`), X11/XCB presentation libraries (including DRI3, GLX,
+present, randr, sync, and xfixes), and driver/runtime dependencies `libdrm`,
+`libdbus-1`, and `libsystemd`. These are observed system/desktop/driver runtime
+inputs; they are not linked vendored project libraries or portable minimum
+versions. The runner disabled implicit layers for this fixture-only run.
+
+Trace: `build/linux-gcc-debug/fixture-runtime-0.1.0.log`. Successful run report:
+`artifacts/runtime-validation/run-962c37cc1de3490c370464fd72c3960c/report.json`.
+Reproduction from the repository root:
+
+```sh
+strace -f -e trace=openat -o build/linux-gcc-debug/fixture-runtime.log build/linux-gcc-debug/ngm-experiment --fixture build/linux-gcc-debug/ngm-vulkan-fixture --output-root artifacts/runtime-validation --scenario reference --seed 42 --width 192 --height 128 --frame 2
+```

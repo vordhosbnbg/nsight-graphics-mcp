@@ -1,7 +1,7 @@
 # Technology Stack Evaluation
 
-Status: **C++20 source-build foundation validated; fastmcpp pinned, stdio interoperability and GPU workflows pending.**
-Last updated: **2026-09-17**.
+Status: **C++20 foundation, real Codex capability query, and basic windowed Vulkan rendering validated at 0.1.0. Artifact/job/capture implementation is next; real Nsight workflows remain unverified.**
+Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
 recommendation has been superseded by the user's preference for C++ throughout.
@@ -11,10 +11,11 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 - The first target is Vulkan graphics and compute on Linux with NVIDIA Nsight
   Graphics.
-- R-013 provides the build/check foundation and version-reporting server/fixture
-  entry points. Rendering and MCP serving remain unimplemented. Exact source pins
-  and build evidence are in [DEPENDENCIES.md](DEPENDENCIES.md) and
-  [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
+- R-013 provides the build/check foundation. R-003/R-005 add an implemented stdio
+  capability tool, windowed Vulkan fixture, and isolated C++ experiment runner.
+  [MCP.md](MCP.md) and [FIXTURE.md](FIXTURE.md) distinguish current evidence from
+  the still-pending Nsight workflows. Exact source pins and build evidence are in
+  [DEPENDENCIES.md](DEPENDENCIES.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 - The initial architecture proposal uses documented Nsight CLI interfaces for
   capture, replay metadata, and profiling, with an optional application-side SDK
   bridge for precise capture control.
@@ -99,7 +100,8 @@ executable would still depend on an appropriate Nsight installation and driver.
 These combinations preserve the alternatives considered. C++ throughout is now
 the selected direction. The C++ build dependencies are now pinned in
 [DEPENDENCIES.md](DEPENDENCIES.md); the other columns are historical alternatives,
-not installed components. Client compatibility remains to validate in R-003.
+not installed components. R-003 validates Codex CLI 0.154.0 over local stdio;
+other clients and HTTP remain outside that validation.
 
 | Layer | Python | Rust | Go | TypeScript | C++ |
 | --- | --- | --- | --- | --- | --- |
@@ -143,7 +145,7 @@ architecture.
 | Component | Current position |
 | --- | --- |
 | Implementation language | C++ throughout; user preference recorded. |
-| MCP library | fastmcpp 3.4.7.1 pinned and source-built; client interoperability remains R-003. |
+| MCP library | fastmcpp 3.4.7.1 pinned and source-built; real Codex stdio capability query validated. First-party framing/schema checks handle documented local library gaps. |
 | C++ standard | First-party C++20 selected and built with GCC/Clang; dependencies retain upstream language levels. |
 | Formatting | Root .clang-format copied byte-for-byte from lava-chan-viewer; its formatter settings do not choose the compiler language level. |
 | Build | CMake 3.25 minimum, Ninja configure/build/test presets, isolated build trees; exact tested compilers in BUILD_VALIDATION.md. |
@@ -155,13 +157,13 @@ architecture.
 | Test harness | Small project-owned C++ checks with focused/aggregate CMake targets, executable tooling stand-ins, and an isolated C++ experiment runner; adopted from the sibling review. |
 | Nsight compatibility | At least two distinct releases, with matching tools/SDK configuration and real GPU workflow evidence for each. |
 | JSON | Reuse fastmcpp's nlohmann/json types where appropriate; avoid an additional JSON stack. |
-| MCP client | Codex for the first release; record the tested client/version during interoperability checks. |
+| MCP client | Codex CLI 0.154.0; a real 0.1.0 capability query negotiated MCP 2025-06-18. |
 | MCP transport | Local stdio for the first release; persistent Streamable HTTP later. |
-| Display | Existing Linux desktop session and a windowed target; windowing library/backend still to select and validate. |
-| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation checked on CPU, live fixture/capture validation pending. |
+| Display | System XCB desktop dependency, Vulkan XCB surface; actual KDE Wayland/Xwayland path exercised by the fixture. |
+| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation and basic fixture rendering exercised. Nsight source correlation remains pending. |
 | Nsight integration | Documented interfaces/exports only; explicit capability gaps and recorded failed attempts. |
-| Jobs/processes | Fresh launch per capture; one coordinator applies completions with exact identity/state checks, deadlines, cancellation, and owned-process cleanup; process-library details remain to validate. |
-| Storage | Staged, atomically published bundles with automatic age/budget pruning, persistent pins, and usage leases coordinated with deletion; SQLite remains a candidate for searchable metadata. |
+| Jobs/processes | Linux process primitive uses a private subreaper supervisor, argv/environment arrays, deadlines, cancellation, and bounded descendant cleanup. Used by the experiment runner; R-011's job coordinator and real Nsight lifecycle remain pending. |
+| Storage | R-012 implements the planned staged/atomic bundles, age/budget pruning, persistent pins, and coordinated usage leases next; no managed capture store is validated yet. SQLite remains optional. |
 
 ### Source-build and linkage policy
 
@@ -284,8 +286,9 @@ that an MCP query can retrieve it.
 ### fastmcpp findings
 
 Initial documentation/source-interface review on 2026-09-17, followed by R-013
-source builds and a CPU library-call check. No client interoperability test has
-been performed for this project:
+source builds and a CPU library-call check. On 2026-09-18, R-003's real Codex CLI
+0.154.0 capability query negotiated MCP 2025-06-18 and passed; see [MCP.md](MCP.md).
+The following records the initial library findings:
 
 - Upstream is `0xeb/fastmcpp`, which describes itself as beta. The README currently
   reports version 3.4.7.1; R-013 pins the exact revision in DEPENDENCIES.md.

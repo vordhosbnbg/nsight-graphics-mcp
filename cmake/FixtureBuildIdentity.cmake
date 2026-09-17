@@ -1,0 +1,131 @@
+cmake_minimum_required(VERSION 3.25)
+
+foreach(required IN ITEMS PROJECT_ROOT BUILD_ROOT OUTPUT_HEADER PROJECT_VERSION HOST_COMPILER
+        HOST_COMPILER_ID HOST_COMPILER_VERSION BUILD_TYPE)
+    if(NOT DEFINED ${required})
+        message(FATAL_ERROR "${required} is required")
+    endif()
+endforeach()
+
+function(json_string output value)
+    string(REPLACE "\\" "\\\\" escaped "${value}")
+    string(REPLACE "\"" "\\\"" escaped "${escaped}")
+    string(REPLACE "\n" "\\n" escaped "${escaped}")
+    string(REPLACE "\r" "\\r" escaped "${escaped}")
+    string(REPLACE "\t" "\\t" escaped "${escaped}")
+    set(${output} "\"${escaped}\"" PARENT_SCOPE)
+endfunction()
+
+function(write_if_different path text)
+    get_filename_component(directory "${path}" DIRECTORY)
+    file(MAKE_DIRECTORY "${directory}")
+    file(WRITE "${path}.tmp" "${text}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${path}.tmp" "${path}"
+        RESULT_VARIABLE copied)
+    file(REMOVE "${path}.tmp")
+    if(NOT copied EQUAL 0)
+        message(FATAL_ERROR "Cannot publish fixture build identity at ${path}")
+    endif()
+endfunction()
+
+set(identity "{\"schema_version\":1,\"source_revision\":\"unknown\",\"source_dirty\":null}")
+foreach(pair IN ITEMS "project_version|${PROJECT_VERSION}" "compiler|${HOST_COMPILER}"
+        "compiler_id|${HOST_COMPILER_ID}" "compiler_version|${HOST_COMPILER_VERSION}"
+        "build_type|${BUILD_TYPE}" "global_cxx_flags|${HOST_COMPILER_FLAGS}")
+    string(FIND "${pair}" "|" separator)
+    string(SUBSTRING "${pair}" 0 ${separator} key)
+    math(EXPR start "${separator} + 1")
+    string(SUBSTRING "${pair}" ${start} -1 value)
+    json_string(encoded "${value}")
+    string(JSON identity SET "${identity}" "${key}" "${encoded}")
+endforeach()
+
+find_program(GIT git)
+if(GIT AND EXISTS "${PROJECT_ROOT}/.git")
+    execute_process(COMMAND "${GIT}" -C "${PROJECT_ROOT}" rev-parse HEAD
+        RESULT_VARIABLE result OUTPUT_VARIABLE revision ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(result EQUAL 0)
+        json_string(encoded "${revision}")
+        string(JSON identity SET "${identity}" source_revision "${encoded}")
+    endif()
+    execute_process(COMMAND "${GIT}" -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal
+        RESULT_VARIABLE result OUTPUT_VARIABLE dirty ERROR_QUIET)
+    if(result EQUAL 0)
+        if(dirty STREQUAL "")
+            string(JSON identity SET "${identity}" source_dirty false)
+        else()
+            string(JSON identity SET "${identity}" source_dirty true)
+        endif()
+    endif()
+endif()
+
+# These are the first-party translation units linked into this executable from
+# ngm_core. Unused objects from that static archive are deliberately excluded.
+set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp
+    src/core/Hash.cpp src/core/File.cpp src/core/Version.cpp)
+set(inputs ${translation_units}
+    src/fixture/Fixture.hpp include/ngm/Hash.hpp include/ngm/File.hpp include/ngm/Version.hpp
+    CMakeLists.txt CMakePresets.json cmake/Fixture.cmake cmake/FixtureBuildIdentity.cmake
+    cmake/Version.hpp.in cmake/Dependencies.cmake)
+set(input_records "[]")
+set(index 0)
+foreach(path IN LISTS inputs)
+    if(NOT EXISTS "${PROJECT_ROOT}/${path}")
+        message(FATAL_ERROR "Missing fixture build input: ${path}")
+    endif()
+    file(SHA256 "${PROJECT_ROOT}/${path}" hash)
+    json_string(encoded "${path}")
+    set(record "{\"sha256\":\"${hash}\"}")
+    string(JSON record SET "${record}" path "${encoded}")
+    string(JSON input_records SET "${input_records}" ${index} "${record}")
+    math(EXPR index "${index} + 1")
+endforeach()
+string(JSON identity SET "${identity}" inputs "${input_records}")
+
+# Exported compile commands contain scoped warning/options/definitions and
+# transitive include flags, not just CMAKE_CXX_FLAGS. The supported Ninja builds
+# emit this file even if the global export option was disabled by an override.
+set(commands "[]")
+set(command_index 0)
+set(found_translation_units)
+if(EXISTS "${BUILD_ROOT}/compile_commands.json")
+    file(READ "${BUILD_ROOT}/compile_commands.json" all_commands)
+    string(JSON command_count LENGTH "${all_commands}")
+    if(command_count GREATER 0)
+        math(EXPR last_command "${command_count} - 1")
+        foreach(index RANGE 0 ${last_command})
+            string(JSON command GET "${all_commands}" ${index})
+            string(JSON source GET "${command}" file)
+            file(RELATIVE_PATH relative "${PROJECT_ROOT}" "${source}")
+            if(relative IN_LIST translation_units)
+                string(JSON commands SET "${commands}" ${command_index} "${command}")
+                list(APPEND found_translation_units "${relative}")
+                math(EXPR command_index "${command_index} + 1")
+            endif()
+        endforeach()
+    endif()
+endif()
+foreach(source IN LISTS translation_units)
+    if(NOT source IN_LIST found_translation_units)
+        message(FATAL_ERROR "Missing actual compile command for ${source}; use the supported CMake/Ninja presets")
+    endif()
+endforeach()
+string(JSON identity SET "${identity}" compile_commands "${commands}")
+
+# Guard the C++ raw-string delimiter even if compiler options contain unusual
+# literal text. C++ permits delimiters of at most 16 characters.
+set(salt 0)
+while(TRUE)
+    string(SHA256 delimiter_hash "${identity}${salt}")
+    string(SUBSTRING "${delimiter_hash}" 0 8 delimiter_hash)
+    set(delimiter "NGM_${delimiter_hash}")
+    string(FIND "${identity}" ")${delimiter}\"" delimiter_collision)
+    if(delimiter_collision EQUAL -1)
+        break()
+    endif()
+    math(EXPR salt "${salt} + 1")
+endwhile()
+set(header "#pragma once\n#include <string_view>\nnamespace ngm::fixture {\ninline constexpr std::string_view build_identity_json = R\"${delimiter}(${identity})${delimiter}\";\n}\n")
+write_if_different("${OUTPUT_HEADER}" "${header}")
+get_filename_component(identity_directory "${OUTPUT_HEADER}" DIRECTORY)
+write_if_different("${identity_directory}/identity.json" "${identity}\n")

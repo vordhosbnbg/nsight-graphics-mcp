@@ -5,8 +5,8 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **R-013 complete — R-005 is the next implementation item.**
-Last updated: **2026-09-17**.
+Planning state: **Build/basic-fixture group complete at 0.1.0; R-012 artifacts, R-011 jobs, and R-001 capture in progress.**
+Last updated: **2026-09-18**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
 The initial interview established the first-release requirements; all implementation
@@ -95,13 +95,14 @@ performance analysis, and a persistent Streamable HTTP service follow later.
   first-party code, minor increments complete identified groups of related
   roadmap items, and major increments require explicit owner instruction.
   `AGENTS.md` defines the reset, exception, and same-commit rules. R-013 implemented
-  version plumbing; R-003 will verify the MCP server
+  version plumbing; R-003 verifies the MCP server
   identity. The root `.clang-format` is copied from `lava-chan-viewer`.
 
 ## Implementation Sequence
 
-R-013's build foundation is complete; R-005 is next. The steps below organize
-work; each group exit check still requires the remaining items' evidence.
+The R-013/R-005/R-003 build/basic-fixture group is complete at 0.1.0.
+The capture/evidence group is active; its exit check requires real Nsight runs
+with the shared job and storage components.
 
 | Step | Items | Exit check |
 | --- | --- | --- |
@@ -118,8 +119,8 @@ a dependent diagnostic capability or satisfy its acceptance check.
 
 R-013's source pins and C++20/CMake/toolchain decisions are recorded in
 [DEPENDENCIES.md](DEPENDENCIES.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
-Remaining implementation choices have owners: R-005/R-010 choose the windowing
-backend and concrete defect cases; R-011 chooses process control and R-002 the
+R-005 selected XCB and the basic defect cases. Remaining implementation choices
+have owners: R-010 selects the advanced scenarios; R-011 validates process control and R-002 the
 per-launch SDK configuration mechanism; R-012 sets retention defaults and index
 format from measured artifacts; R-015 selects the second Nsight release. Later
 HTTP service policies are resolved in R-004. These do not require reopening the
@@ -170,36 +171,10 @@ Item conventions:
 
 ## In Progress
 
-## Pending
-
-### R-005
-
-```text
-Status: Pending
-Area: test/platform/shaders/build
-Title: Build a deterministic Vulkan development application
-Goal: Provide a small, reproducible target with known correct and faulty rendering behavior for developing and validating the MCP server.
-Scope: A standalone windowed C++ Vulkan application in this repository using an existing Linux desktop session, fixed inputs and frame selection, a correct reference scene, selectable visual-defect scenarios, named passes/resources, GLSL shaders compiled to SPIR-V with glslang, retained sources/build settings/debug information, and image readback for comparison. Add a C++ experiment runner with per-run configuration/log/output isolation and explicit scenario, seed, resolution, and frame selection. Initial cases should cover shader calculation, resource binding, and pipeline-state mistakes; the application will grow with later compute and profiling work.
-Acceptance: The app builds and runs independently of the MCP server in the validated desktop session; a selected scenario reproduces its output across fresh application launches within declared tolerances; the runner isolates each run from other runs and normal user configuration and records its inputs, environment, outcome, and evidence locations; each initial faulty scenario has a correct reference and a documented expected symptom/cause; the app can run without NGFX calls or the optional capture bridge; fixture configuration, compiler version/options, shader hashes, and build identity accompany results; compilation failures surface clearly and cannot silently reuse stale shader output; missing display prerequisites produce an actionable error.
-Notes: User requested a new test application in interview round 4. Uses R-013's source-built dependencies and shader compiler. Start with small visual scenarios; R-010 extends the app with the advanced rendering coverage required for the first release by round 6. R-008 adds compute correctness cases and R-009 adds performance workloads after that release. Keep expected diagnoses in test-harness data rather than returning them as MCP inspection evidence. Tests using application readback must identify that evidence source. Round 7 selected GLSL/glslang under delegated shader-language choice; round 8 selected a desktop/windowed target. Compiler pin/flags, windowing library/backend, and exact scenario inventory still need validation or selection; headless operation is not a first-release acceptance requirement.
-```
-
-### R-003
-
-```text
-Status: Pending
-Area: mcp/core/build/docs
-Title: Integrate the local stdio server with Codex
-Goal: Give Codex access to the C++ server's implemented tools through a local stdio process on the GPU machine.
-Scope: A reproducible fastmcpp-based server build, a small MCP adapter, capability discovery, server identity using R-013's project version, Codex launch/configuration instructions, and focused client interoperability checks.
-Acceptance: Codex launches the server, discovers its tools, and completes a real capability query; the MCP server identity reports the same project version as the standalone command-line query; invalid arguments produce a structured error; diagnostics, version banners, and child-process output do not corrupt protocol stdout; normal client shutdown is handled cleanly; the documented setup is verified on the Linux development machine.
-Notes: First-release client and transport selected in interview round 3. C++ throughout and fastmcpp preference come from round 2. Uses R-013's pinned submodule/static-build integration; record the actual Codex client/version and negotiated protocol. This establishes the MCP access layer for R-001 and R-002; it does not establish capture functionality by itself. HTTP and other-client validation are outside this item's scope.
-```
-
 ### R-012
 
 ```text
-Status: Pending
+Status: In Progress
 Area: artifacts/core/mcp/test
 Title: Store capture evidence with configurable retention and pinning
 Goal: Keep capture evidence inspectable across server sessions while automatically managing eligible artifact storage and preserving explicitly retained evidence.
@@ -211,7 +186,7 @@ Notes: Retention policy selected in round 8. This is a first-release prerequisit
 ### R-011
 
 ```text
-Status: Pending
+Status: In Progress
 Area: core/platform/mcp/test
 Title: Manage one application launch per capture job
 Goal: Give each capture a fresh, owned application instance and a predictable lifecycle without leaving job processes running after completion or cancellation.
@@ -223,7 +198,7 @@ Notes: First-release lifecycle selected in round 7. Core process handling is ind
 ### R-001
 
 ```text
-Status: Pending
+Status: In Progress
 Area: capture/platform
 Title: Capture unmodified Vulkan applications
 Goal: Let agents capture supported Vulkan workloads without requiring changes to the application's source or an application-side integration.
@@ -231,6 +206,8 @@ Scope: A fresh application launch for each capture through Nsight's documented i
 Acceptance: A reproducible Vulkan application produces a saved capture without source changes; the matching replayer reads its metadata; repeating the request launches a new application instance and produces a separate capture; launch/capture failures are reported without claiming success; applications lacking a usable capture delimiter receive an explicit limitation.
 Notes: Accepted application mode in round 2 and fresh-launch lifecycle in round 7. Depends on R-003 for MCP access, R-011's process supervisor, and R-012's artifact store; use R-005 with NGFX integration disabled as the primary fixture and extend capture validation to R-010 before release. Round 8 requires an existing desktop session; verify its display prerequisites and actual window-system path. Exact API features remain to validate. Existing-process attachment, application-session reuse, and fully headless operation are outside first-release scope; compatibility with every Vulkan feature is not promised.
 ```
+
+## Pending
 
 ### R-006
 
@@ -344,6 +321,30 @@ Notes: Accepted later work in interview round 3, outside the first release. Depe
 
 ## Done
 
+### R-005
+
+```text
+Status: Done
+Area: test/platform/shaders/build
+Title: Build a deterministic Vulkan development application
+Goal: Provide a small, reproducible target with known correct and faulty rendering behavior for developing and validating the MCP server.
+Scope: A standalone windowed C++ Vulkan application in this repository using an existing Linux desktop session, fixed inputs and frame selection, a correct reference scene, selectable visual-defect scenarios, named passes/resources, GLSL shaders compiled to SPIR-V with glslang, retained sources/build settings/debug information, and image readback for comparison. Add a C++ experiment runner with per-run configuration/log/output isolation and explicit scenario, seed, resolution, and frame selection. Initial cases should cover shader calculation, resource binding, and pipeline-state mistakes; the application will grow with later compute and profiling work.
+Acceptance: The app builds and runs independently of the MCP server in the validated desktop session; a selected scenario reproduces its output across fresh application launches within declared tolerances; the runner isolates each run from other runs and normal user configuration and records its inputs, environment, outcome, and evidence locations; each initial faulty scenario has a correct reference and a documented expected symptom/cause; the app can run without NGFX calls or the optional capture bridge; fixture configuration, compiler version/options, shader hashes, and build identity accompany results; compilation failures surface clearly and cannot silently reuse stale shader output; missing display prerequisites produce an actionable error.
+Notes: User requested a new test application in interview round 4. Uses R-013's source-built dependencies and shader compiler. Start with small visual scenarios; R-010 extends the app with the advanced rendering coverage required for the first release by round 6. R-008 adds compute correctness cases and R-009 adds performance workloads after that release. Keep expected diagnoses in test-harness data rather than returning them as MCP inspection evidence. Tests using application readback must identify that evidence source. Round 7 selected GLSL/glslang under delegated shader-language choice; round 8 selected a desktop/windowed target. The selected compiler flags, XCB backend, and initial scenarios are validated below; headless operation is not a first-release acceptance requirement. Completed 2026-09-18 after implementation, independent review, and correction cycles: XCB windowed presentation on KDE Wayland/Xwayland, four deterministic basic scenarios, isolated executable snapshots, retained GLSL/SPIR-V/compiler and independent executable identities. All 13 CPU checks pass in GCC Debug. The synchronization-validation matrix passes 17 fresh launches on RTX 3080 Ti / driver 615.71.09 with repeated images identical and an independent oracle within one RGB8 channel step outside the declared edge band. Shader-override provenance stays separate from executable identity. See docs/FIXTURE.md and docs/BUILD_VALIDATION.md for exact inputs, review corrections, retained evidence, and limits. Application readback establishes fixture behavior, not Nsight capture support.
+```
+
+### R-003
+
+```text
+Status: Done
+Area: mcp/core/build/docs
+Title: Integrate the local stdio server with Codex
+Goal: Give Codex access to the C++ server's implemented tools through a local stdio process on the GPU machine.
+Scope: A reproducible fastmcpp-based server build, a small MCP adapter, capability discovery, server identity using R-013's project version, Codex launch/configuration instructions, and focused client interoperability checks.
+Acceptance: Codex launches the server, discovers its tools, and completes a real capability query; the MCP server identity reports the same project version as the standalone command-line query; invalid arguments produce a structured error; diagnostics, version banners, and child-process output do not corrupt protocol stdout; normal client shutdown is handled cleanly; the documented setup is verified on the Linux development machine.
+Notes: First-release client and transport selected in interview round 3. C++ throughout and fastmcpp preference come from round 2. Uses R-013's pinned submodule/static-build integration; record the actual Codex client/version and negotiated protocol. This establishes the MCP access layer for R-001 and R-002; it does not establish capture functionality by itself. HTTP and other-client validation are outside this item's scope. Completed 2026-09-18 after independent protocol review and correction: fastmcpp 3.4.7.1, bounded stdio adapter, one implemented read-only capabilities tool. Codex CLI 0.154.0 launched product 0.1.0, negotiated MCP 2025-06-18, completed one real capabilities call, and exited cleanly. All 13 CPU checks pass, including protocol errors, lifecycle, stdout isolation, versions, and EOF. See docs/MCP.md and docs/BUILD_VALIDATION.md. Capture and detailed inspection remain explicitly unavailable.
+```
+
 ### R-013
 
 ```text
@@ -353,5 +354,5 @@ Title: Establish the source-built submodule dependency graph
 Goal: Build the server, test application, and required dependency code reproducibly from pinned sources with vendored libraries linked statically and platform/runtime dependencies documented.
 Scope: Top-level CMake targets, shared Ninja configure/build/test presets, ignored build directories and local overrides, exact-commit dependency submodules under external/, required transitive sources, a source-built glslang compiler, dependency-purpose/revision records, and binary-linkage checks. Configure fastmcpp to consume local dependency targets and keep unnecessary features disabled. Add a small project-owned C++ check harness and a registration helper for focused run targets, CTest, and an explicit aggregate target, with hardware integration targets separate. Establish the single CMake project version and shared C++ version accessor under the adopted Kiln policy, with standalone command-line version reporting.
 Acceptance: A clean recursively initialized checkout builds using documented host prerequisites without dependency downloads or prebuilt project dependency packages; required dependency libraries and the fixture shader compiler are built from pinned source; a missing submodule produces an actionable configure error; binary inspection confirms static vendored-library linkage and the documentation accounts for system/runtime/GPU dependencies, including runtime-loaded libraries; focused and aggregate first-party checks run independently of Nsight/GPU execution, and ordinary checks do not launch hardware integration; reported server/fixture command-line versions match the authoritative CMake declaration.
-Notes: Build/source policy selected in round 9, with lava-chan-viewer as the reference. The user clarified that documented system/runtime/GPU exceptions are allowed; the requirement is static vendored code, not zero dynamic ELF dependencies. This supplies the build foundation for R-003 and R-005; R-014 owns full user-facing source-installation validation. Completed 2026-09-17: C++20, CMake 3.25+, six exact-commit source submodules, source-built glslang 16.4.0, version 0.0.1 and both CLI version queries; the seven ngm_* CPU checks pass in GCC Debug, Clang Debug, and GCC Release. A clean recursively initialized snapshot passed with CMake 3.25.3 in a network namespace; ELF/archive inspection and runtime library tracing passed. See README.md, docs/DEPENDENCIES.md, and docs/BUILD_VALIDATION.md for commands, exact compilers, and runtime exceptions. Server/fixture entry points remain build bootstraps; MCP serving and rendering belong to R-003/R-005. The R-013/R-005/R-003 group is not complete, so this initial foundation does not trigger a minor increment.
+Notes: Build/source policy selected in round 9, with lava-chan-viewer as the reference. The user clarified that documented system/runtime/GPU exceptions are allowed; the requirement is static vendored code, not zero dynamic ELF dependencies. This supplies the build foundation for R-003 and R-005; R-014 owns full user-facing source-installation validation. Completed 2026-09-17: C++20, CMake 3.25+, six exact-commit source submodules, source-built glslang 16.4.0, version 0.0.1 and both CLI version queries; the seven ngm_* CPU checks pass in GCC Debug, Clang Debug, and GCC Release. A clean recursively initialized snapshot passed with CMake 3.25.3 in a network namespace; ELF/archive inspection and runtime library tracing passed. See README.md, docs/DEPENDENCIES.md, and docs/BUILD_VALIDATION.md for commands, exact compilers, and runtime exceptions. At R-013 completion, server/fixture entry points were build bootstraps. R-003/R-005 subsequently completed MCP serving and basic rendering; the R-013/R-005/R-003 group completes at 0.1.0 on 2026-09-18. The initial foundation commit alone did not trigger a minor increment.
 ```

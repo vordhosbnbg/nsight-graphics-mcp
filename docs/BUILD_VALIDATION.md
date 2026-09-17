@@ -1,4 +1,6 @@
-# R-013 build validation
+# Build and development validation
+
+## R-013 source-build foundation
 
 Date: 2026-09-17. Product version: `0.0.1`.
 Scope: the source-build foundation, with CPU-only library/compiler probes and
@@ -98,4 +100,53 @@ Raw CTest/linkage/runtime logs are disposable ignored build outputs. These are
 build checks, not Nsight investigation or visual-verification evidence bundles.
 The reproducible commands and source pins are the retained record. Runtime-loaded
 Vulkan/driver/desktop/Nsight libraries are discussed separately in
-[DEPENDENCIES.md](DEPENDENCIES.md); their live validation remains pending.
+[DEPENDENCIES.md](DEPENDENCIES.md); their live validation was pending at R-013.
+
+## R-013/R-005/R-003 group completion
+
+Date: 2026-09-18. Product version: **0.1.0**. This minor increment completes the
+related build, deterministic basic fixture, and local stdio integration group.
+It does not declare the first visual-debugging release complete.
+
+The GCC 16.2.1 Debug preset passes all **13 CPU checks** after review corrections
+(39.02 seconds for the final aggregate run). The source-built glslang remains
+16.4.0 with Vulkan 1.3/SPIR-V 1.6 and `-g -Od`. Focused checks were used during
+correction; the final group check was:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_check
+```
+
+The opt-in `ngm_fixture_validation_run` passes 17 fresh windowed launches on
+RTX 3080 Ti / NVIDIA 615.71.09 / KDE Wayland through Xwayland and XCB 1.17.0.
+Each scenario/configuration pair repeats exactly and matches an independent
+analytic image oracle; synchronization validation is active and clean. A shader
+override preserves executable identity while changing shader-bundle metadata.
+See [FIXTURE.md](FIXTURE.md) for the matrix, tolerances, and retained run reports.
+
+Codex CLI 0.154.0 launches the corrected version 0.1.0 server, negotiates MCP
+2025-06-18, discovers `capabilities`, completes one real call, and exits cleanly.
+The subprocess protocol checks cover malformed input, invalid parameters, size
+and nesting limits, lifecycle, output isolation, and EOF. [MCP.md](MCP.md) records
+the exact client setup, library adapter boundaries, and local logs.
+
+Separate fresh-context reviewers examined fixture/provenance, process ownership,
+and protocol code. Their findings led to corrections for atfork deadlocks and
+ptrace stops, unbounded JSON nesting/raw NUL, protocol negotiation/tool errors,
+executable hashing races, presentation lifetime, and incomplete retained metadata.
+Correction reviews included independent subprocess probes; the final provenance
+review verified all 17 retained GPU records and manifest/inline identity agreement.
+The last strict retained-schema issue has a process-boundary CPU regression.
+
+Binary linkage checks include the real server, renderer, and experiment runner.
+A successful fixture reference run under file-open tracing records the runtime
+Vulkan/NVIDIA/desktop dependencies in [DEPENDENCIES.md](DEPENDENCIES.md).
+The new implementation is qualified here on GCC Debug only; R-013's separate
+Clang/Release/clean-source results above do not qualify all later code on those
+configurations. Full delivery qualification remains R-014/R-015.
+
+No Nsight capture, replay, SDK-control, profiling, advanced fixture, or source
+repair workflow is claimed by this milestone. Fixture records are application
+readback and remain local experiment directories until R-012 imports and pins
+the required baselines. Temporary review probes and CTest logs are ordinary
+development evidence, not managed capture bundles.

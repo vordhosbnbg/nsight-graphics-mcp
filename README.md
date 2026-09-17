@@ -1,10 +1,11 @@
 # nsight-graphics-mcp
 
 A C++ MCP server under development for NVIDIA Nsight Graphics on Linux.
-The build foundation (R-013) is implemented. The server and Vulkan fixture currently
-support `--version` and `--help`; MCP serving, rendering, and capture are subsequent
-[roadmap items](docs/ROADMAP.md). Running either executable without an option
-reports that limitation on stderr and exits unsuccessfully.
+The source-build foundation, a local stdio capability tool, and a deterministic
+windowed Vulkan fixture are implemented. Capture and Nsight evidence inspection
+remain subsequent [roadmap items](docs/ROADMAP.md). R-003/R-005 passed independent
+review/correction cycles, CPU checks, real Codex interoperability, and local GPU
+fixture validation; the R-013/R-005/R-003 group is complete at version 0.1.0.
 
 ## Build on Linux
 
@@ -18,6 +19,8 @@ Host prerequisites:
   headers/linker. Python runs glslang's header generator; it is not a server runtime.
 - Git for source/submodule acquisition, and GNU binutils (`ar`, `readelf`) for
   the linkage check. Configuration itself does not require Git metadata.
+- pkg-config and XCB development headers/library (xcb 1.13+). XCB is the selected
+  system desktop dependency; Vulkan headers and volk remain pinned source builds.
 
 From the repository root:
 
@@ -44,12 +47,17 @@ Do not reuse a configured build tree when changing compilers. The Release preset
 still preserves shader source and line information; it is not yet a GPU performance
 measurement configuration.
 
-The current build and all ordinary checks need no display, GPU, Vulkan loader, or
-Nsight installation. The eventual rendering/capture workflow requires a compatible
-NVIDIA GPU/driver, a system Vulkan loader, an existing Linux desktop session, and a
-separately installed Nsight Graphics release. Windowing selection and real capture
-compatibility remain in R-005/R-015; no GPU configuration is qualified by these
-CPU checks.
+The build and ordinary checks need no display, GPU, Vulkan loader, or Nsight
+installation. The rendering fixture requires a Vulkan 1.3 device/driver, a system
+Vulkan loader, and an existing X11/Xwayland desktop through `DISPLAY`. The local
+GPU runs use KDE Wayland with Xwayland; this is a windowed application. Nsight
+capture compatibility remains unverified. The process runner requires Linux
+`/proc`, `close_range` (Linux 5.9+), and a platform with the `fork` system call;
+the currently validated architecture is x86-64.
+
+The server runs on stdin/stdout with one implemented `capabilities` tool. See
+[MCP.md](docs/MCP.md) for the verified Codex integration, protocol boundaries,
+and explicit distinction between discovered tools and tested capture support.
 
 ## Focused checks
 
@@ -66,7 +74,13 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | --- | --- |
 | `ngm_dependency_check` | Source-built fastmcpp/JSON calls and uninitialized volk calls, with no GPU or loader initialization. |
 | `ngm_shader_check` | Valid SPIR-V 1.6 with embedded GLSL source and source-line instructions. |
-| `ngm_cli_check` | Both versions match CMake; invalid/startup requests fail on stderr without contaminating stdout. |
+| `ngm_hash_check` | SHA-256 standard known answers for content identities. |
+| `ngm_image_check` | Bounded PPM parsing, channel comparisons, malformed images, and nonblocking FIFO rejection. |
+| `ngm_process_check` | Actual executable boundary, timeout/cancellation, descendants, process ownership, and isolated logs/environment. |
+| `ngm_mcp_check` | Real stdio protocol, initialization, capability query, invalid requests, discovery, and shutdown. |
+| `ngm_fixture_contract_check` | Standalone option and shader-provenance validation without initializing Vulkan. |
+| `ngm_experiment_check` | Isolated repeated runs and retained failed/malformed results using a CPU executable stand-in. |
+| `ngm_cli_check` | Versions match CMake; standalone options and clean server EOF keep diagnostics separate. |
 | `ngm_shader_failure_check` | A bad compile removes an earlier shader output, reports failure, and recovers after a fix; paths include spaces. |
 | `ngm_missing_source_check` | Each missing dependency gives an actionable configure error. |
 | `ngm_check_isolation` | The registration helper excludes hardware executables from default builds, CPU aggregates, and CTest. |
@@ -75,22 +89,23 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 The registration helpers in [cmake/Checks.cmake](cmake/Checks.cmake) give ordinary
 checks a focused `<name>_run` target and a CTest entry. Hardware checks use a
 separate helper, are excluded from default builds, and have explicit run targets
-only. No real hardware check is implemented yet; the isolation check uses a tiny
-CPU stand-in to verify the build rules.
+only. `ngm_fixture_integration_run` explicitly launches the real windowed fixture
+and compares all four scenarios across repeated fresh launches and two input
+configurations. It is excluded from ordinary CTest and default check targets.
 
 ## Build boundaries
 
-`ngm_core` owns shared first-party code. The server and fixture have separate entry
-points; later MCP handlers, job/process coordination, artifact storage, parsers,
-and backend adapters can build on this boundary. Vendored warnings and flags stay
-separate from first-party C++20 targets.
+`ngm_core` owns shared versioning, process execution, discovery, content hashes,
+and image parsing. `ngm_experiments` owns the isolated fixture runner. The server
+and fixture have separate entry points; later job coordination, artifact storage,
+and Nsight backend adapters build on these boundaries. Vendored warnings and flags
+stay separate from first-party C++20 targets.
 
 The authoritative product version is `project(... VERSION ...)` in
 [CMakeLists.txt](CMakeLists.txt), exposed through `ngm::project_version()`.
-The initial version is `0.0.1`; R-013 alone does not finish the roadmap's
-R-013/R-005/R-003 group or trigger a minor increment. MCP protocol, artifact schema,
-Nsight, and dependency versions are separate identifiers. The source-edit and
-capture provenance records will be added with the corresponding features.
+MCP protocol, artifact schema, Nsight, and dependency versions are separate
+identifiers. Fixture results retain shader artifacts and build identities;
+Nsight capture provenance arrives with the capture backend.
 
 Planning and integration limits are in [AGENTS.md](AGENTS.md),
 [TECH_STACK.md](docs/TECH_STACK.md), and [INVESTIGATIONS.md](docs/INVESTIGATIONS.md).
