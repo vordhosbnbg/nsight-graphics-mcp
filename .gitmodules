@@ -1,0 +1,18 @@
+[submodule "external/fastmcpp"]
+	path = external/fastmcpp
+	url = https://github.com/0xeb/fastmcpp.git
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json.git
+[submodule "external/cpp-httplib"]
+	path = external/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "external/glslang"]
+	path = external/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+[submodule "external/vulkan-headers"]
+	path = external/vulkan-headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "external/volk"]
+	path = external/volk
+	url = https://github.com/zeux/volk.git

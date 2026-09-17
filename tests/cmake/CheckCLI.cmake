@@ -1,0 +1,25 @@
+foreach(program IN ITEMS "${SERVER}" "${FIXTURE}")
+    get_filename_component(name "${program}" NAME)
+    execute_process(COMMAND "${program}" --version
+        RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+    if(NOT result STREQUAL "0" OR NOT output STREQUAL "${name} ${EXPECTED_VERSION}\n" OR NOT error STREQUAL "")
+        message(FATAL_ERROR "${name} version mismatch (${result}): stdout=[${output}] stderr=[${error}]")
+    endif()
+    execute_process(COMMAND "${program}" --help
+        RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+    if(NOT result STREQUAL "0" OR NOT output MATCHES "Usage:" OR NOT error STREQUAL "")
+        message(FATAL_ERROR "${name} help failed")
+    endif()
+    execute_process(COMMAND "${program}"
+        RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+    if(NOT result STREQUAL "1" OR NOT output STREQUAL "" OR NOT error MATCHES "not implemented yet")
+        message(FATAL_ERROR "${name} must report its bootstrap limitation on stderr")
+    endif()
+    foreach(arguments IN ITEMS "--invalid" "--version;unexpected")
+        execute_process(COMMAND "${program}" ${arguments}
+            RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+        if(NOT result STREQUAL "2" OR NOT output STREQUAL "" OR NOT error MATCHES "unsupported arguments")
+            message(FATAL_ERROR "${name} accepted invalid arguments or polluted stdout")
+        endif()
+    endforeach()
+endforeach()

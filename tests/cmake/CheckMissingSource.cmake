@@ -1,0 +1,27 @@
+set(names fastmcpp json cpp-httplib glslang vulkan-headers volk)
+foreach(missing IN LISTS names)
+    set(source "${SCRATCH}/${missing}")
+    file(MAKE_DIRECTORY "${source}")
+    file(WRITE "${source}/CMakeLists.txt"
+        "cmake_minimum_required(VERSION 3.25)\nproject(MissingSource NONE)\n"
+        "include(\"${PROJECT_ROOT}/cmake/Dependencies.cmake\")\nngm_add_dependencies()\n")
+    foreach(name IN LISTS names)
+        if(name STREQUAL "cpp-httplib")
+            set(marker httplib.h)
+        else()
+            set(marker CMakeLists.txt)
+        endif()
+        file(MAKE_DIRECTORY "${source}/external/${name}")
+        if(name STREQUAL missing)
+            file(REMOVE "${source}/external/${name}/${marker}")
+        else()
+            file(WRITE "${source}/external/${name}/${marker}" "# unused source marker\n")
+        endif()
+    endforeach()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -S "${source}" -B "${source}/build" -G Ninja
+        RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+    if(result STREQUAL "0" OR NOT error MATCHES "Missing dependency source: external/${missing}/"
+            OR NOT error MATCHES "git submodule update --init --recursive")
+        message(FATAL_ERROR "Missing ${missing} did not produce an actionable error: ${output}${error}")
+    endif()
+endforeach()
