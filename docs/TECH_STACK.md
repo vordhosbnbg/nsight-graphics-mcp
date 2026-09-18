@@ -7,6 +7,12 @@ This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
 recommendation has been superseded by the user's preference for C++ throughout.
 Keep the selected direction, remaining choices, and interview answers here.
 
+At 0.2.3, a separate `capture_cpp` activity retains generated API source and
+resource files through the existing service/artifact path (16 current tools).
+It uses the same pinned dependencies. [CPP_CAPTURE.md](CPP_CAPTURE.md) records
+its contract; fixed-capture generated-helper experiments remain separate from a
+generic resource-extraction API. Full visual repair remains unfinished.
+
 ## Confirmed context
 
 - The first target is Vulkan graphics and compute on Linux with NVIDIA Nsight
@@ -14,7 +20,7 @@ Keep the selected direction, remaining choices, and interview answers here.
 - R-013 provides the build/check foundation. R-003/R-005 completed the 0.1.0 stdio
   capability query, windowed Vulkan fixture, and isolated C++ experiment runner.
   The 0.2.0 capture/evidence milestone adds managed storage, asynchronous jobs,
-  `CaptureService`, a native `ngm-capture` command, and 15 MCP tools, including
+  `CaptureService`, a native `ngm-capture` command, and initially 15 MCP tools, including
   bounded retained metadata/event/object queries.
   [MCP.md](MCP.md) and [FIXTURE.md](FIXTURE.md) distinguish current evidence from
   the still-pending Nsight workflows. Exact source pins and build evidence are in

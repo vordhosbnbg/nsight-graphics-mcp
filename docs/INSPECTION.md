@@ -14,6 +14,13 @@ and verify the fix. This document records the parser contract and observed
 exports; [MCP.md](MCP.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md) own the
 integrated tool surface and executed validation results.
 
+Separate **0.2.2 experiments** demonstrate generated source and selected shader
+bytes for the basic correct/faulty pair on both releases. Product **0.2.3** now
+retains generated projects through `capture_cpp` and artifact reads; its six basic
+MCP captures pass on both matching releases. This is a separate evidence format
+from the metadata inventories. See [CPP_CAPTURE.md](CPP_CAPTURE.md) and the
+experimental extraction results below.
+
 ## Observed evidence and limits
 
 The initial 2026.3.1.0 correct/faulty pair is retained in explicitly pinned bundles
@@ -275,9 +282,10 @@ runs, separate from the historical Codex capability query.
 
 The [Generate C++ Capture
 activity](https://docs.nvidia.com/nsight-graphics/UserGuide/generate-cpp-activity.html)
-is a documented route under investigation for deeper state, API arguments, shader
-and resource evidence. It is not implemented by these parsers, and its existence
-does not establish a working extraction path for this workload. NVIDIA's
+is a documented route for generated API source and resource data. The separate
+0.2.3 `capture_cpp` path retains this project for artifact access; the inventory
+parsers above do not interpret it. See [CPP_CAPTURE.md](CPP_CAPTURE.md) for its
+contract and qualification. NVIDIA's
 [2026.3 release notes](https://docs.nvidia.com/nsight-graphics/ReleaseNotes/index.html)
 deprecate Vulkan C++ Capture support and say it will be removed in a future
 release. Probe outcomes and retained evidence belong in
@@ -291,11 +299,92 @@ was found in the reviewed official documentation/download sources. This is a
 bounded discovery observation, not a claim that the preview is universally
 unavailable. Recheck availability before choosing a future integration path.
 
-R-006 remains in progress while the next documented deeper-state path is probed:
-Generate C++ Capture with matching 2026.2 tools, following the unsuccessful
-2026.3 attempt in I-006. Preserve any source/build correlation supplied by the
-application as application evidence. I-007/I-009/I-010/I-011 retain the separate
-GPU replay failures. A failed follow-up must retain its exact gap and revisit
-condition; it must not be generalized to universal unavailability. R-007 still
-requires sufficient evidence for the actual source-edit/rebuild/recapture/fix-
-verification workflow; inventories alone do not complete it.
+The first matching 2026.2 attempt fails during connection; I-013 retains its
+frozen input, logs, and pinned failed bundle. Later diagnostic and ordinary
+repeats succeed with the same executable and shader inputs. The original failure
+cause remains unresolved. I-006 retains the earlier 2026.3 failure, and
+I-007/I-009/I-010/I-011 retain the separate `ngfx-replay` GPU replay failures.
+
+### Generated C++ reference evidence on 2026.2
+
+The successful diagnostic capture is pinned as
+`bundle-cd9faf11bccbc42e3da46f1275b39073`; a subsequent run without diagnostic
+flags is pinned as `bundle-31416cc9a35fef45aa1ef5a828473393`. Both use product
+0.2.2's frozen fixture, no SDK calls, seed 42, 192×128, `reference`, and
+`--wait-frames=2`. Both exit zero with cleanup confirmed. Their generated
+`CommandList00.cpp` labels the captured workload `frame.2` / `scene.raster`.
+Independent decoded RGB comparison of each generated `screenshot.bmp` with
+the pinned standalone frame-2 baseline `bundle-06953401867d9a2a5f5b38cb73d2aad3`
+is exact, without resizing or color transforms. This is correspondence for these
+inputs, not a general frame-numbering rule or proof of standalone replay.
+
+In the diagnostic capture's generated project:
+
+| Evidence | Observed source relationship | Remaining limit |
+| --- | --- | --- |
+| Draw and pipeline | `CommandList00.cpp` event 18 draws three vertices after binding pipeline 38. `Resources00.cpp` records its topology, viewport/scissor, rasterization, blend, and stage settings. | These IDs belong only to this C++ capture; they are not joined to another capture's inventories. |
+| Shader association and bytes | Pipeline 38 uses vertex module 35 and fragment module 36. Their creation references resource handles 13/14, with 2196/1300 bytes. | Extraction is qualified for this generated project and helper, not an arbitrary producer or malformed capture. |
+| Descriptor selection | Event 17 binds set 32 at set index 0. Its layout declares a fragment uniform buffer at binding 0; setup annotates that binding with buffer 26. | The packed descriptor-write blob has not been decoded through its generated `StructHydrator`; exact descriptor offset/range are not claimed. |
+| Buffer contents | Setup references initial 16-byte values; frame code references subsequent 64-byte allocation updates before submission. | Each Vulkan buffer is only 16 bytes. Allocation padding is not shader-visible buffer content; initial and later values have different temporal meaning. |
+| Pass and output | Render pass 19 uses framebuffer 21, view 13, and swapchain image 8, with clear/store and presentation transitions. | One raster pass only. Stored setup images represent beginning-of-frame state, not arbitrary after-draw snapshots. |
+
+NVIDIA's generated `ReadOnlyDatabase`/`DataScope` helper was compiled unchanged
+with a small native reader; no independent binary-format decoder was introduced.
+The corrected reader and seven selected resource blobs are pinned as
+`bundle-44c491ce96fef4b2b53817c5ee677c93`. Its inputs are restricted to the exact
+capture above and source-referenced handles 0, 1, 5, 6, 11, 13, and 14. Extracted
+handles 13/14 match the application's retained vertex/fragment SPIR-V byte for
+byte. Their SHA-256 values are respectively
+`3598c77b63b8ab122854ac805b2d75eadeb7d595b7c6c5b49a0537847d45add2` and
+`425fc681c678f5965bad5dc1cbd42a48958895f5eb5d3c65e0d5c151be881d36`.
+The earlier reader result remains pinned as
+`bundle-08735abe7d9ca17af019b7f1bac4eda8`; fresh-context review prompted the
+explicit capture/handle restrictions and independently verified the byte matches.
+
+R-006 remains in progress. Advanced workloads and deeper resource extraction
+require separate qualification before dependent diagnostic features are completed. R-007 still requires an actual source edit, rebuild, recapture, and fix
+verification. Preserve generated-source evidence, application evidence, and
+remaining gaps separately.
+
+### Experimental correct/faulty C++ evidence on both releases
+
+The 0.2.2 native experiments now qualify the basic `reference` / `shader-error`
+pair on matching 2026.2.0.0/build 37991608 and 2026.3.1.0/build 38722833 tools.
+All captures, baselines, resource-reader outputs, and the comparison snapshot
+below are complete and explicitly pinned in `artifacts/nsight-evidence`.
+These are experimental runs, separate from product 0.2.3 MCP acceptance.
+
+| Release | Reference / faulty C++ capture | Reference / faulty resource extraction |
+| --- | --- | --- |
+| 2026.2 | `bundle-cd9faf11bccbc42e3da46f1275b39073` / `bundle-4625a12836a154589f2f03849a5fa361` | `bundle-44c491ce96fef4b2b53817c5ee677c93` / `bundle-feca43a3a7422eddb52099ec49ff9c0b` |
+| 2026.3 | `bundle-38193a3c08f330f06fc7b026d580e633` / `bundle-3bbbc048cc769e4e4d2a46d84ac1fa1f` | `bundle-d1ad05c9083c95efa90fe46cc6227d88` / `bundle-8eb503c687623794de4198f365ad6552` |
+
+Comparison snapshot **`bundle-4d0ca74d88003db698ae2dca0b952e11`** retains
+`raw/imported/report.json`, the comparison script, reader binary identities, and
+recorded compiler argv. Standalone baselines are
+`bundle-06953401867d9a2a5f5b38cb73d2aad3` (2026.2) and
+`bundle-d091dc14197d554aa1d943b963cd2f6b` (2026.3).
+On each release, independently decoded 192×128 reference RGB exactly matches its
+application baseline. Faulty output differs at **7,337 pixels / 14,641 channels**,
+maximum channel error 140, mean absolute channel error 8.852064344618055.
+The changed bounding box is `[20,16,172,111)`. No resize or color conversion is
+used beyond decoding BMP/PPM channel layout.
+
+All **eight shader comparisons** (two modules in four captures) match the frozen
+application SPIR-V byte for byte. The faulty fragment module is 1,344 bytes,
+SHA-256 `d8f019e218a9fe10bdbd69f870ca950e95df96847f487a13ae473002c95fb7e6`;
+reference fragment and common vertex hashes are recorded above. Each native
+reader uses the generated unchanged `ReadOnlyDatabase`/`DataScope` helper and
+restricts its input to one exact capture/producer and seven selected handles.
+The four readers are trusted fixed-capture experiments, not a generic malformed
+binary parser. Helper hashes are recorded, not an embedded validation policy.
+Fresh-context review independently checked the eight shader matches, 28
+helper/database hashes, 28 resource hashes, four reader identities, and eleven
+bundle inventories.
+
+The 2026.3 generated sources expose the same basic draw/pipeline/shader,
+descriptor, and pass relationships listed above, with IDs interpreted only inside
+each capture. Packed descriptor writes and after-draw resource contents remain
+unqualified. These image and byte comparisons establish useful real evidence;
+they do not establish generated-project compilation, standalone GPU replay, an
+advanced workload, or an actual source repair.

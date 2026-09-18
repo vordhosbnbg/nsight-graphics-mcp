@@ -140,3 +140,14 @@ queries pass on all 54 retained captures with two exact producer profiles;
 [INSPECTION.md](INSPECTION.md) records the observed version differences and gaps.
 Detailed event state, SDK capture, GPU replay, and source repair remain
 unfinished.
+
+## Generated C++ activity at 0.2.3
+
+`run_nsight_cpp_capture` adds a separate documented activity for generated API
+source and referenced resource data. The shared service exposes it as
+`capture_cpp` over MCP and `ngm-capture --format cpp`. It uses the same owned
+process, cancellation, deadline, publication, and retention contracts. Exact
+producer checks, generated CMake file-list validation, failed-output preservation,
+and limits are documented in [CPP_CAPTURE.md](CPP_CAPTURE.md). It does not pass
+these projects through the graphics-inventory parsers or claim standalone replay.
+I-016 records the initial output-directory prerequisite error and its correction.

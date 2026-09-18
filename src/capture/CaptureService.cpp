@@ -104,9 +104,9 @@ Json manifest_provenance(const Json& report) {
     // Full argv, caller provenance, and operation observations are retained in
     // raw/report.json. Their growth must not exhaust the compact manifest API.
     Json result{{"report_path", "raw/report.json"}};
-    for(const auto* key :
-        {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings", "sdk",
-         "readable_capture", "application_identity_observed", "cleanup_confirmed", "worker_outcome"}) {
+    for(const auto* key : {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings",
+                           "sdk", "readable_capture", "generated_cpp_project", "application_identity_observed",
+                           "cleanup_confirmed", "worker_outcome"}) {
         if(report.contains(key)) {
             result[key] = report.at(key);
         }
@@ -142,6 +142,63 @@ std::string failure_reason(const std::string& message) {
         result += suffix;
     }
     return result.empty() ? "Capture failed without a diagnostic" : result;
+}
+
+void retain_safe_cpp_failure_output(const fs::path& root, Json& report) {
+    // Only called after confirmed process cleanup, only on this attempt's
+    // rejected generated output. Preserve regular evidence and never follow
+    // links. Invalid entries cannot enter the artifact store's file inventory.
+    const auto output = root / "raw/cpp";
+    std::error_code error;
+    const auto type = fs::symlink_status(output, error).type();
+    if(type == fs::file_type::not_found || error == std::errc::no_such_file_or_directory) {
+        return;
+    }
+    if(error) {
+        throw std::runtime_error("Cannot inspect rejected C++ output: " + error.message());
+    }
+    Json removed = Json::array();
+    std::size_t removed_entries = 0;
+    const auto discard = [&](const fs::path& path, const std::string& reason) {
+        if(removed.size() < 32) {
+            removed.push_back({{"path", path.lexically_relative(root).generic_string()}, {"reason", reason}});
+        }
+        removed_entries += fs::remove_all(path); // remove_all unlinks symlinks, never follows them.
+    };
+    if(type != fs::file_type::directory) {
+        discard(output, "generated output root is not a directory");
+    } else {
+        std::size_t retained_entries = 0;
+        for(auto it = fs::recursive_directory_iterator(output); it != fs::recursive_directory_iterator();) {
+            const auto path = it->path();
+            const auto kind = it->symlink_status().type();
+            std::string reason;
+            if(kind != fs::file_type::regular && kind != fs::file_type::directory) {
+                reason = "non-regular generated output";
+            } else if(kind == fs::file_type::regular && fs::hard_link_count(path) != 1) {
+                reason = "multiply linked generated output";
+            } else if(retained_entries >= 3500 || it.depth() > 8 ||
+                      path.lexically_relative(output).native().size() > 384) {
+                reason = "generated output exceeds retained entry, depth, or path limits";
+            }
+            if(!reason.empty()) {
+                it.disable_recursion_pending();
+                ++it;
+                discard(path, reason);
+            } else {
+                ++retained_entries;
+                ++it;
+            }
+        }
+    }
+    if(removed_entries != 0) {
+        report["rejected_cpp_output"] = {
+            {"removed_entries", removed_entries},
+            {"examples", std::move(removed)},
+            {"policy", "After confirmed cleanup, rejected non-regular/over-limit entries in this attempt were removed. "
+                       "Regular output within bounds and original process logs are retained. Symlink targets were not "
+                       "followed."}};
+    }
 }
 
 struct Attempt {
@@ -180,6 +237,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
     report["job"] = context.identity;
     const auto root = attempt->writer.directory();
     bool readable_capture = false;
+    bool generated_cpp_project = false;
     bool inspected_application = false;
     try {
         const auto environment = isolated_environment(options, root);
@@ -211,58 +269,102 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
         if(stopped(context)) {
             throw std::runtime_error("Capture stopped before application launch");
         }
-        NsightCaptureOptions capture;
         fs::create_directories(root / "raw/logs/capture");
-        capture.context = {root / "raw/logs/capture", environment, remaining(context)};
-        capture.executable = request.executable;
-        capture.arguments = request.arguments;
-        capture.working_directory = request.working_directory;
-        capture.capture_file = root / "raw/capture.ngfx-capture";
-        capture.capture_frame = request.capture_frame;
-        capture.delimiter = request.delimiter == CaptureDelimiter::Present ? NsightDelimiter::Present
-                                                                           : NsightDelimiter::GraphicsCaptureApi;
-        completion.cleanup_confirmed = false;
-        const auto captured = run_nsight_capture(installation, capture, context.stop);
-        completion.cleanup_confirmed = !captured.launched || captured.process.cleanup_confirmed;
-        report["capture"] = operation_json(captured, root);
-        if(captured.outcome != NsightOutcome::Success) {
-            throw std::runtime_error("Capture failed: " + captured.message);
-        }
-        report["exports"] = Json::array();
-        for(const auto kind : {NsightExportKind::Metadata, NsightExportKind::Functions, NsightExportKind::Objects,
-                               NsightExportKind::Logs, NsightExportKind::Screenshot}) {
-            if(stopped(context)) {
-                throw std::runtime_error("Capture stopped before exports completed");
-            }
-            const std::string name(nsight_export_name(kind));
-            fs::create_directories(root / "raw/logs" / name);
-            NsightExportOptions export_options;
-            export_options.context = {root / "raw/logs" / name, environment, remaining(context)};
-            export_options.capture_file = capture.capture_file;
-            export_options.capture_tool_version = installation.capture.version;
-            export_options.capture_tool_build = installation.capture.build;
-            export_options.kind = kind;
-            export_options.output_file =
-                root / "raw/exports" / (name + (kind == NsightExportKind::Screenshot ? ".png" : ".raw"));
+        if(request.format == CaptureFormat::Cpp) {
+            NsightCppCaptureOptions capture;
+            capture.context = {root / "raw/logs/capture", environment, remaining(context)};
+            capture.executable = request.executable;
+            capture.arguments = request.arguments;
+            capture.working_directory = request.working_directory;
+            capture.output_directory = root / "raw/cpp";
+            capture.wait_frames = request.cpp_wait_frames;
             completion.cleanup_confirmed = false;
-            const auto exported = export_nsight_capture(installation, export_options, context.stop);
-            completion.cleanup_confirmed = !exported.launched || exported.process.cleanup_confirmed;
-            auto evidence = operation_json(exported, root);
-            evidence["kind"] = name;
-            evidence["evidence_origin"] = "nsight_export";
-            report["exports"].push_back(std::move(evidence));
-            if(!completion.cleanup_confirmed) {
-                throw std::runtime_error("Export left owned-process cleanup unconfirmed");
-            }
-            if(kind == NsightExportKind::Metadata) {
-                if(exported.outcome != NsightOutcome::Success) {
-                    throw std::runtime_error("Saved capture could not be read by matching replay tools: " +
-                                             exported.message);
+            const auto captured = run_nsight_cpp_capture(installation, capture, context.stop);
+            completion.cleanup_confirmed = !captured.operation.launched || captured.operation.process.cleanup_confirmed;
+            report["capture"] = operation_json(captured.operation, root);
+            if(captured.operation.outcome != NsightOutcome::Success) {
+                if(completion.cleanup_confirmed) {
+                    retain_safe_cpp_failure_output(root, report);
                 }
-                readable_capture = true;
+                throw std::runtime_error("C++ capture failed: " + captured.operation.message);
             }
-            // Optional exports retain their individual outcomes. A readable
-            // capture does not assert that every inspection category exists.
+            Json sources = Json::array();
+            for(const auto& source : captured.source_files) {
+                sources.push_back(relative_evidence(captured.project_directory / source, root));
+            }
+            Json index{{"schema_version", 1},
+                       {"evidence_origin", "nsight_generated_cpp"},
+                       {"job", context.identity},
+                       {"project_directory", relative_evidence(captured.project_directory, root)},
+                       {"metadata_path", relative_evidence(captured.project_directory / "metadata.json", root)},
+                       {"screenshot_path", relative_evidence(captured.project_directory / "screenshot.bmp", root)},
+                       {"database_path", relative_evidence(captured.project_directory / "data.bin", root)},
+                       {"source_files", std::move(sources)},
+                       {"nsight_version", captured.metadata.nsight_version},
+                       {"nsight_version_build_id", captured.metadata.build_id},
+                       {"primary_api", captured.metadata.primary_api},
+                       {"primary_gpu", captured.metadata.primary_gpu},
+                       {"has_unsupported_operation", captured.metadata.has_unsupported_operation},
+                       {"inspection_scope", "Generated source and referenced data from this capture only. "
+                                            "No automatic event-state reconstruction or database extraction. "
+                                            "Setup resources are not arbitrary after-draw snapshots."},
+                       {"validation_scope", captured.operation.message}};
+            save(root / "derived/cpp-project.json", index);
+            report["cpp_project_index"] = "derived/cpp-project.json";
+            generated_cpp_project = true;
+        } else {
+            NsightCaptureOptions capture;
+            capture.context = {root / "raw/logs/capture", environment, remaining(context)};
+            capture.executable = request.executable;
+            capture.arguments = request.arguments;
+            capture.working_directory = request.working_directory;
+            capture.capture_file = root / "raw/capture.ngfx-capture";
+            capture.capture_frame = request.capture_frame;
+            capture.delimiter = request.delimiter == CaptureDelimiter::Present ? NsightDelimiter::Present
+                                                                               : NsightDelimiter::GraphicsCaptureApi;
+            completion.cleanup_confirmed = false;
+            const auto captured = run_nsight_capture(installation, capture, context.stop);
+            completion.cleanup_confirmed = !captured.launched || captured.process.cleanup_confirmed;
+            report["capture"] = operation_json(captured, root);
+            if(captured.outcome != NsightOutcome::Success) {
+                throw std::runtime_error("Capture failed: " + captured.message);
+            }
+            report["exports"] = Json::array();
+            for(const auto kind : {NsightExportKind::Metadata, NsightExportKind::Functions, NsightExportKind::Objects,
+                                   NsightExportKind::Logs, NsightExportKind::Screenshot}) {
+                if(stopped(context)) {
+                    throw std::runtime_error("Capture stopped before exports completed");
+                }
+                const std::string name(nsight_export_name(kind));
+                fs::create_directories(root / "raw/logs" / name);
+                NsightExportOptions export_options;
+                export_options.context = {root / "raw/logs" / name, environment, remaining(context)};
+                export_options.capture_file = capture.capture_file;
+                export_options.capture_tool_version = installation.capture.version;
+                export_options.capture_tool_build = installation.capture.build;
+                export_options.kind = kind;
+                export_options.output_file =
+                    root / "raw/exports" / (name + (kind == NsightExportKind::Screenshot ? ".png" : ".raw"));
+                completion.cleanup_confirmed = false;
+                const auto exported = export_nsight_capture(installation, export_options, context.stop);
+                completion.cleanup_confirmed = !exported.launched || exported.process.cleanup_confirmed;
+                auto evidence = operation_json(exported, root);
+                evidence["kind"] = name;
+                evidence["evidence_origin"] = "nsight_export";
+                report["exports"].push_back(std::move(evidence));
+                if(!completion.cleanup_confirmed) {
+                    throw std::runtime_error("Export left owned-process cleanup unconfirmed");
+                }
+                if(kind == NsightExportKind::Metadata) {
+                    if(exported.outcome != NsightOutcome::Success) {
+                        throw std::runtime_error("Saved capture could not be read by matching replay tools: " +
+                                                 exported.message);
+                    }
+                    readable_capture = true;
+                }
+                // Optional exports retain their individual outcomes. A readable
+                // capture does not assert that every inspection category exists.
+            }
         }
         report["application"]["sha256_after_launch"] =
             sha256_regular_file(request.executable, context.deadline, context.stop);
@@ -281,6 +383,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
         }
     }
     report["readable_capture"] = readable_capture;
+    report["generated_cpp_project"] = generated_cpp_project;
     report["application_identity_observed"] = inspected_application;
     report["cleanup_confirmed"] = completion.cleanup_confirmed;
     report["worker_outcome"] = completion.outcome == JobOutcome::succeeded ? "succeeded" : "failed";
@@ -358,6 +461,14 @@ CaptureService::~CaptureService() {
 
 CaptureSubmission CaptureService::capture(CaptureRequest request) {
     const auto delimiter = capture_delimiter_name(request.delimiter);
+    if((request.format != CaptureFormat::Graphics && request.format != CaptureFormat::Cpp) ||
+       (request.format == CaptureFormat::Cpp &&
+        (request.delimiter != CaptureDelimiter::Present || request.capture_frame != 2 || request.cpp_wait_frames < 2 ||
+         request.cpp_wait_frames > 1000000)) ||
+       (request.format == CaptureFormat::Graphics && request.cpp_wait_frames != 2)) {
+        throw std::invalid_argument(
+            "C++ capture requires wait_frames 2..1000000 and no graphics delimiter/frame options");
+    }
     if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.capture_frame < 2 ||
        request.arguments.size() > 256 || !request.application_provenance.is_object() ||
        request.application_provenance.dump().size() > 65536) {
@@ -388,7 +499,7 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
     artifacts_.prune();
     Json provenance{{"schema_version", 1},
                     {"project_version", project_version()},
-                    {"evidence_origin", "nsight_capture"},
+                    {"evidence_origin", request.format == CaptureFormat::Cpp ? "nsight_cpp_capture" : "nsight_capture"},
                     {"backend", "documented_nsight_cli"},
                     {"application",
                      {{"executable", request.executable.string()},
@@ -403,12 +514,19 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
                     {"sdk",
                      {{"status", request.delimiter == CaptureDelimiter::Present ? "application_control_not_requested"
                                                                                 : "application_control_requested"}}}};
+    if(request.format == CaptureFormat::Cpp) {
+        provenance["capture_settings"] = {
+            {"format", "cpp"}, {"wait_frames", request.cpp_wait_frames}, {"timeout_ms", request.timeout.count()}};
+        provenance["sdk"]["status"] = "not_applicable";
+    }
     auto attempt = std::make_shared<Attempt>();
     attempt->artifacts = &artifacts_;
     attempt->provenance = provenance;
-    attempt->writer =
-        artifacts_.begin(manifest_provenance(provenance),
-                         {"raw/capture.ngfx-capture", "raw/exports/metadata.raw", "raw/report.json"}, request.pin);
+    const std::vector<std::string> required_outputs =
+        request.format == CaptureFormat::Cpp
+            ? std::vector<std::string>{"derived/cpp-project.json", "raw/report.json"}
+            : std::vector<std::string>{"raw/capture.ngfx-capture", "raw/exports/metadata.raw", "raw/report.json"};
+    attempt->writer = artifacts_.begin(manifest_provenance(provenance), required_outputs, request.pin);
     const auto artifact_id = attempt->writer.id();
     if(!request.application_output_option.empty()) {
         request.arguments.push_back(request.application_output_option);

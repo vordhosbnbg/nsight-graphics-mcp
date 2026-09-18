@@ -392,5 +392,21 @@ int main(int argc, char** argv) {
         check_inventory_schema(Json::parse(fixture(directory, "reference-functions.json")),
                                Json::parse(fixture(directory, "reference-objects.json")));
         check_json_limits();
+        Json cpp = {{"metadata_version", 1},
+                    {"nsight_version", "2026.3.1"},
+                    {"nsight_version_build_id", 38722833},
+                    {"primary_api", "vulkan"},
+                    {"primary_gpu", "synthetic"},
+                    {"project_filename", "synthetic-project"},
+                    {"has_unsupported_operation", false}};
+        require(ngm::parse_nsight_cpp_metadata(cpp.dump()).build_id == 38722833,
+                "generated C++ metadata has a distinct numeric build-ID contract");
+        cpp["nsight_version_build_id"] = "38722833";
+        rejected(Error::InvalidField, [&] { ngm::parse_nsight_cpp_metadata(cpp.dump()); });
+        cpp["nsight_version_build_id"] = 38722833;
+        cpp.erase("project_filename");
+        rejected(Error::MissingField, [&] { ngm::parse_nsight_cpp_metadata(cpp.dump()); });
+        rejected(Error::DuplicateKey,
+                 [&] { ngm::parse_nsight_cpp_metadata("{\"metadata_version\":1,\"metadata_version\":1}"); });
     });
 }

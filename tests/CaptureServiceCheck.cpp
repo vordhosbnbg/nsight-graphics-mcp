@@ -38,8 +38,9 @@ void copy_executable(const fs::path& source, const fs::path& destination) {
     fs::permissions(destination, fs::perms::owner_all);
 }
 
-ngm::JobSnapshot completed(ngm::CaptureService& service, const ngm::CaptureSubmission& submission) {
-    const auto result = service.wait(submission.identity.job_id, 10s);
+ngm::JobSnapshot completed(ngm::CaptureService& service, const ngm::CaptureSubmission& submission,
+                           std::chrono::seconds wait = 10s) {
+    const auto result = service.wait(submission.identity.job_id, wait);
     require(result && ngm::job_terminal(result->state), "capture reaches a terminal state");
     require(result->identity == submission.identity, "completion has the submitted job/capture/attempt identity");
     require(result->cleanup_confirmed && !result->gpu_reserved && !result->worker_running &&
@@ -154,6 +155,86 @@ int main(int argc, char** argv) {
             const auto saved = service.artifacts().inspect(retained_id);
             require(saved.summary.pinned && saved.summary.status == "complete",
                     "capture evidence and pins survive service restart");
+        }
+
+        auto cpp_options = options;
+        cpp_options.artifacts.root = scratch.path / "cpp-store";
+        auto cpp_request = request;
+        cpp_request.format = ngm::CaptureFormat::Cpp;
+        cpp_request.cpp_wait_frames = 6;
+        std::string cpp_id;
+        {
+            ngm::CaptureService service(cpp_options);
+            const auto submission = service.capture(cpp_request);
+            const auto result = completed(service, submission);
+            require(result.state == ngm::JobState::succeeded, "shared C++ capture completes: " + result.error);
+            cpp_id = submission.artifact_id;
+            const auto artifact = service.artifacts().inspect(cpp_id);
+            const auto report = nlohmann::json::parse(service.artifacts().read(cpp_id, "raw/report.json"));
+            const auto index = nlohmann::json::parse(service.artifacts().read(cpp_id, "derived/cpp-project.json"));
+            require(artifact.summary.status == "complete" && artifact.summary.pinned &&
+                        report.at("evidence_origin") == "nsight_cpp_capture" &&
+                        report.at("generated_cpp_project") == true && report.at("readable_capture") == false &&
+                        !report.contains("exports"),
+                    "C++ source evidence is published separately from graphics capture inventories");
+            require(report.at("capture_settings").at("wait_frames") == 6 &&
+                        index.at("job") == nlohmann::json(submission.identity) &&
+                        index.at("nsight_version_build_id") == 38722833 && index.at("source_files").size() == 12,
+                    "generated-project index binds paths and producer to the exact capture job");
+            require(service.artifacts()
+                            .read(cpp_id, index.at("source_files").at(0).get<std::string>())
+                            .find("CPU stand-in") != std::string::npos,
+                    "generated source is retrievable through the normal artifact core");
+        }
+        {
+            ngm::CaptureService service(cpp_options);
+            require(service.artifacts().inspect(cpp_id).summary.pinned &&
+                        !service.artifacts().read(cpp_id, "derived/cpp-project.json").empty(),
+                    "C++ evidence/index and persistent pin survive restart");
+        }
+        for(const auto* mode : {"missing-resource", "missing-partition", "missing-header", "wrong-producer", "symlink",
+                                "fifo", "too-many"}) {
+            auto failed_options = cpp_options;
+            failed_options.artifacts.root = scratch.path / (std::string("cpp-failure-") + mode);
+            failed_options.environment["NGM_STANDIN_CPP_MODE"] = mode;
+            ngm::CaptureService service(failed_options);
+            auto failed_request = cpp_request;
+            // Thousands of retained files exercise durable fsync publication;
+            // this case tests the file limit, rather than a short job deadline.
+            failed_request.timeout = std::string_view(mode) == "too-many" ? 60s : 5s;
+            const auto submission = service.capture(failed_request);
+            require(completed(service, submission, std::string_view(mode) == "too-many" ? 60s : 10s).state ==
+                            ngm::JobState::failed &&
+                        service.artifacts().inspect(submission.artifact_id).summary.status == "failed" &&
+                        !service.artifacts().inspect(submission.artifact_id).summary.quarantined,
+                    "C++ generation with invalid output retains a failed bundle, never a complete project");
+            const auto report =
+                nlohmann::json::parse(service.artifacts().read(submission.artifact_id, "raw/report.json"));
+            require(report.at("cleanup_confirmed") == true &&
+                        !service.artifacts()
+                             .read(submission.artifact_id, report.at("capture").at("stderr").get<std::string>())
+                             .empty(),
+                    "rejected generated output retains readable report and original process logs");
+            if(std::string_view(mode) == "symlink" || std::string_view(mode) == "fifo" ||
+               std::string_view(mode) == "too-many") {
+                require(report.contains("rejected_cpp_output") &&
+                            report.at("rejected_cpp_output").at("removed_entries") > 0,
+                        "discarded invalid/over-limit entries are explicitly recorded in retained failure evidence");
+            }
+        }
+        {
+            auto hanging_options = cpp_options;
+            hanging_options.artifacts.root = scratch.path / "cpp-cancel";
+            const auto pids = scratch.path / "cpp-cancel-pids.txt";
+            hanging_options.environment["NGM_STANDIN_CPP_MODE"] = "hang";
+            hanging_options.environment["NGM_STANDIN_PIDS"] = pids.string();
+            ngm::CaptureService service(hanging_options);
+            const auto submission = service.capture(cpp_request);
+            await_file(pids);
+            service.cancel(submission.identity.job_id);
+            require(completed(service, submission).state == ngm::JobState::cancelled &&
+                        service.artifacts().inspect(submission.artifact_id).summary.status == "failed",
+                    "C++ cancellation confirms process cleanup before releasing its GPU/evidence ownership");
         }
 
         // The service supplies defaults for explicit empty values too, and

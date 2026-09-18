@@ -99,6 +99,19 @@ struct NsightMetadata {
     std::optional<NsightMetadataCollection> collection;
 };
 
+// Generate C++ Capture metadata is a separate export, with an integer build ID
+// and lowercase API spelling. Never apply the graphics-inventory schema to it.
+struct NsightCppMetadata {
+    std::string nsight_version;
+    std::uint64_t build_id = 0;
+    std::string primary_api;
+    std::string primary_gpu;
+    std::string project_filename;
+    bool has_unsupported_operation = false;
+};
+
+NsightCppMetadata parse_nsight_cpp_metadata(std::string_view text);
+
 // Pure parsers for observed Nsight 2026.3.1/2026.2.0 JSON exports. These functions own no
 // files, artifact leases, processes, or capture identities. The caller associates
 // each result with its capture and retains the raw export/tool provenance.

@@ -444,3 +444,36 @@ R-002 for the recorded basic windowed workload. R-006/R-007/R-015, advanced SDK
 qualification, no-presentation compute and profiling are not established by
 these runs. The larger visual workflow group remains unfinished, so 0.2.2 is
 a patch increment.
+
+## Generated C++ capture implementation, 0.2.3
+
+On 2026-09-18, GCC 16.2.1 Debug builds the separate C++ activity, shared service,
+native CLI selection, typed generated metadata parser, MCP tool, and opt-in
+`ngm_cpp_capture_integration` harness. Fresh-context backend and harness review
+found missing declared source-unit validation, failed-tree publication gaps, and
+harness provenance/failure-reporting weaknesses. Corrections validate every
+observed CMake-declared unit, preserve safe failed output with removal records,
+snapshot the server as well as target, and record case success after assertions.
+Review follow-ups report no remaining blockers.
+
+The full `cmake --build --preset linux-gcc-debug --target ngm_check` passes
+**20/20 CPU checks**, total **182.67 seconds**, recorded in
+`build/capture-acceptance/check-0.2.3-aggregate.log`. This aggregate predates the
+subsequent narrow output-directory correction found by real hardware (I-016).
+After that correction, `ngm_cpp_capture_integration` rebuilds and
+`ngm_nsight_check_run`, `ngm_capture_service_check_run`, and `ngm_mcp_check_run`
+all pass; log `build/capture-acceptance/check-0.2.3-output-directory.log`.
+The stand-in now enforces the real launcher's existing-directory prerequisite.
+
+Earlier CPU correction logs retain a GCC dangling-reference diagnostic resolved
+by copying a small JSON scalar, a MCP test missing the requested pin, and an
+entry-overflow service test whose observation deadline was shorter than durable
+publication of thousands of files. Only that overflow case received a longer
+request/observation budget. The corrected service case passed; these were
+build/test failures rather than Nsight integration failures. The real failure
+is retained with pinned evidence in I-016.
+
+Hardware runs are separate from these CPU results. The C++ harness is excluded
+from default builds, CTest, and `ngm_check`; exact retained results are in
+[NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Experimental two-release shader/image
+comparisons at 0.2.2 remain labelled separately in [INSPECTION.md](INSPECTION.md).

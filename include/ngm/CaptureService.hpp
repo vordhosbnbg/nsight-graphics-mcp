@@ -11,6 +11,7 @@
 #include <vector>
 
 namespace ngm {
+enum class CaptureFormat { Graphics, Cpp };
 enum class CaptureDelimiter { Present, GraphicsCaptureApi };
 std::string_view capture_delimiter_name(CaptureDelimiter delimiter);
 CaptureDelimiter parse_capture_delimiter(std::string_view name);
@@ -28,7 +29,11 @@ struct CaptureRequest {
     std::filesystem::path executable;
     std::vector<std::string> arguments;
     std::filesystem::path working_directory;
+    CaptureFormat format = CaptureFormat::Graphics;
     std::uint64_t capture_frame = 2;
+    // Generate C++ Capture's distinct --wait-frames control, not a graphics
+    // capture delimiter ordinal. SDK delimiters are unavailable in this mode.
+    std::uint64_t cpp_wait_frames = 2;
     CaptureDelimiter delimiter = CaptureDelimiter::Present;
     std::chrono::milliseconds timeout{120000};
     bool pin = false;

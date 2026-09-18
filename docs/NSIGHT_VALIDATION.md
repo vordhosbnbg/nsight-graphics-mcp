@@ -202,3 +202,55 @@ verification on each selected release, including sufficient
 retrievable diagnostic evidence. Failed or skipped required cases do not
 count as full support. Replay failures and other documented-interface probes are
 retained in [INVESTIGATIONS.md](INVESTIGATIONS.md).
+
+## Product generated C++ capture, 0.2.3
+
+The separate `capture_cpp` mode passes its basic MCP matrix on **both matching
+releases** on 2026-09-18. The C++ harness snapshots the server, fixture, and shader
+inputs, makes three fresh captures per release, retrieves the derived index and
+real command source through MCP, checks exact screenshot file repeat/difference,
+and verifies persistent pins and identical indexes after restart without desktop
+variables or an Nsight override. All jobs succeed with confirmed cleanup and
+released GPU reservations; all generated metadata reports
+`has_unsupported_operation: false`. All six captures and both reports below are
+complete and explicitly pinned in `artifacts/nsight-evidence`.
+
+| Exact release | Reference | Repeated reference | Shader error | Report, inputs, sources, transcripts |
+| --- | --- | --- | --- | --- |
+| 2026.3.1.0 / 38722833 | `bundle-acdca6fd76d4b9a6e153d3078fe11ef7` | `bundle-8c356036e93abe7d7f45dbf2ffb5c89e` | `bundle-cb123656b3f61d803d6d7e5035793cb4` | `bundle-d2579d201899eba43073dfdcecf2387f` |
+| 2026.2.0.0 / 37991608 | `bundle-b1b222b28ffecf6932f72d20a5bf3511` | `bundle-f88354f27982a13dca9a3013670fdcb2` | `bundle-fc62ec56688368e10d7c3db34e41caba` | `bundle-8287081bf6c6f039ced6341fd9aa59e4` |
+
+Configuration: Arch Linux x86-64, GCC **16.2.1 20260810** Debug, source-built
+glslang **16.4.0**, RTX **3080 Ti**, driver **615.71.09** (rechecked with
+`nvidia-smi`), KDE Wayland/Xwayland with XCB fixture presentation. No SDK calls.
+Each target uses seed 42, 192×128, final frame 120, and the documented C++ activity
+`wait_frames=2`. Retrieved source contains the complete `"frame.2"` label.
+The final frame keeps the fresh target running long enough for capture; it is
+not the requested capture index. Each job took approximately 9.5–10.1 seconds.
+Production uses the runtime-documented notice suppression without verbose or
+Vulkan-loader diagnostic environment settings. I-016 retains the initial failed
+output-directory attempt and the reviewed correction before these passing runs.
+
+Common retained executable SHA-256 identities:
+
+- Server: `7334dfb79aaed6a53ad6050e5aa0d599bd79537b0f06adb09482d024e70ac6bd`.
+- Fixture: `0cc871be97972deee89e335e3c86063b1e6a79227516fbc0c17f9c2b326ebc11`.
+- Harness: `03d89fc035e4497b3c13b38f151959c6829a80db3b8cbc259cffbd8848375e4e`.
+
+Reference screenshot file SHA-256 is
+`c32658800ea2b20c881da011561496de69e1b731c226673c66a7fd5ff2b495b2`; faulty is
+`3d89d5e30ef184380420c1ca5cb72303f724bd42ddf6b8dea1f08d41d49cb813` on each release.
+This harness compares **files**, not decoded pixels. The independent decoded
+image/SPIR-V comparisons in [INSPECTION.md](INSPECTION.md) belong to earlier
+0.2.2 experiments. Neither result establishes source repair, generic resource
+extraction, advanced generated-C++ workloads, or standalone GPU replay.
+
+Reproduce using the built `ngm_cpp_capture_integration` argument contract in
+[CPP_CAPTURE.md](CPP_CAPTURE.md), ending with `reference shader-error`.
+Exact local argv/stdout/stderr/exit records are under
+`build/cpp-mcp-validation/nsight-2026.3-corrected/` and
+`build/cpp-mcp-validation/nsight-2026.2/`; the durable pinned reports retain the
+MCP arguments, source, frozen inputs, hashes, and successful restart exchanges.
+The hardware target is opt-in, separate from the passing CPU aggregate and
+focused correction checks recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
+R-006 and R-015 remain in progress; R-007 still requires actual source repair.

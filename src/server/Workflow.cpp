@@ -324,9 +324,9 @@ void add_tool(fastmcpp::tools::ToolManager& tools, const char* name, Schema inpu
 } // namespace
 
 Json implemented_tool_names() {
-    return Json::array({"capabilities", "capture", "job_status", "job_cancel", "artifact_list", "artifact_info",
-                        "artifact_files", "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune",
-                        "artifact_import", "capture_metadata", "capture_events", "capture_objects"});
+    return Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
+                        "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
+                        "artifact_prune", "artifact_import", "capture_metadata", "capture_events", "capture_objects"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -388,6 +388,41 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
             }
             return Json(service().capture(std::move(request)));
         });
+    add_tool(tools, "capture_cpp",
+             object_schema({{"executable", string_schema(4096, 1)},
+                            {"arguments", array_schema(string_schema(4096), 256)},
+                            {"working_directory", string_schema(4096, 1)},
+                            {"wait_frames", integer_schema(2, 1000000)},
+                            {"timeout_ms", integer_schema(1, 600000)},
+                            {"pin", boolean_schema()},
+                            {"application_output_option", string_schema(64)}},
+                           {"executable", "working_directory"}),
+             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                           {"identity", "artifact_id"}),
+             "Submit documented Generate C++ Capture of a fresh Vulkan application on the two qualified Nsight "
+             "2026.2/2026.3 producer builds. Defaults: wait_frames 2, timeout 120000 ms, pin false. "
+             "wait_frames controls ngfx --wait-frames, separately from graphics-capture delimiter ordinals. "
+             "Poll job_status, then artifact_read derived/cpp-project.json for generated source/data/screenshot paths. "
+             "Artifact tools retrieve source; capture_metadata/events/objects apply to the separate graphics format. "
+             "No source compilation, resource extraction, or GPU replay is performed. SDK delimiters are unavailable. "
+             "Application output, when requested, remains separate from generated Nsight evidence.",
+             false, false, [this](const Json& arguments) {
+                 CaptureRequest request;
+                 request.format = CaptureFormat::Cpp;
+                 request.executable = absolute_path(arguments.at("executable"), true);
+                 request.working_directory = absolute_path(arguments.at("working_directory"));
+                 request.arguments = arguments.value("arguments", std::vector<std::string>{});
+                 request.cpp_wait_frames = arguments.value("wait_frames", std::uint64_t{2});
+                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+                 request.pin = arguments.value("pin", false);
+                 request.application_output_option = arguments.value("application_output_option", "");
+                 if(!request.application_output_option.empty() &&
+                    (request.application_output_option.front() != '-' ||
+                     request.application_output_option.find_first_of(" \t\r\n") != std::string::npos)) {
+                     throw std::invalid_argument("application_output_option must be one option starting with '-'");
+                 }
+                 return Json(service().capture(std::move(request)));
+             });
     const auto job_input = object_schema({{"job_id", string_schema(256, 1)}}, {"job_id"});
     add_tool(
         tools, "job_status", job_input, job_schema(),

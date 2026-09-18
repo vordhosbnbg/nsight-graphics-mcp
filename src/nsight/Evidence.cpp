@@ -302,6 +302,28 @@ NsightMetadata parse_nsight_metadata(std::string_view text) {
     return result;
 }
 
+NsightCppMetadata parse_nsight_cpp_metadata(std::string_view text) {
+    const auto document = bounded_json(text);
+    require_object(document, "cpp_metadata");
+    if(unsigned_integer(required(document, "metadata_version", "cpp_metadata"), "metadata_version") != 1) {
+        fail(Error::UnsupportedVersion, "unsupported C++ capture metadata version");
+    }
+    NsightCppMetadata result;
+    result.nsight_version = string_value(required(document, "nsight_version", "cpp_metadata"), "nsight_version", false);
+    result.build_id =
+        unsigned_integer(required(document, "nsight_version_build_id", "cpp_metadata"), "nsight_version_build_id");
+    result.primary_api = string_value(required(document, "primary_api", "cpp_metadata"), "primary_api", false);
+    result.primary_gpu = string_value(required(document, "primary_gpu", "cpp_metadata"), "primary_gpu", false);
+    result.project_filename =
+        string_value(required(document, "project_filename", "cpp_metadata"), "project_filename", false);
+    const auto unsupported = required(document, "has_unsupported_operation", "cpp_metadata");
+    if(!unsupported.is_boolean()) {
+        fail(Error::InvalidField, "has_unsupported_operation must be a boolean");
+    }
+    result.has_unsupported_operation = unsupported.get<bool>();
+    return result;
+}
+
 std::vector<NsightEvent> parse_nsight_functions(std::string_view text) {
     const auto document = bounded_json(text);
     require_array(document, "functions", Limits::maximum_records);

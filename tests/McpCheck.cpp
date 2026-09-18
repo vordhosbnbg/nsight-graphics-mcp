@@ -79,11 +79,12 @@ Json query_capabilities(Client& client) {
     const auto report = result["structuredContent"];
     require(Json::parse(result["content"][0]["text"].get<std::string>()) == report, "text and structured result agree");
     require(report["server"]["version"] == ngm::project_version(), "capabilities use project version");
-    require(report["implemented_tools"] ==
-                Json::array({"capabilities", "capture", "job_status", "job_cancel", "artifact_list", "artifact_info",
-                             "artifact_files", "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune",
-                             "artifact_import", "capture_metadata", "capture_events", "capture_objects"}),
-            "exactly the implemented tools advertised");
+    require(
+        report["implemented_tools"] ==
+            Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
+                         "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
+                         "artifact_prune", "artifact_import", "capture_metadata", "capture_events", "capture_objects"}),
+        "exactly the implemented tools advertised");
     for(const auto* name : {"profiling", "fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
         require(operation["available"] == false && operation["status"] == "not_implemented",
@@ -105,7 +106,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 15, "discover exactly the implemented tools");
+    require(listing.size() == 16, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -602,6 +603,32 @@ void workflow_check(const std::string& server, const std::string& standin, const
                 std::find(sdk_command.begin(), sdk_command.end(), "--delimiter-present") == sdk_command.end(),
             "SDK delimiter reaches the real capture subprocess boundary through MCP");
     require(recorded_pid(record1) != recorded_pid(record2), "each capture launches a fresh process");
+    const auto cpp_record = scratch.path / "cpp-target.pid";
+    auto cpp_arguments = capture_arguments(cpp_record);
+    cpp_arguments.erase("capture_frame");
+    cpp_arguments["wait_frames"] = 5;
+    cpp_arguments["pin"] = true;
+    auto invalid_cpp_arguments = cpp_arguments;
+    invalid_cpp_arguments["delimiter"] = "present";
+    expect_tool_error(call(client, "capture_cpp", invalid_cpp_arguments));
+    const auto cpp = successful_call(client, "capture_cpp", cpp_arguments);
+    const auto cpp_job = await_job(client, cpp["identity"]["job_id"]);
+    require(cpp_job["state"] == "succeeded" && cpp_job["cleanup_confirmed"] == true,
+            "C++ capture succeeds through the real MCP process boundary");
+    const auto cpp_id = cpp["artifact_id"].get<std::string>();
+    const auto cpp_index =
+        Json::parse(successful_call(client, "artifact_read",
+                                    {{"artifact_id", cpp_id}, {"path", "derived/cpp-project.json"}})["text"]
+                        .get<std::string>());
+    require(cpp_index["evidence_origin"] == "nsight_generated_cpp" && cpp_index["source_files"].size() == 12 &&
+                cpp_index["job"] == cpp["identity"],
+            "MCP retrieves capture-scoped generated-project evidence");
+    require(successful_call(client, "artifact_read",
+                            {{"artifact_id", cpp_id}, {"path", cpp_index["source_files"][0]}})["text"]
+                    .get<std::string>()
+                    .find("CPU stand-in") != std::string::npos,
+            "generated source is retrievable using bounded artifact reads");
+    expect_tool_error(call(client, "capture_metadata", {{"capture_id", cpp_id}}), "not_capture");
     const auto page = successful_call(client, "artifact_list", {{"limit", 1}});
     require(page["artifacts"].size() == 1 && page["next_after"].is_string(), "artifact list pagination");
     require(!successful_call(client, "artifact_list", {{"after_id", page["next_after"]}})["artifacts"].empty(),
@@ -694,6 +721,10 @@ void workflow_check(const std::string& server, const std::string& standin, const
             "import pin survives server restart");
     require(successful_call(restarted, "artifact_info", {{"artifact_id", first_id}})["pinned"] == true,
             "capture pin survives server restart");
+    require(successful_call(restarted, "artifact_info", {{"artifact_id", cpp_id}})["pinned"] == true &&
+                successful_call(restarted, "artifact_read",
+                                {{"artifact_id", cpp_id}, {"path", "derived/cpp-project.json"}})["status"] == "text",
+            "C++ capture pin and generated index survive restart without tool paths or desktop variables");
     require(successful_call(restarted, "capture_events", {{"capture_id", first_id}})["total"] == 3,
             "retained inspection works after restart with no Nsight installation or desktop configured");
     const auto eof_info = successful_call(restarted, "artifact_info", {{"artifact_id", eof["artifact_id"]}});

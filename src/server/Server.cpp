@@ -52,7 +52,10 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                                   "only establish observable prerequisites; each job checks tools and retains results. "
                                   "Captures one delimiter interval, using presentation by default. Optional "
                                   "graphics_capture_api boundaries require application SDK initialization and calls; "
-                                  "qualification is specific to the application, SDK, and matching Nsight release."}};
+                                  "qualification is specific to the application, SDK, and matching Nsight release. "
+                                  "capture_cpp selects documented Generate C++ Capture with its separate wait_frames "
+                                  "control; it retains generated source/data on qualified 2026.2/2026.3 builds. "
+                                  "That mode has no SDK delimiter or automatic resource extraction/replay."}};
     const Json store{{"available", storage},
                      {"status", storage ? "configured" : "missing_prerequisites"},
                      {"reason", storage ? "Implemented; storage is opened lazily by a workflow call. "

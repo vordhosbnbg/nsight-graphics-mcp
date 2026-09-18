@@ -83,7 +83,7 @@ are recorded in docs/BUILD_VALIDATION.md, docs/MCP.md, and docs/FIXTURE.md.
 The R-012/R-011/R-001 capture/evidence group completes at **0.2.0** after
 independent acceptance review. It provides the job coordinator, managed artifact
 storage, documented Nsight CLI adapter, and shared `CaptureService`, used by the
-native `ngm-capture` command and stdio tools. The current surface has **15 MCP
+native `ngm-capture` command and stdio tools. The 0.2.0 surface had **15 MCP
 tools**, including bounded retained metadata/event/object queries. The integrated
 GCC Debug CPU suite passes **20 checks**. Real basic MCP capture/export matrices
 pass on matching Nsight **2026.3.1.0/build 38722833** and
@@ -101,7 +101,10 @@ through MCP, independently decoded frame correspondence, and retained pins.
 The default GCC Debug aggregate passes 20 checks; a subsequent portability
 annotation passes focused fixture checks on GCC and Clang. Exact SDK evidence,
 source/build identities, and limits are in docs/SDK_CONTROL.md. Detailed state
-and source repair remain unfinished.
+and source repair remain unfinished. At 0.2.3, the separate `capture_cpp` mode
+retains generated source and resource files with a derived project index, bringing
+the current surface to 16 tools. See docs/CPP_CAPTURE.md for its validated scope,
+producer restrictions, and limits; it is not a typed deep-state query or replay.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,

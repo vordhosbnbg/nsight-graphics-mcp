@@ -18,8 +18,10 @@ passes 57 launches with synchronization validation. R-010's advanced fixture is
 complete. At **0.2.2**, optional SDK control passes 12 basic captures and 6
 default-mode regressions on matching SDK 0.9.2/0.9.0 toolchains, with independently
 verified frame selection; see [SDK_CONTROL.md](docs/SDK_CONTROL.md).
-Detailed event state and the diagnosis/source-repair/recapture workflow remain
-unfinished. Actual GPU replay
+At **0.2.3**, `capture_cpp` adds generated API source and resource-file retention
+as a separate mode, bringing the current surface to **16 tools**. Its contract
+and qualification are in [CPP_CAPTURE.md](docs/CPP_CAPTURE.md). Typed deep state
+and the diagnosis/source-repair/recapture workflow remain unfinished. Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
 [INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in

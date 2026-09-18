@@ -363,5 +363,58 @@ int main(int argc, char** argv) {
         require(cancelled_result.outcome == ngm::NsightOutcome::Cancelled && cancelled_result.process.cleanup_confirmed,
                 "export cancellation forwards to process ownership cleanup");
         require_owned_pids_gone(scratch.path / "cancelled pids.txt");
+
+        const auto cpp_options = [&](const std::string& name) {
+            ngm::NsightCppCaptureOptions options;
+            options.context = context(scratch.path / name / "logs");
+            options.executable = target;
+            options.working_directory = scratch.path / "target working directory";
+            options.output_directory = scratch.path / name / "generated";
+            options.arguments = {"--scenario", "reference"};
+            options.wait_frames = 5;
+            options.context.environment["NGM_TARGET_RECORD"] = (scratch.path / "cpp targets.txt").string();
+            return options;
+        };
+        const auto cpp = ngm::run_nsight_cpp_capture(installation, cpp_options("cpp success"));
+        require_success(cpp.operation);
+        require(cpp.metadata.primary_api == "vulkan" && cpp.metadata.build_id == 38722833 &&
+                    cpp.source_files.size() == 12 &&
+                    std::filesystem::is_regular_file(cpp.project_directory / "data.bin"),
+                "C++ capture retains its distinct metadata schema and generated source/data paths");
+        require(std::find(cpp.operation.arguments.begin(), cpp.operation.arguments.end(), "--wait-frames=5") !=
+                    cpp.operation.arguments.end(),
+                "C++ wait control reaches the real process boundary");
+        for(const auto* mode :
+            {"fail", "missing", "missing-resource", "missing-partition", "missing-header", "unsafe-cmake-path",
+             "wrong-producer", "duplicate-key", "ambiguous", "symlink", "fifo", "bad-bmp"}) {
+            auto options = cpp_options(std::string("cpp ") + mode);
+            options.context.environment["NGM_STANDIN_CPP_MODE"] = mode;
+            const auto result = ngm::run_nsight_cpp_capture(installation, options);
+            require(result.operation.outcome == (std::string_view(mode) == "fail"
+                                                     ? ngm::NsightOutcome::Failed
+                                                     : ngm::NsightOutcome::InvalidOutput) &&
+                        result.operation.process.cleanup_confirmed,
+                    "C++ project rejects failed/incomplete/ambiguous or invalid evidence: " + std::string(mode));
+        }
+        auto absent_option = installation;
+        absent_option.cli.documented_options.erase("--wait-frames");
+        require(ngm::run_nsight_cpp_capture(absent_option, cpp_options("cpp unsupported option")).operation.outcome ==
+                    ngm::NsightOutcome::Unavailable,
+                "C++ interface requires its documented options");
+        auto unqualified = installation;
+        unqualified.cli.build = unqualified.capture.build = unqualified.replay.build = "99999999";
+        const auto unqualified_result = ngm::run_nsight_cpp_capture(unqualified, cpp_options("cpp unqualified"));
+        require(unqualified_result.operation.outcome == ngm::NsightOutcome::Unavailable &&
+                    !unqualified_result.operation.launched,
+                "an unqualified C++ producer cannot borrow another producer's schema profile");
+        auto cpp_timed = cpp_options("cpp timed");
+        cpp_timed.context.timeout = 150ms;
+        cpp_timed.context.environment["NGM_STANDIN_CPP_MODE"] = "hang";
+        cpp_timed.context.environment["NGM_STANDIN_PIDS"] = (scratch.path / "cpp timed pids.txt").string();
+        const auto cpp_timeout = ngm::run_nsight_cpp_capture(installation, cpp_timed);
+        require(cpp_timeout.operation.outcome == ngm::NsightOutcome::TimedOut &&
+                    cpp_timeout.operation.process.cleanup_confirmed,
+                "--no-timeout cannot disable the outer C++ capture deadline or descendant cleanup");
+        require_owned_pids_gone(scratch.path / "cpp timed pids.txt");
     });
 }

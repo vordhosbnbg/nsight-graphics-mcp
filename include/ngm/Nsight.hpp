@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ngm/Capabilities.hpp"
+#include "ngm/NsightEvidence.hpp"
 #include "ngm/Process.hpp"
 
 #include <cstdint>
@@ -112,6 +113,33 @@ struct NsightOperationResult {
     std::uint64_t output_bytes = 0;
     std::string message;
 };
+
+struct NsightCppCaptureOptions {
+    NsightRunContext context;
+    std::filesystem::path executable;
+    std::vector<std::string> arguments;
+    std::filesystem::path working_directory;
+    // Must not exist. ngfx creates its timestamped project below this directory.
+    std::filesystem::path output_directory;
+    std::uint64_t wait_frames = 2;
+};
+
+struct NsightCppCaptureResult {
+    NsightOperationResult operation;
+    std::filesystem::path project_directory;
+    NsightCppMetadata metadata;
+    // Relative to project_directory. Generated source IDs are local to this
+    // capture; they must not be joined to another capture's event inventories.
+    std::vector<std::filesystem::path> source_files;
+};
+
+// Documented Generate C++ Capture on the two explicitly qualified Vulkan
+// producers. Uses the same safe-token argument boundary as graphics capture.
+// Success checks one project, matching metadata, required regular source/data
+// files, and BMP framing. It does not compile source, decode data.bin, execute
+// GPU replay, or establish arbitrary resource contents at an event.
+NsightCppCaptureResult run_nsight_cpp_capture(const NsightInstallation& installation,
+                                              const NsightCppCaptureOptions& options, std::stop_token stop = {});
 
 // No shell is used. Because the documented --args string does not define its
 // escaping rules, this adapter accepts only nonempty ASCII tokens composed of

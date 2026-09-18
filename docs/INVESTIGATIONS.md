@@ -582,6 +582,193 @@ Corrected report `bundle-5ae595db97eecc3d2d117e1a5123c31f` and baseline
 Revisit if the application context or raw shader-manifest representation changes;
 the harness still must compare their complete content after the explicit tag.
 
+### I-013 — Matching 2026.2 C++ capture also fails during connection
+
+Date: **2026-09-18**. State: **Open**. Related item: R-006; follow-up to I-006.
+The documented [Generate C++ Capture
+activity](https://docs.nvidia.com/nsight-graphics/UserGuide/generate-cpp-activity.html)
+was tested with matching **2026.2.0.0/build 37991608** tools. The retained help
+advertises the activity and every requested option. This probes a documented
+source export, without parsing private capture formats.
+
+The frozen **0.2.2** fixture has SHA-256
+`cc4330e4e804b2a43c584635bd33eeff945dcaa0ed623707fab097b67c144563`, matching the
+successful default-mode capture `bundle-f5e4dab66b22c440fdf230bd73eaf539` and
+application baseline `bundle-06953401867d9a2a5f5b38cb73d2aad3`. Both references
+remain pinned. It was built with SDK **0.9.0**, but this invocation requests no
+SDK control. The references identify RTX 3080 Ti / driver 615.71.09 and KDE
+Wayland through Xwayland/XCB. The probe copies and hashes its executable and
+shader inputs, uses isolated HOME/XDG/temp directories, and preserves the system
+data search path. No driver, desktop, or profiling configuration changed.
+
+Reproduction: compile retained `raw/CppCaptureInspection.cpp` against the
+project's C++20 headers and `ngm_capture`, `ngm_artifacts`, `ngm_nsight`, and
+`ngm_core` archives. Its arguments are absolute store, matching installation,
+frozen fixture, reference-capture ID, and baseline ID. `raw/report.json` retains
+the complete launch arguments and input identities. The activity uses
+`--wait-frames=2`, scenario `reference`, seed 42, 192×128, final application frame
+120, and an explicit retained shader directory and fresh application output.
+
+Expected: generated C++ resource/state/frame sources and associated data.
+Observed: Nsight detects PID **144293** with status `Vulkan instance created`,
+then repeatedly searches for the process before reporting its internal operation
+timeout. It exits **1**; the outer 120-second deadline does **not** expire, and
+there is no cancellation or process-runner error. Cleanup is confirmed. No C++
+files, application result, or final readback are produced. The copied executable
+hash is unchanged; application shader provenance is retained. These logs do not
+identify the reason connection stops after the initial observation.
+
+**Pinned failed bundle:** `bundle-f2a49d27a1ea24b00c0ecb3b95bfb574` under
+`artifacts/nsight-evidence`, with `raw/report.json`, the exact probe source,
+fixture/shaders, launcher/discovery logs, manifest, and persistent pin. It is a
+normal failed bundle, not a cleanup quarantine. Fresh-context probe review
+corrected the success guard before this run so timeout, cancellation, and process
+errors cannot pass merely because source files exist.
+
+Follow-up: a fresh run with documented CLI `--verbose` and target
+`VK_LOADER_DEBUG=all` succeeds, exits zero, and confirms cleanup. It is pinned as
+`bundle-cd9faf11bccbc42e3da46f1275b39073`. Its generated metadata records the
+requested loader variable; captured launcher stderr does not contain loader
+diagnostics. A subsequent run with neither diagnostic option also succeeds,
+pinned as `bundle-31416cc9a35fef45aa1ef5a828473393`. Both preserve the same
+executable/shader inputs, contain generated C++/data, and have screenshots that
+match the retained frame-2 baseline exactly in decoded RGB. The successful
+follow-ups establish a working reference extraction path; they do not identify
+the first attempt's failure cause or prove that logging fixed it.
+
+[INSPECTION.md](INSPECTION.md#generated-c-reference-evidence-on-20262) records
+source associations, selected resource extraction through the generated helper,
+and remaining qualification. The current host reports `vm.nr_hugepages=128`;
+an existing `/etc/profile.d/hugepages.sh` writes this value during login-shell
+startup. Subsequent orchestration uses non-login shells. No before/after kernel
+setting evidence establishes any relationship to the capture results.
+
+Conclusion: keep this failed attempt and its cause unresolved, alongside the
+successful follow-ups. Revisit connection diagnostics if the failure recurs
+under a controlled run; qualify correct/faulty pairs and other workloads/releases
+before generalizing the demonstrated source path. Ordinary Graphics Capture
+remains independently qualified. [Khronos loader logging
+documentation](https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderDebugging.md)
+describes the diagnostic variable used here.
+
+### I-014 — Faulty shader C++ capture reaches the internal connection timeout
+
+Date: **2026-09-18**. State: **Open**. Related item: R-006; follows I-013's
+successful reference repeats. A fresh **2026.2.0.0/build 37991608** Generate C++
+Capture attempt selects `shader-error` with the same frozen executable/shaders,
+seed 42, 192×128, final application frame 120, and `--wait-frames=2`. The native
+probe adds the reviewed `--verbose` / `--env=VK_LOADER_DEBUG=all` diagnostic
+options; its exact source and arguments are retained. The executable hash remains
+`cc4330e4e804b2a43c584635bd33eeff945dcaa0ed623707fab097b67c144563` before/after.
+The qualified reference capture and baseline are the same pinned inputs as I-013.
+
+Expected: a faulty member of the generated-source pair, allowing shader and
+output comparison. Observed: the launcher reports `Vulkan instance created`,
+then its internal operation timeout. Exit is **1**, with no outer timeout,
+cancellation, or process-runner error; cleanup is confirmed. No C++ files are
+produced. This attempt does not complete the correct/faulty extraction pair.
+
+**Pinned failed bundle:** `bundle-02687bc350297f6dd2e51d39d2c2340e`. Its
+`raw/CppCaptureScenarioProbe.cpp`, `raw/report.json`, frozen inputs, and
+launcher/discovery logs reproduce the attempt. The native experiment accepts
+only the basic `reference` / `shader-error` selectors and otherwise retains the
+previous probe's lifecycle and success checks.
+
+The successful ordinary reference attempt took roughly 31 seconds including
+discovery/export, while this failed attempt took roughly 38 seconds. These
+durations do not identify the connection failure's cause. The next probe tests
+the launcher's documented suggestion, `--no-timeout`, while retaining the native
+runner's independent **120-second** deadline and owned-process cleanup. That
+separates Nsight's shorter internal connection deadline from the experiment's
+bounded lifetime. The option is documented in the [CLI launch
+reference](https://docs.nvidia.com/nsight-graphics/UserGuide/launch-application-overview.html#cli-arguments-details)
+and the retained matching help. No machine setting change is needed.
+
+### I-015 — Bounded C++ capture waits for a migration notice
+
+Date: **2026-09-18**. State: **Open**. Related item: R-006; follows I-014.
+The same 2026.2 `shader-error` attempt adds documented `--no-timeout`, retaining
+the native runner's 120-second deadline. The frozen executable/shaders and all
+workload inputs remain the same. Expected: distinguish a shorter internal
+connection deadline from a target that cannot progress. Observed: the native
+deadline expires, sends signal **15**, and confirms owned-process cleanup.
+`exit_code` is null, `timed_out` is true, and no C++ source is produced.
+
+During this owned invocation, read-only Linux process inspection finds fixture
+PID **186237** sleeping in `do_wait` and its child **186270**, `zenity`. Reading
+that child's command line after verifying its parent records the informational
+title `Next-generation Graphics Capture Tools Available`. Its message explains
+that Graphics Capture replaces the legacy Frame Debugger for D3D12/Vulkan and
+explicitly documents **`NSIGHT_SUGGEST_GRAPHICS_CAPTURE=0`** to suppress this
+notice. No window was clicked or automated. The separate observations at
+06:45:01 and 06:46:18 UTC support the blocking-notice diagnosis; they are not a
+simultaneous `waitpid` trace and do not retroactively establish the
+cause of I-006/I-013/I-014, whose child state was not retained.
+
+**Pinned failed capture probe:** `bundle-2e10c11bd0bd7f5378f32c300376b5e0`, with
+`raw/CppCaptureNoTimeout.cpp`, full arguments, input identities, process outcome,
+and launcher/discovery logs. **Pinned process-observation snapshot:**
+`bundle-57f831ab54a3e2dde0c588f9ab8413b8`, with
+`raw/imported/process-snapshot.json` and
+`raw/imported/owned-dialog-command.json`, including timestamps, exact observed
+PIDs/parent, and the message text. The native importer reports product 0.2.2.
+
+The fresh follow-up passes the message-documented suppression variable through
+`ngfx --env` and succeeds in roughly 9.5 seconds including discovery/export,
+with exit zero and cleanup confirmed. The generated faulty capture is pinned as
+`bundle-4625a12836a154589f2f03849a5fa361`. This supplies the faulty source export;
+image and shader comparisons are separate qualification steps. The native
+deadline and cleanup remain unchanged. This is a per-launch Nsight setting, not a driver/desktop
+configuration change or GUI interaction. No matching public web documentation
+was found for the variable in the bounded NVIDIA-source search; its authority
+here is the exact tool-generated runtime instruction retained above. Qualify
+the resulting behavior on each tested release before using it in a backend.
+
+Subsequent 0.2.2 experiments succeed on the basic correct/faulty pair on both
+matching releases. Independent image and shader comparisons are pinned as
+`bundle-4d0ca74d88003db698ae2dca0b952e11`; [INSPECTION.md](INSPECTION.md) identifies
+all source and resource bundles. These results qualify the per-launch suppression
+for those experiments without assigning causes to earlier unobserved failures.
+The production 0.2.3 mode uses the same suppression without diagnostic environment
+variables; its separate acceptance results are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md).
+
+### I-016 — Product C++ capture omitted the required output directory
+
+Date: **2026-09-18**. State: **Resolved**. Related items: R-006, R-015.
+The first 0.2.3 `capture_cpp` hardware run used matching Nsight
+**2026.3.1.0/build 38722833**, GCC 16.2.1 Debug, and the same RTX 3080 Ti /
+615.71.09 / KDE Wayland-Xwayland configuration as I-015. No SDK was used.
+The documented Generate C++ Capture activity received `--wait-frames=2`,
+`--no-timeout`, and the runtime-documented migration-notice suppression.
+The fresh reference target used seed 42, 192×128, and final frame 120.
+
+Expected: a generated source project. Observed: launcher exit **1** after about
+5.2 seconds, with `No such output directory` and `Invalid general options`.
+Cleanup was confirmed and the GPU reservation released. The backend rejected
+an existing output path but failed to create the fresh directory before launch;
+the earlier successful experiment explicitly created it. This is an adapter
+error, not an unavailable Nsight capability.
+
+**Pinned failed attempt:** `bundle-18972888569f4911619fb90616c78711` retains
+`raw/report.json` with exact argv/environment/tool identities and launcher logs.
+**Pinned harness/input/transcript snapshot:**
+`bundle-b579b128bedb15d655cb8a1f7ff6b7fc`, containing the frozen server, fixture,
+shaders, runner source, report, and MCP transcript. The fixture SHA-256 is
+`0cc871be97972deee89e335e3c86063b1e6a79227516fbc0c17f9c2b326ebc11`.
+Reproduction uses `ngm_cpp_capture_integration` with server, fixture, shader,
+Nsight installation, artifact, and isolated run paths followed by
+`reference shader-error`; the exact local invocation is retained in
+`build/cpp-mcp-validation/nsight-2026.3/invocation.json`.
+
+Correction: exclusively create the output directory after rejecting pre-existing
+paths, and make the CPU stand-in require it. Revisit immediately with the corrected
+backend through the same MCP harness, then qualify the second matching release.
+The corrected 2026.3 run passes all three fresh captures, generated-source reads,
+screenshot repeat/difference, and pins/indexes after restart. Its report, frozen
+inputs, runner, and transcripts are pinned as
+`bundle-d2579d201899eba43073dfdcecf2387f`; the exact successful captures are listed
+in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). This resolves the directory error.
+
 ## Entry template
 
 Use the next unused I-### ID. An unsuccessful retry gets a new entry linked to the

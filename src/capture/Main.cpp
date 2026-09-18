@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
                "  [--nsight-root DIR] [--argument TEXT ...] [--capture-frame N] [--timeout-ms N]\n"
                "  [--application-output-option NAME] [--provenance-json PATH] [--pin]\n"
                "  [--delimiter present|graphics_capture_api]\n"
+               "  [--format graphics|cpp] [--wait-frames N (cpp only)]\n"
                "Launch a fresh application with documented Nsight CLI, export evidence, and retain a managed bundle.\n"
                "Arguments are subject to the documented adapter's safe-token limit. --pin protects retained "
                "evidence.\n";
@@ -66,6 +67,13 @@ int main(int argc, char** argv) {
                 request.application_output_option = value;
             } else if(key == "--capture-frame") {
                 request.capture_frame = integer(value, "--capture-frame");
+            } else if(key == "--format") {
+                if(value != "graphics" && value != "cpp") {
+                    throw std::invalid_argument("--format must be graphics or cpp");
+                }
+                request.format = value == "cpp" ? ngm::CaptureFormat::Cpp : ngm::CaptureFormat::Graphics;
+            } else if(key == "--wait-frames") {
+                request.cpp_wait_frames = integer(value, "--wait-frames");
             } else if(key == "--delimiter") {
                 request.delimiter = ngm::parse_capture_delimiter(value);
             } else if(key == "--timeout-ms") {
@@ -95,6 +103,11 @@ int main(int argc, char** argv) {
             if(!seen.contains(key)) {
                 throw std::invalid_argument(std::string("Missing required option ") + key);
             }
+        }
+        if((request.format == ngm::CaptureFormat::Cpp &&
+            (seen.contains("--capture-frame") || seen.contains("--delimiter"))) ||
+           (request.format == ngm::CaptureFormat::Graphics && seen.contains("--wait-frames"))) {
+            throw std::invalid_argument("--wait-frames is for cpp; --capture-frame and --delimiter are for graphics");
         }
         ngm::CaptureService service(std::move(options));
         const auto timeout = request.timeout;

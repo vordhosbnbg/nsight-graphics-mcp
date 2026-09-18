@@ -66,7 +66,10 @@ bool has(const std::vector<std::string>& arguments, std::string_view name) {
 
 int launch_target(const std::vector<std::string>& arguments) {
     const auto executable = value(arguments, "--exe");
-    const auto working_directory = value(arguments, "--working-dir");
+    auto working_directory = value(arguments, "--working-dir");
+    if(working_directory.empty()) {
+        working_directory = value(arguments, "--dir");
+    }
     std::vector<std::string> target_arguments{executable};
     std::istringstream tokens(value(arguments, "--args"));
     for(std::string token; tokens >> token;) {
@@ -133,6 +136,13 @@ int main(int argc, char** argv) {
             std::cout << "unrelated program --help --version\n";
         } else if(is_cli) {
             std::cout << "NVIDIA Nsight Graphics [general_options] [activity_options]:\n--version --help --help-all\n";
+            for(const auto* option : {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--wait-frames",
+                                      "--args", "--env", "--no-timeout"}) {
+                if(environment("NGM_OMIT_CPP_OPTION") != option) {
+                    std::cout << ' ' << option;
+                }
+            }
+            std::cout << '\n';
         } else if(capture) {
             std::cout << "NVIDIA Nsight Graphics Capture CLI Tool\n--version --help --exe --working-dir --args "
                          "--output-file --output-dir --capture-frame --frame-count --delimiter-present "
@@ -160,6 +170,9 @@ int main(int argc, char** argv) {
        name == "ngfx-replay" && replay_mode != nullptr) {
         mode = replay_mode;
     }
+    if(is_cli && !environment("NGM_STANDIN_CPP_MODE").empty()) {
+        mode = environment("NGM_STANDIN_CPP_MODE");
+    }
     std::cerr << "stand-in diagnostic only\n";
     if(mode == "hang") {
         hang();
@@ -167,6 +180,81 @@ int main(int argc, char** argv) {
     if(mode == "fail") {
         std::cout << "Version: 2026.3.1.0 (build 38722833)\n";
         return 1;
+    }
+    if(is_cli) {
+        if(value(arguments, "--activity") != "Generate C++ Capture" ||
+           value(arguments, "--platform") != "Linux (x86_64)" || !has(arguments, "--no-timeout") ||
+           value(arguments, "--env") != "NSIGHT_SUGGEST_GRAPHICS_CAPTURE=0" ||
+           value(arguments, "--wait-frames").empty() ||
+           !std::filesystem::is_directory(value(arguments, "--output-dir"))) {
+            return 85;
+        }
+        const auto target_exit = launch_target(arguments);
+        if(target_exit != 0 || mode == "missing") {
+            return target_exit;
+        }
+        const auto project =
+            std::filesystem::path(value(arguments, "--output-dir")) / "CppCaptures/cpu-synthetic-project";
+        std::filesystem::create_directories(project);
+        for(const auto* file : {"CommandLists.h",        "ReplayProcedures.h",
+                                "FrameReset00.cpp",      "ReplayProcedures.cpp",
+                                "PerfMarkersReset.cpp",  "PerfMarkersSetup.cpp",
+                                "WinResourcesReset.cpp", "WinResourcesSetup.cpp",
+                                "Resources.h",           "Resources00.cpp",
+                                "CommandList00.cpp",     "Frame0Part00.cpp",
+                                "FrameSetup00.cpp",      "ReadOnlyDatabase.cpp",
+                                "ReadOnlyDatabase.h",    "DataScope.cpp",
+                                "DataScope.h",           "data.bin",
+                                "data.bin.rec",          "cpu-synthetic-project.ngfx-cppcap"}) {
+            if(mode == "missing-resource" && std::string_view(file) == "data.bin") {
+                continue;
+            }
+            std::ofstream stream(project / file);
+            stream << "CPU stand-in generated project; not real Nsight source or serialized resource data\n";
+        }
+        {
+            std::ofstream cmake(project / "CMakeLists.txt");
+            cmake << "set(GeneratedReplayHeaders\n    CommandLists.h\n    ReplayProcedures.h\n    Resources.h\n)\n"
+                     "add_library(GeneratedReplay ${ReplayExecutorLibraryType}\n"
+                     "    CommandList00.cpp\n    Frame0Part00.cpp\n    FrameReset00.cpp\n    FrameSetup00.cpp\n"
+                     "    PerfMarkersReset.cpp\n    PerfMarkersSetup.cpp\n    ReplayProcedures.cpp\n"
+                     "    Resources00.cpp\n    WinResourcesReset.cpp\n    WinResourcesSetup.cpp\n";
+            if(mode == "missing-partition") {
+                cmake << "    CommandList01.cpp\n";
+            }
+            if(mode == "unsafe-cmake-path") {
+                cmake << "    ../outside.cpp\n";
+            }
+            cmake << "\n${GeneratedReplayHeaders})\n";
+        }
+        if(mode == "missing-header") {
+            std::filesystem::remove(project / "CommandLists.h");
+        }
+        {
+            std::ofstream metadata(project / "metadata.json");
+            metadata << R"({"metadata_version":1,"nsight_version":"2026.3.1","nsight_version_build_id":)"
+                     << (mode == "wrong-producer" ? "42" : "38722833")
+                     << R"(,"primary_api":"vulkan","primary_gpu":"CPU stand-in",)"
+                        R"("project_filename":"cpu-synthetic-project","has_unsupported_operation":false)"
+                     << (mode == "duplicate-key" ? R"(,"metadata_version":1})" : "}");
+        }
+        if(mode == "ambiguous") {
+            std::filesystem::create_directories(project.parent_path() / "second-project");
+            std::filesystem::copy_file(project / "metadata.json",
+                                       project.parent_path() / "second-project/metadata.json");
+        }
+        if(mode == "symlink") {
+            std::filesystem::create_symlink(environment("NGM_TARGET_RECORD"), project / "linked-data");
+        } else if(mode == "fifo") {
+            mkfifo((project / "fifo-data").c_str(), 0600);
+        } else if(mode == "too-many") {
+            for(int index = 0; index < 4100; ++index) {
+                std::ofstream(project / ("extra-" + std::to_string(index))) << "synthetic overflow\n";
+            }
+        }
+        std::ofstream image(project / "screenshot.bmp", std::ios::binary);
+        image << (mode == "bad-bmp" ? "XX" : "BM") << std::string(52, '\0');
+        return 0;
     }
     if(capture) {
         if(!has(arguments, "--terminate-after-capture") || !has(arguments, "--no-bundle-replayer") ||

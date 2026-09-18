@@ -7,8 +7,10 @@
 #include <fcntl.h>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <sys/stat.h>
+#include <tuple>
 #include <unistd.h>
 
 namespace ngm {
@@ -284,6 +286,46 @@ bool usable_installation(NsightOperationResult& result, const NsightInstallation
     }
     return true;
 }
+
+// Both qualified producers emit these literal blocks. Read the declarations
+// without evaluating CMake; platform-conditional runtime blocks are separate.
+std::set<std::string> generated_cmake_inputs(const std::string& cmake) {
+    std::set<std::string> result;
+    const std::regex filename("[A-Za-z][A-Za-z0-9_]*\\.(cpp|h)");
+    for(const auto& [begin, end, extension] : std::vector<std::tuple<std::string, std::string, std::string>>{
+            {"set(GeneratedReplayHeaders\n", "\n)", ".h"},
+            {"add_library(GeneratedReplay ${ReplayExecutorLibraryType}\n", "\n${GeneratedReplayHeaders})", ".cpp"}}) {
+        const auto start = cmake.find(begin);
+        if(start == std::string::npos || (start != 0 && cmake[start - 1] != '\n') ||
+           cmake.find(begin, start + begin.size()) != std::string::npos) {
+            throw std::runtime_error("Missing, ambiguous, or unsupported generated CMake file-list block");
+        }
+        const auto finish = cmake.find(end, start + begin.size());
+        if(finish == std::string::npos) {
+            throw std::runtime_error("Truncated generated CMake file-list block");
+        }
+        std::istringstream tokens(cmake.substr(start + begin.size(), finish - start - begin.size()));
+        std::size_t count = 0;
+        for(std::string token; tokens >> token;) {
+            if(++count > 1024 || token.size() > 255 || !std::regex_match(token, filename) ||
+               !token.ends_with(extension) || !result.insert(token).second) {
+                throw std::runtime_error("Invalid or repeated literal generated-source filename in CMake");
+            }
+        }
+        if(count == 0) {
+            throw std::runtime_error("Empty generated CMake file-list block");
+        }
+    }
+    for(const auto* required :
+        {"CommandLists.h", "ReplayProcedures.h", "Resources.h", "CommandList00.cpp", "Resources00.cpp",
+         "FrameSetup00.cpp", "FrameReset00.cpp", "Frame0Part00.cpp", "ReplayProcedures.cpp", "PerfMarkersReset.cpp",
+         "PerfMarkersSetup.cpp", "WinResourcesReset.cpp", "WinResourcesSetup.cpp"}) {
+        if(!result.contains(required)) {
+            throw std::runtime_error(std::string("Generated CMake omits required source/header ") + required);
+        }
+    }
+    return result;
+}
 } // namespace
 
 NsightInstallation inspect_nsight(const NsightInspectionOptions& options, std::stop_token stop) {
@@ -499,6 +541,155 @@ NsightOperationResult export_nsight_capture(const NsightInstallation& installati
     } catch(const std::exception& error) {
         result.outcome = NsightOutcome::InvalidOutput;
         result.message = error.what();
+    }
+    return result;
+}
+
+NsightCppCaptureResult run_nsight_cpp_capture(const NsightInstallation& installation,
+                                              const NsightCppCaptureOptions& options, std::stop_token stop) {
+    namespace fs = std::filesystem;
+    NsightCppCaptureResult result;
+    auto& operation = result.operation;
+    operation.process.cleanup_confirmed = true;
+    if(!usable_installation(operation, installation)) {
+        return result;
+    }
+    const auto& cli = installation.cli;
+    const bool profile_20263 = cli.version == "2026.3.1.0" && cli.build == "38722833";
+    const bool profile_20262 = cli.version == "2026.2.0.0" && cli.build == "37991608";
+    if(!cli.path || !cli.help_valid || !matching_tools(cli, installation.capture) ||
+       (!profile_20263 && !profile_20262)) {
+        operation.outcome = NsightOutcome::Unavailable;
+        operation.message = "Generate C++ Capture requires a qualified matching 2026.3.1.0/38722833 or "
+                            "2026.2.0.0/37991608 installation";
+        return result;
+    }
+    for(const auto* flag : {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--wait-frames", "--args",
+                            "--env", "--no-timeout"}) {
+        if(!cli.documented_options.contains(flag)) {
+            operation.outcome = NsightOutcome::Unavailable;
+            operation.message = std::string("ngfx help does not advertise required C++ capture option ") + flag;
+            return result;
+        }
+    }
+    const auto deadline = std::chrono::steady_clock::now() + options.context.timeout;
+    fs::path output;
+    try {
+        if(options.wait_frames < 2 || options.wait_frames > 1000000) {
+            throw std::runtime_error("C++ capture wait_frames must be in [2, 1000000]");
+        }
+        const auto target = executable_path(options.executable);
+        const auto directory = directory_path(options.working_directory, "Application working directory");
+        const auto arguments = target_arguments(options.arguments);
+        output = fresh_file(options.output_directory);
+        // ngfx requires an existing output directory, unlike ngfx-capture's file output.
+        // Claim it exclusively after rejecting existing paths; never reuse another attempt.
+        if(!fs::create_directory(output)) {
+            throw std::runtime_error("Could not create fresh C++ capture output directory");
+        }
+        auto process = process_options(*cli.path, options.context, "cpp-capture");
+        // Nsight's migration notice explicitly documents this per-target value.
+        // See retained runtime instruction and suppression qualification in I-015.
+        // --no-timeout disables ngfx's internal deadline, not our owned-process deadline.
+        process.arguments = {"--activity=Generate C++ Capture",
+                             "--platform=Linux (x86_64)",
+                             "--no-timeout",
+                             "--env=NSIGHT_SUGGEST_GRAPHICS_CAPTURE=0",
+                             "--exe=" + target.string(),
+                             "--dir=" + directory.string(),
+                             "--output-dir=" + output.string(),
+                             "--wait-frames=" + std::to_string(options.wait_frames)};
+        if(!arguments.empty()) {
+            process.arguments.push_back("--args=" + arguments);
+        }
+        if(!run_operation(operation, process, stop)) {
+            return result;
+        }
+    } catch(const std::exception& error) {
+        operation.outcome = NsightOutcome::InvalidInput;
+        operation.message = error.what();
+        return result;
+    }
+    try {
+        if(fs::symlink_status(output).type() != fs::file_type::directory) {
+            throw std::runtime_error("C++ capture did not produce a real output directory");
+        }
+        std::size_t entries = 0;
+        std::vector<fs::path> metadata_files;
+        std::vector<fs::path> files;
+        for(auto it = fs::recursive_directory_iterator(output); it != fs::recursive_directory_iterator(); ++it) {
+            if(stop.stop_requested() || std::chrono::steady_clock::now() >= deadline) {
+                operation.outcome = stop.stop_requested() ? NsightOutcome::Cancelled : NsightOutcome::TimedOut;
+                operation.message = "C++ capture stopped during generated-project validation";
+                return result;
+            }
+            if(++entries > 3500 || it.depth() > 8 || it->path().lexically_relative(output).native().size() > 384 ||
+               it->path().native().size() > 4096) {
+                throw std::runtime_error("Generated C++ project exceeds file-count, nesting, or path limits");
+            }
+            const auto kind = it->symlink_status().type();
+            if(kind == fs::file_type::regular) {
+                if(fs::hard_link_count(it->path()) != 1) {
+                    throw std::runtime_error("Generated project contains a multiply linked file");
+                }
+                regular_file_size(it->path(), true, 0);
+                files.push_back(it->path());
+                if(it->path().filename() == "metadata.json") {
+                    metadata_files.push_back(it->path());
+                }
+            } else if(kind != fs::file_type::directory) {
+                throw std::runtime_error("Generated project contains a symlink or non-regular file");
+            }
+        }
+        if(metadata_files.size() != 1) {
+            throw std::runtime_error("Expected exactly one generated C++ project with metadata.json");
+        }
+        const auto project = metadata_files.front().parent_path();
+        result.metadata = parse_nsight_cpp_metadata(read_regular_file(metadata_files.front(), 1024U * 1024U));
+        if(result.metadata.nsight_version != (profile_20263 ? "2026.3.1" : "2026.2.0") ||
+           result.metadata.build_id != (profile_20263 ? 38722833U : 37991608U) ||
+           result.metadata.primary_api != "vulkan" || result.metadata.project_filename != project.filename().string()) {
+            throw std::runtime_error("Generated C++ metadata does not match the selected Vulkan producer/project");
+        }
+        for(const auto* name : {"CMakeLists.txt", "Resources.h", "Resources00.cpp", "CommandList00.cpp",
+                                "Frame0Part00.cpp", "FrameSetup00.cpp", "ReadOnlyDatabase.cpp", "ReadOnlyDatabase.h",
+                                "DataScope.cpp", "DataScope.h", "data.bin", "data.bin.rec", "screenshot.bmp"}) {
+            regular_file_size(project / name, false, 0);
+        }
+        const auto declared = generated_cmake_inputs(read_regular_file(project / "CMakeLists.txt", 1024U * 1024U));
+        for(const auto& file : declared) {
+            regular_file_size(project / file, false, 16U * 1024U * 1024U);
+        }
+        regular_file_size(project / (project.filename().string() + ".ngfx-cppcap"), false, 1024U * 1024U);
+        const auto screenshot = read_regular_file(project / "screenshot.bmp", 64U * 1024U * 1024U);
+        if(screenshot.size() < 54 || !screenshot.starts_with("BM")) {
+            throw std::runtime_error("Generated screenshot lacks a BMP header");
+        }
+        for(const auto& file : files) {
+            const auto relative = file.lexically_relative(project);
+            if(relative.empty() || *relative.begin() == "..") {
+                throw std::runtime_error("Generated output contains files outside its single project");
+            }
+            if(file.extension() == ".cpp") {
+                regular_file_size(file, false, 16U * 1024U * 1024U);
+                result.source_files.push_back(relative);
+            }
+        }
+        std::sort(result.source_files.begin(), result.source_files.end());
+        if(stop.stop_requested() || std::chrono::steady_clock::now() >= deadline) {
+            operation.outcome = stop.stop_requested() ? NsightOutcome::Cancelled : NsightOutcome::TimedOut;
+            operation.message = "C++ capture stopped after generated-project validation";
+            return result;
+        }
+        result.project_directory = project;
+        operation.output_file = metadata_files.front();
+        operation.output_bytes = regular_file_size(operation.output_file, false, 1024U * 1024U);
+        operation.outcome = NsightOutcome::Success;
+        operation.message = "One generated Vulkan C++ project has matching metadata and required source/data files; "
+                            "source compilation, database decoding, image decoding, and GPU replay are not performed";
+    } catch(const std::exception& error) {
+        operation.outcome = NsightOutcome::InvalidOutput;
+        operation.message = error.what();
     }
     return result;
 }
