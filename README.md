@@ -1,87 +1,36 @@
 # nsight-graphics-mcp
 
-A C++ MCP server under development for NVIDIA Nsight Graphics on Linux.
-At **0.2.12**, the server exposes **22 tools**, including literal generated-resource
-references and bounded serialized-byte reads through optional confined workers.
-All nine visual defect scenarios have recorded source-repair verification on the
-two tested Nsight releases. Full visual-workflow qualification and source-installation
-acceptance remain active work. See [RESOURCE_QUERIES.md](docs/RESOURCE_QUERIES.md)
-for the new tools, storage costs and evidence limits.
+A C++20 MCP server for investigating Vulkan rendering defects with NVIDIA Nsight
+Graphics on Linux. Codex uses **22 local stdio tools** to capture a fresh application,
+inspect retained evidence, preview/compare images and verify source fixes. Codex's
+normal development tools perform source edits and builds.
 
-The milestones below record the implementation history.
-The source-build foundation, local stdio integration, and deterministic windowed
-Vulkan fixture completed the R-013/R-005/R-003 group at version 0.1.0, with CPU
-checks, a real Codex capability query, and local GPU fixture validation.
+The visual first-release group completes at **0.3.0** after independent review.
+All nine fixture defect scenarios have actual source-repair verification on Nsight
+**2026.3.1.0/build 38722833** and **2026.2.0.0/build 37991608**. The clean 0.2.12
+installation walkthrough passes **25 CPU checks** and a fresh shader repair;
+[ROADMAP.md](docs/ROADMAP.md) records the completed group and later work.
+The 0.3.0 GCC Debug aggregate also passes all 25 checks.
 
-The capture/evidence group completed at **0.2.0**: asynchronous jobs, managed
-artifact storage, a documented Nsight CLI adapter, and **15 MCP tools** including
-bounded metadata/event/object queries. The 0.2.0 complete CPU suite passed
-20 checks; focused parser, inspection, MCP, and version checks pass at **0.2.1**.
-The current basic/advanced matrix passes **54 fresh captures** across nine
-workload pairs on matching Nsight **2026.3.1.0/build 38722833** and
-**2026.2.0.0/build 37991608** tools. Typed metadata/event/object queries pass on
-all 54 retained captures, including server restart. Other producer tuples are
-explicitly rejected until qualified. The application-readback fixture matrix
-passes 57 launches with synchronization validation. R-010's advanced fixture is
-complete. At **0.2.2**, optional SDK control passes 12 basic captures and 6
-default-mode regressions on matching SDK 0.9.2/0.9.0 toolchains, with independently
-verified frame selection; see [SDK_CONTROL.md](docs/SDK_CONTROL.md).
-At **0.2.3**, `capture_cpp` adds generated API source and resource-file retention
-as a separate mode, bringing the current surface to **16 tools**. Its contract
-and qualification are in [CPP_CAPTURE.md](docs/CPP_CAPTURE.md). Thirty basic and
-advanced C++ captures pass on both matching releases. R-006's inspection
-investigation is complete with explicit capability gaps. At **0.2.4**, bounded
-P6/BMP image comparison brings the surface to **17 tools**.
-The basic shader source edit/rebuild/recapture case passes on both releases with
-exact repaired/reference RGB equality; see [SHADER_REPAIR.md](docs/SHADER_REPAIR.md).
-At **0.2.5**, `artifact_preview_image` adds bounded PNG previews for retained
-P6/PNG/BMP images, with explicit crop/downsampling metadata (**18 tools**).
-PNG input also works for original-image comparisons. See
-[IMAGE_PREVIEWS.md](docs/IMAGE_PREVIEWS.md).
-At **0.2.6**, `capture_cpp_source` and `capture_cpp_draws` add numbered source
-excerpts and qualified draw/pipeline/shader source relationships (**20 tools**).
-Retained MCP queries pass for 36 generated projects and 48 draws on both releases;
-see [CPP_INSPECTION.md](docs/CPP_INSPECTION.md). The final 0.2.6 CPU suite passes
-22 checks. Generic resource extraction,
-executed GPU state, and the remaining visual diagnosis/repair cases remain unfinished.
-At **0.2.7**, an opt-in fixed-capture descriptor hydration experiment qualifies
-setup array-slot mappings on four retained combined captures; see
-[DESCRIPTOR_HYDRATION.md](docs/DESCRIPTOR_HYDRATION.md). The MCP surface remains
-20 tools; this experiment is not a generic product resource reader.
-At **0.2.8**, an isolated C++ source repair passes for the combined and standalone
-postpass defects on both releases: 12 fresh captures match their application
-baselines, and repaired output exactly matches each correct reference. See
-[SOURCE_REPAIR.md](docs/SOURCE_REPAIR.md). Other defect families and generic
-resource access remain unfinished.
-At **0.2.9**, binding and pipeline-state source repairs also pass on both releases:
-12 fresh captures match independent application readbacks and repaired references.
-See [STATE_REPAIR.md](docs/STATE_REPAIR.md). Five of nine defect scenarios now have
-verified source repairs; the four resource-selection/indirect-parameter cases and
-generic bounded resource access remain unfinished. The surface remains 20 tools.
-At **0.2.10**, the four remaining standalone/combined resource-selection and
-indirect-parameter source repairs pass on both releases: 24 fresh captures and
-24 application readbacks, with exact repaired/reference pixels. All nine defect
-scenarios now have verified source repairs; generic bounded resource access and
-full release qualification remain unfinished. See [ADVANCED_REPAIR.md](docs/ADVANCED_REPAIR.md).
-Actual GPU replay
-timed out on both releases. See
-[NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
-[INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in
-[INVESTIGATIONS.md](docs/INVESTIGATIONS.md) for precise evidence and limits.
+Start with [INSTALL.md](docs/INSTALL.md) for the source-build-to-repair walkthrough.
+[VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md) consolidates capability/repair evidence
+and exact limits; [BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) preserves versioned
+milestones and tested configurations.
 
-At **0.2.11**, optional confined resource workers provide the underlying byte-reader
-boundary for both qualified generated-helper profiles. They remain internal
-components; general resource queries are not yet exposed through MCP. See
-[RESOURCE_WORKER.md](docs/RESOURCE_WORKER.md) for builds, limits and remaining work.
+The server provides asynchronous captures, managed/pinned evidence, metadata/event/
+object queries, generated-source draw/pipeline/shader relationships, and optional
+confined serialized-resource readers. Those relationships and bytes do not establish
+arbitrary executed GPU state. Standalone GPU replay remains unqualified after
+recorded timeouts. Compute correctness, performance profiling and HTTP are later work.
 
 ## Build on Linux
 
 Host prerequisites:
 
 - A C++20 compiler and matching standard library (`std::span` and
-  `std::source_location` are used). The qualification baseline is GCC 15.3 or
-  newer, or Clang 22.1 with libstdc++; see the exact
-  [tested configurations](docs/BUILD_VALIDATION.md). Older compilers are unqualified.
+  `std::source_location` are used). Recorded compilers are GCC 15.3.0/16.2.1 and Clang 22.1.8
+  with libstdc++; the current full suite uses GCC 16.2.1. See the exact
+  [tested configurations](docs/BUILD_VALIDATION.md); other versions are unqualified.
 - CMake 3.25 or newer, Ninja, Python 3, and the normal Linux C development
   headers/linker. Python runs glslang's header generator; it is not a server runtime.
 - Git for source/submodule acquisition, and GNU binutils (`ar`, `readelf`) for
@@ -159,6 +108,8 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_nsight_evidence_check` | Bounded parsing of sanitized observed metadata/event/object exports, invalid schemas, duplicate IDs/keys, and input limits. |
 | `ngm_capture_service_check` | Shared job/storage/backend workflow, retained success/failure evidence, timeout, and cancellation using executable stand-ins. |
 | `ngm_cpp_evidence_check` | Bounded generated-source associations, unsupported forms, malformed input, and result budgets. |
+| `ngm_resource_reference_check` | Literal resource references, declaration conflicts, source spans and unsupported forms. |
+| `ngm_resource_read_check` | Qualified worker supervision, leased input snapshots, bounded byte results, failures and publication retention. |
 | `ngm_cpp_inspection_check` | C++ bundle provenance/index completeness, source pagination, coverage, limits, and leases. |
 | `ngm_inspection_check` | Retained capture provenance, producer profiles, pagination, response bounds, and leased artifact image comparisons. |
 | `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |

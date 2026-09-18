@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0; R-010 advanced fixture complete at 0.2.1; R-002 optional SDK control complete at 0.2.2 for the qualified basic workload. The recorded CPU aggregate passes 20 checks. Basic/advanced capture and retained typed queries pass across 54 captures on two Nsight releases, with current focused CPU checks passing. Application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
+Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness, performance and HTTP remain pending.**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python

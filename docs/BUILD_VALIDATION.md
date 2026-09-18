@@ -1,5 +1,92 @@
 # Build and development validation
 
+## Visual release milestone (0.3.0)
+
+The related R-010/R-002/R-006/R-007/R-015/R-014 group completes at **0.3.0** on
+2026-09-18. The minor increment subsumes a patch increment. Capture/inspection
+behavior is unchanged from 0.2.12; the first-party code delta is the authoritative
+CMake version. The main GCC Debug `ngm_check` aggregate passes **25/25 without
+skips in 218.92 seconds**. Both configured optional workers rebuild at 0.3.0;
+CLI versions, negotiated MCP identity, 22-tool listing and retained pinned-artifact
+retrieval pass. The fresh GPU walkthrough below remains explicitly a 0.2.12 run.
+
+Fresh-context final release review validates the roadmap/group/version rules,
+document links and retained qualification identities. It corrected one matrix
+phrase: C++ repairs can retain identical shaders while application build identities
+change. The original pinned snapshot preserves the earlier draft; the final
+release record retains the correction, final documents, reviews and check logs.
+Source-installation evidence is separate from the newly rebuilt release binaries.
+The final record is complete/pinned as
+`bundle-c4319d1418a5b4ad16e1d173d8261c0c` in
+`artifacts/source-install-validation`: 28 files, 572,438 bundle bytes and 27
+verified payload hashes, with a checked reference to the primary qualification.
+
+## Linux source-installation walkthrough (R-014)
+
+Date: **2026-09-18**. Source commit **15df044**, product **0.2.12**.
+[INSTALL.md](INSTALL.md) is the exercised build-to-repair guide. A separate clone
+under `build/source-install-validation/checkout` used no copied build outputs or
+machine-specific cache from the development tree. Submodule acquisition used
+command-scoped local source mirrors at the seven exact gitlinks; this is source
+acquisition, not a prebuilt dependency substitution or a test of public repository
+access. The initial pre-submodule configure correctly failed with the documented
+initialization instruction; its log is retained.
+
+Configure, the 204-step default build, and `ngm_check` ran with networking disabled
+using `unshare --user --map-root-user --net`. All **25 CPU checks pass without
+skips in 217.06 seconds**, including actual binary/archive linkage inspection.
+The host has GCC **16.2.1 (20260810)**, CMake **4.4.3**, Ninja **1.13.2**, Python
+**3.14.7**, pkg-config **3.0.7**, XCB **1.17.0**, and Linux
+**7.2.6-zen2-1-zen x86-64**. The default clean build has no optional SDK or resource
+worker. A matching 2026.3 worker subsequently builds from the fresh capture's
+qualified helpers, also without network access. This validates a clean source/
+build tree on the recorded host, not a fresh distribution image or every compiler
+configuration. `unshare` is a validation wrapper, not a product prerequisite.
+
+On the recorded RTX 3080 Ti / driver 615.71.09 / KDE Wayland-Xwayland-XCB desktop,
+the guide's seed 42, 192x128, frame-2 tutorial passes with matching Nsight
+**2026.3.1.0/build 38722833** tools. Three fresh MCP C++ captures cover the correct
+reference, original `shader-error`, and rebuilt `shader-error`. All three
+screenshots exactly match independently launched frame-2 application readbacks
+from `ngm-experiment`. The original fault differs from the reference at **7,337
+pixels**, with maximum channel difference **140**; the repaired output has
+**zero** differing pixels/channel error at tolerance zero.
+
+The generated draw's fragment resource in each capture byte-matches its retained
+application SPIR-V. Retained GLSL identifies the faulty red/blue swizzle. The only
+source edit removes `.bgr` from `shaders/fixture/shader-error.frag`; a normal
+network-isolated CMake rebuild recompiles that shader and the fixture build
+identity. Original/repaired executable and shader hashes differ and are retained.
+The main checkout's deliberate defect is unchanged. All three capture bundles,
+three resource-read attempts and three imported application baselines are complete
+and pinned across restart. Exact request/response logs, source/build inputs and
+comparison records are archived.
+
+Codex CLI **0.154.0** independently launches this clean 0.2.12 stdio build using
+temporary command-line configuration, discovers 22 tools, calls `capabilities`
+and retrieves the complete/pinned repaired capture with `artifact_info`; it exits
+zero. No persistent user configuration is changed. This is a bounded real-client
+interoperability check; the repair was performed by the development agent with
+ordinary tools, with protocol requests recorded by the walkthrough driver.
+It does not claim a new autonomous Codex CLI diagnosis session.
+
+Fresh-context guide review corrected overly broad compiler-qualification wording.
+Its final independent audit rehashes **510 payloads in nine pinned bundles**,
+decodes the screenshots/readbacks with Pillow, verifies the three shader/source
+correlations and changed build identities, and checks the actual Codex events.
+The fresh tutorial uses 2026.3; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates
+the separately versioned two-release qualification and R-007/R-015 acceptance.
+
+The complete installation/acceptance snapshot is pinned as
+**`bundle-49217a19ae75f41fbe607152bbbd3699`** in
+`artifacts/source-install-validation`. It retains 121 payload files, the guide,
+source archive, clean binaries/logs, workflow responses, independent reviews and
+the earlier visual-acceptance audit. Its 902 unique referenced bundles remain
+explicitly pinned in their original stores. Publication checks validate payload
+sizes/hashes, referenced manifest identities/pins and the archived guide.
+Local reproducible scripts and receipts are under
+`build/source-install-validation`; the snapshot retains the corresponding inputs.
+
 ## R-013 source-build foundation
 
 Date: 2026-09-17. Product version: `0.0.1`.

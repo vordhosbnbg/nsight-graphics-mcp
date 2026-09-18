@@ -71,90 +71,34 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
-At initialization on 2026-09-17, this repository had no implementation, dependency
-manifest, or test suite. R-013 now supplies CMake/Ninja presets, pinned source
-dependencies, a source-built glslang compiler, CPU-only checks, and server/fixture
-entry points with version/help reporting. See [README.md](README.md) and
-[docs/BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) for verified commands and limits.
-R-003/R-005 complete the first build/basic-fixture group at version 0.1.0 with a
-real Codex capability query, a windowed Vulkan fixture, and an isolated C++
-experiment runner. Fresh-context reviews, CPU checks, and local GPU validation
-are recorded in docs/BUILD_VALIDATION.md, docs/MCP.md, and docs/FIXTURE.md.
-The R-012/R-011/R-001 capture/evidence group completes at **0.2.0** after
-independent acceptance review. It provides the job coordinator, managed artifact
-storage, documented Nsight CLI adapter, and shared `CaptureService`, used by the
-native `ngm-capture` command and stdio tools. The 0.2.0 surface had **15 MCP
-tools**, including bounded retained metadata/event/object queries. The integrated
-GCC Debug CPU suite passes **20 checks**. Real basic MCP capture/export matrices
-pass on matching Nsight **2026.3.1.0/build 38722833** and
-**2026.2.0.0/build 37991608** tools, with three fresh targets per release and
-persistent pins. The service preserves explicit `XDG_DATA_DIRS` and supplies
-standard defaults when unset or empty. Typed queries pass on both exact producer
-profiles at **0.2.1**. The basic and advanced matrix passes 54 fresh captures
-across nine workload pairs on matching tools; all 54 retained captures also pass
-typed metadata/event/object pagination and restart queries. The full fixture
-passes 57 fresh application-readback launches with synchronization validation.
-R-010 is complete with recorded advanced capture compatibility and export gaps.
-R-002 completes at **0.2.2** with optional per-launch SDK control, tested matching
-SDK 0.9.2/0.9.0 builds, 12 real basic SDK captures and 6 default-mode regressions
-through MCP, independently decoded frame correspondence, and retained pins.
-The default GCC Debug aggregate passes 20 checks; a subsequent portability
-annotation passes focused fixture checks on GCC and Clang. Exact SDK evidence,
-source/build identities, and limits are in docs/SDK_CONTROL.md. Detailed state
-and source repair remain unfinished. At 0.2.3, the separate `capture_cpp` mode
-retains generated source and resource files with a derived project index, bringing
-the current surface to 16 tools. See docs/CPP_CAPTURE.md for its validated scope,
-producer restrictions, and limits; it is not a typed deep-state query or replay.
-R-006 completes its investigation/interface acceptance at 0.2.3 after 30 real
-basic/advanced C++ captures and independently reviewed selected resource/shader
-extraction on both releases. Its capability/gap/next-action matrix is in
-docs/INSPECTION.md. R-007 remains active. At **0.2.4**, bounded artifact image comparison brings the
-surface to 17 tools. The basic shader source edit/build/recapture case passes on
-both releases, with exact repaired/reference RGB equality and retained pins; see
-docs/SHADER_REPAIR.md. At **0.2.5**, PNG comparison and bounded P6/PNG/BMP
-image previews bring the surface to 18 tools; docs/IMAGE_PREVIEWS.md records
-retained-file validation. At **0.2.6**, numbered generated-source queries and qualified draw/pipeline/shader
-relationships bring the surface to 20 tools. Retained MCP queries pass for 36
-C++ captures and 48 draws on both exact profiles; see docs/CPP_INSPECTION.md.
-At 0.2.7, the opt-in fixed-capture descriptor hydration experiment qualifies setup
-array-element mappings for four combined captures; docs/DESCRIPTOR_HYDRATION.md
-records the trusted helper/data contract. Generic descriptor/resource extraction,
-executed GPU state, and the remaining visual defect families remain unfinished.
-At 0.2.8, an isolated C++ source repair passes combined/standalone postpass cases
-on both releases with 12 fresh captures and 12 application baselines; exact image
-comparison, build/source identities, queries, pins, and restart are verified.
-See docs/SOURCE_REPAIR.md. Binding, pipeline, resource-index, and indirect-parameter
-repairs remain R-007 work.
-Actual GPU replay times out on both releases. These results are
-separate from the historical 0.1.0 Codex capability query. Exact versions,
-evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,
-docs/FIXTURE.md, docs/INSPECTION.md, and docs/INVESTIGATIONS.md. Component contracts
-are in docs/ARTIFACTS.md, docs/JOBS.md, docs/NSIGHT_BACKEND.md, and docs/MCP.md.
-Update these instructions as the project develops.
+The repository now implements the **0.3.0 visual first-release group**
+(R-010/R-002/R-006/R-007/R-015/R-014), following the build/basic-fixture group at
+0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
+builds, a deterministic windowed Vulkan fixture, a C++ experiment runner,
+fastmcpp stdio integration, asynchronous capture jobs and managed artifact storage.
+The server exposes **22 tools**, including bounded metadata/event/object queries,
+image previews/comparisons, generated-source relationships and qualified optional
+serialized-resource reads. `ngm-capture` shares the capture service.
 
-At 0.2.9, binding and pipeline-state C++ source repairs also pass on both releases,
-with 12 fresh captures matching application baselines and exact repaired/reference
-pixels. Five of nine visual defects now have verified source repairs. The four
-resource-selection/indirect-parameter cases and generic bounded resource access
-remain unfinished; see `docs/STATE_REPAIR.md`. The MCP surface remains 20 tools.
+All nine visual fault scenarios have actual source-edit/build/recapture validation
+on matching Nsight **2026.3.1.0/build 38722833** and
+**2026.2.0.0/build 37991608**. Optional basic SDK control is qualified with matching
+SDK **0.9.2/0.9.0**. Independent final acceptance and the clean 0.2.12 source-build
+walkthrough pass; the latter includes all **25 CPU checks**, three fresh captures,
+three application baselines, shader-byte correlation, exact repaired/reference
+pixels and a real Codex two-tool interoperability check. Each historical result
+retains its exact product/build/tool identities; do not imply every run used 0.3.0.
 
-At 0.2.10, standalone/combined resource-selection and indirect-parameter source
-repairs pass on both releases, with 24 fresh captures and 24 application baselines.
-All nine visual defect scenarios now have verified source repairs. Generic bounded
-product resource access remains unfinished; fixed-input helper experiments are
-not that API. See `docs/ADVANCED_REPAIR.md`. R-007/R-015 remain in progress.
-
-At 0.2.11, optional workers compile exact generated reader helper profiles and
-confine database parsing with Landlock/seccomp and process limits. Retained-input
-byte checks are separate from unfinished source-reference, snapshot, parent
-validation and MCP resource-query integration; see `docs/RESOURCE_WORKER.md`.
-
-At 0.2.12, `capture_cpp_resources` and `capture_cpp_resource` expose literal
-source references and bounded serialized resource bytes through the qualified
-workers, bringing the surface to 22 tools. Each byte request retains exact input
-snapshots and logs; quotas and source-capture pinning remain explicit. See
-`docs/RESOURCE_QUERIES.md`. These queries do not reconstruct arbitrary event
-state or replace the remaining R-007/R-015 workflow acceptance checks.
+Start with [docs/INSTALL.md](docs/INSTALL.md) and the consolidated capability/
+repair matrix in [docs/VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md). Detailed
+validation and failed probes remain in docs/BUILD_VALIDATION.md,
+docs/NSIGHT_VALIDATION.md and docs/INVESTIGATIONS.md. Qualification snapshots and
+referenced evidence are explicitly pinned. General executed event state and
+executed descriptor selection remain unavailable. Fixed-input descriptor hydration
+experiments are not a generic product API. Standalone GPU replay timed out on both
+releases and remains unqualified. Compute correctness, performance analysis and
+Streamable HTTP remain pending roadmap work. Update these instructions as the
+project develops.
 
 Local baseline, inspected on 2026-09-17:
 

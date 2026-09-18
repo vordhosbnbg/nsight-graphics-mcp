@@ -1,5 +1,11 @@
 # Local stdio MCP server
 
+The visual release completes at **0.3.0**, preserving the 22-tool surface qualified
+at 0.2.12. [INSTALL.md](INSTALL.md) provides the exercised source-build and repair
+walkthrough; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates acceptance scope.
+The clean 0.2.12 build also passes a real Codex CLI 0.154.0 capability/artifact
+retrieval check; exact evidence is in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
+
 The local stdio server exposes capability discovery, asynchronous fresh-process
 capture, job status/cancellation, and bounded access to managed artifact bundles.
 Retained capture metadata and paginated event/object inventories are implemented
