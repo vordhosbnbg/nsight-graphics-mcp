@@ -105,6 +105,12 @@ and source repair remain unfinished. At 0.2.3, the separate `capture_cpp` mode
 retains generated source and resource files with a derived project index, bringing
 the current surface to 16 tools. See docs/CPP_CAPTURE.md for its validated scope,
 producer restrictions, and limits; it is not a typed deep-state query or replay.
+R-006 completes its investigation/interface acceptance at 0.2.3 after 30 real
+basic/advanced C++ captures and independently reviewed selected resource/shader
+extraction on both releases. Its capability/gap/next-action matrix is in
+docs/INSPECTION.md. R-007 is the next active source-repair workflow; descriptor
+array mapping, generic deeper queries, and actual edit/build/recapture verification
+remain unfinished.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,

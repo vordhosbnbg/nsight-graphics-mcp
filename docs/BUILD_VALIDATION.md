@@ -477,3 +477,21 @@ Hardware runs are separate from these CPU results. The C++ harness is excluded
 from default builds, CTest, and `ngm_check`; exact retained results are in
 [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Experimental two-release shader/image
 comparisons at 0.2.2 remain labelled separately in [INSPECTION.md](INSPECTION.md).
+
+### Advanced evidence and R-006 acceptance
+
+The unchanged 0.2.3 product/harness then passes 24 advanced C++ captures on both
+releases, bringing this format's qualified matrix to 30 captures across five pairs.
+Four fixed-capture native readers compile without warnings and extract 52 selected
+resources with unchanged generated helpers. Independent review checks their
+exact source references, enforced input hashes, sizes, shader matches, and
+comparison results. I-017 preserves the comparison assumption failure and fix.
+Pinned qualification snapshot: `bundle-cb069965dca0cc90e2b672194195beb5`.
+
+A separate fresh-context R-006 acceptance audit finds the investigation criteria
+satisfied after status reconciliation and the consolidated capability/gap/next-action
+matrix in INSPECTION.md. R-007 becomes the next active workflow; neither source
+repair nor R-015 is complete. These follow-up changes are documentation/evidence
+only: no additional product code or version increment, and no CPU-suite rerun.
+Content/diff review supplements the already recorded 0.2.3 aggregate and focused
+correction checks. All hardware commands and outcomes are retained separately.

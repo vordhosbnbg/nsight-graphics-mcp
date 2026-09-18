@@ -20,7 +20,9 @@ default-mode regressions on matching SDK 0.9.2/0.9.0 toolchains, with independen
 verified frame selection; see [SDK_CONTROL.md](docs/SDK_CONTROL.md).
 At **0.2.3**, `capture_cpp` adds generated API source and resource-file retention
 as a separate mode, bringing the current surface to **16 tools**. Its contract
-and qualification are in [CPP_CAPTURE.md](docs/CPP_CAPTURE.md). Typed deep state
+and qualification are in [CPP_CAPTURE.md](docs/CPP_CAPTURE.md). Thirty basic and
+advanced C++ captures pass on both matching releases. R-006's inspection
+investigation is complete with explicit capability gaps. Typed deep state
 and the diagnosis/source-repair/recapture workflow remain unfinished. Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),

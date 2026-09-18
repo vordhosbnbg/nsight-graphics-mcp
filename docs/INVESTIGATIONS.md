@@ -769,6 +769,50 @@ inputs, runner, and transcripts are pinned as
 `bundle-d2579d201899eba43073dfdcecf2387f`; the exact successful captures are listed
 in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). This resolves the directory error.
 
+### I-017 — Opaque descriptor bytes invalidated a cross-capture comparison assumption
+
+Date: **2026-09-18**. State: **Resolved comparison error; descriptor semantics open**.
+Related items: R-006, R-007. The product 0.2.3 combined reference/fault C++ captures
+succeed on matching 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools,
+on the same RTX 3080 Ti / 615.71.09 / KDE Wayland-Xwayland / GCC 16.2.1 host.
+Each uses seed 42, 192×128, wait_frames 2, and no SDK.
+The documented generated `ReadOnlyDatabase`/`DataScope` helper successfully
+extracts thirteen explicitly source-referenced blocks per capture. Four native
+readers enforce exact capture/producer/helper/database identities before reading.
+
+The initial independent comparison incorrectly expected only handle19 (postpass
+push constant) to differ. It failed its `changed==[19]` assertion: **handles16,
+17, and19 differ on both releases**. Handles16/17 are opaque serialized descriptor
+writes (176/88 bytes). Byte differences across captures do not establish different
+logical descriptor bindings, and no private decoder was attempted. The failure
+is an overstrong comparison assumption, not a failed capture or resource read.
+
+Pinned comparison snapshot **`bundle-79ab7d070ca805b5f0284066f7c0e7c5`** retains
+`raw/imported/compare-initial-failed.py`, `initial-failure.txt`, corrected
+`compare.py` / `report.json`, all four reader source/build argv/log/receipt sets,
+and a fresh `nvidia-smi` GPU/driver observation. Capture reports/inputs are pinned
+as `bundle-90cc2a26b7c8d4f0dda20721baf32ce8` (2026.3) and
+`bundle-e7196d4bdbb9519a4c1872bf44840b8a` (2026.2). Resource outputs are pinned as
+`bundle-aa4a38db5c92874565fb1f012e5bd5ce`,
+`bundle-45d9b15ae9b8b7c34e1890878457c179`,
+`bundle-c5a443e432cee3eb2f4c59cec48b71b4`, and
+`bundle-56e9ef3c57706b145d64d0013a2244af` (reference/fault in release order).
+
+Reproduce the initial assertion with the retained initial script and its original
+local input layout, or compare the resource paths/hashes named in the retained
+reports. The corrected comparison passes, separates opaque descriptor differences
+from public typed payloads, verifies exact source-declared lengths, and matches
+all sixteen extracted shaders to frozen application SPIR-V. Of the eleven
+non-descriptor blocks, only postpass push value `channel_order` differs (0 versus
+1). Matched GLSL shows a red/blue swap when nonzero. This supports that diagnosis;
+it does not rule out additional descriptor-state differences or establish a fix.
+Revisit descriptor interpretation with a demonstrated generated-helper calling
+contract; raw-byte similarity/difference is insufficient. Preserve the unknown
+array-element mapping until that path is actually qualified. Final snapshot
+`bundle-cb069965dca0cc90e2b672194195beb5` includes the same verified comparison
+with “postpass push constant” wording, clarifying that the update precedes its draw;
+the original comparison/failure snapshot remains pinned.
+
 ## Entry template
 
 Use the next unused I-### ID. An unsuccessful retry gets a new entry linked to the

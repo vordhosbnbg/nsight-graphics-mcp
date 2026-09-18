@@ -253,4 +253,44 @@ Exact local argv/stdout/stderr/exit records are under
 MCP arguments, source, frozen inputs, hashes, and successful restart exchanges.
 The hardware target is opt-in, separate from the passing CPU aggregate and
 focused correction checks recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
-R-006 and R-015 remain in progress; R-007 still requires actual source repair.
+R-015 remains in progress; R-007 still requires actual source repair. The later
+advanced evidence below completes R-006 investigation acceptance.
+
+## Advanced generated C++ qualification at 0.2.3
+
+After the basic matrix, 24 additional captures pass through the same native MCP
+harness: reference/reference/fault for four advanced pairs on each matching
+release. Source retrieval, screenshot file repeat/difference, cleanup, pin/index
+restart checks, and `has_unsupported_operation: false` pass for every capture.
+Server, fixture, harness, seed 42, 192×128, frame/wait settings, no-SDK mode, and
+host configuration match the basic matrix above. These are generated-C++ results,
+separate from the earlier 54 graphics-inventory captures.
+
+| Reference / fault pair | 2026.3 pinned report | 2026.2 pinned report |
+| --- | --- | --- |
+| multipass-reference / pass-output-error | `bundle-45ffa24447fd00e4e83e555b610ea7fe` | `bundle-91e93869a006e42105aaee093c415000` |
+| bindless-reference / resource-selection-error | `bundle-98e6cd6650672b63831989f0fc554e36` | `bundle-31657e9fb579bdc0919207e4ec84985c` |
+| indirect-reference / indirect-parameter-error | `bundle-610742c29aa975dce800d92ed57c1bd6` | `bundle-04f98fa5b955bdd2ccf5ec33385f7e00` |
+| combined-reference / combined-pass-error | `bundle-90cc2a26b7c8d4f0dda20721baf32ce8` | `bundle-e7196d4bdbb9519a4c1872bf44840b8a` |
+
+**Pinned qualification snapshot:** `bundle-cb069965dca0cc90e2b672194195beb5`.
+It records the 18 standalone capture IDs, both combined reports (each naming its
+three captures), exact invocation/exit records and orchestration source, and the
+corrected combined-resource comparison. Individual pinned reports retain frozen
+inputs and complete MCP transcripts. All capture/report/resource bundles remain
+explicitly pinned. No failed or skipped run is counted as a pass.
+
+The combined pair also has independently reviewed draw/pipeline/shader/pass
+associations, 52 exact resource lengths/hashes, 16 shader byte comparisons, public
+push/indirect values, and decoded image metrics. [INSPECTION.md](INSPECTION.md)
+records those examples and descriptor/temporal limits. I-017 preserves a rejected
+cross-capture descriptor-byte assumption, with successful corrected comparison.
+
+The generated-C++ matrix now covers 30 fresh captures across five workload pairs
+on two releases. Basic binding-error/pipeline-error and combined-resource-error /
+combined-indirect-error variants remain **not run in this C++ matrix**; they were
+qualified separately by the earlier graphics capture/export matrix and still need
+R-007 diagnosis and repair coverage. This is representative evidence coverage for
+R-006, not completion of R-007 or R-015. No source repair or standalone GPU replay
+has been demonstrated. The fresh acceptance audit permits completing R-006 with
+its consolidated capability/gap/next-action matrix and explicit remaining limits.

@@ -8,9 +8,10 @@ and **2026.2.0.0/build 37991608** tools, on Linux with RTX 3080 Ti / driver
 615.71.09 and the repository's windowed Vulkan fixture. This qualifies the two
 exact inventory profiles and selected workloads, not arbitrary Nsight releases.
 
-**R-006 and R-007 remain incomplete.** Inventory parsing does not provide the
-detailed state required to diagnose a defect, edit its source, rebuild, recapture,
-and verify the fix. This document records the parser contract and observed
+**R-006 completes its investigation/interface acceptance at 0.2.3. R-007 remains
+incomplete.** The demonstrated extraction paths and explicit gaps below guide
+diagnosis; source editing, rebuilding, recapturing, and fix verification still
+require implementation and validation. This document records the parser contract and observed
 exports; [MCP.md](MCP.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md) own the
 integrated tool surface and executed validation results.
 
@@ -341,8 +342,8 @@ The earlier reader result remains pinned as
 `bundle-08735abe7d9ca17af019b7f1bac4eda8`; fresh-context review prompted the
 explicit capture/handle restrictions and independently verified the byte matches.
 
-R-006 remains in progress. Advanced workloads and deeper resource extraction
-require separate qualification before dependent diagnostic features are completed. R-007 still requires an actual source edit, rebuild, recapture, and fix
+The later advanced qualification below completes R-006 investigation; deeper
+product extraction remains separate R-007 implementation work. R-007 still requires an actual source edit, rebuild, recapture, and fix
 verification. Preserve generated-source evidence, application evidence, and
 remaining gaps separately.
 
@@ -388,3 +389,104 @@ each capture. Packed descriptor writes and after-draw resource contents remain
 unqualified. These image and byte comparisons establish useful real evidence;
 they do not establish generated-project compilation, standalone GPU replay, an
 advanced workload, or an actual source repair.
+
+### Combined multipass, bindless, and indirect evidence at 0.2.3
+
+The product MCP harness passes `combined-reference` twice and
+`combined-pass-error` once on each matching release, with generated source reads,
+screenshot file repeat/difference, cleanup, and pins/indexes after restart.
+All six metadata files report `has_unsupported_operation: false`.
+Pinned reports, transcripts, runner, and frozen inputs:
+`bundle-90cc2a26b7c8d4f0dda20721baf32ce8` (2026.3) and
+`bundle-e7196d4bdbb9519a4c1872bf44840b8a` (2026.2).
+
+| Release | Reference | Repeated reference | Fault |
+| --- | --- | --- | --- |
+| 2026.3 | `bundle-938942909c8c6fffa39c4f414a09d757` | `bundle-baa7af13cae85738173d447b21efdb06` | `bundle-09954164fb3b3f94c059bc32925cfe94` |
+| 2026.2 | `bundle-3fde28d339612fff727a76c6711c869e` | `bundle-adfa156bff1e69337bb175cbbc053813` | `bundle-2ae0cba81613f143fc7c6db08bfda437` |
+
+Fresh-context inspection independently checks all six generated projects.
+`CommandList00.cpp`, `Resources00.cpp`, `FrameSetup00.cpp`, and `Frame0Part00.cpp`
+are identical within each release; across releases only the generated-version
+comment differs. The associations below were checked inside **each capture**;
+matching numeric IDs alone are not a cross-capture join.
+
+| Evidence | Generated source observation | Limit |
+| --- | --- | --- |
+| Scene → postpass | Event16 begins render pass24/framebuffer28/view27/image25. Event20 draws the scene. Event23 transitions image25 from attachment writes to fragment shader reads. Event25 begins the postpass; setup associates its set40 binding0 with view27/sampler29. Event29 draws to framebuffer21 and the swapchain output. | Initial scene-image data is not an after-event20 attachment snapshot. |
+| Shader associations | Scene pipeline47 uses vertex44/fragment45 (handles22/23); post pipeline53 uses vertex50/fragment51 (handles24/25). Debug names identify indirect.vert, bindless.frag, post.vert, and post.frag. | SPIR-V correlation is independently verified below; no live shader stepping. |
+| Bindless input | Set-layout36 declares two fragment storage-buffer descriptors at binding0; set39 is bound at set0. Captured feature initialization enables nonuniform storage-buffer array indexing and runtime arrays. | The setup comment only names buffer34 while restoring two serialized writes. It does not establish array element0/1 mapping. |
+| Indirect input | Event20 calls `CmdDrawIndirect(buffer42, offset0, drawCount1, stride16)`. Buffer42 is 16 bytes with indirect usage and is initialized from handle10. | Evidence is for this source-referenced input; no arbitrary buffer history API. |
+| Temporal palette values | Buffers32/34 have initial handles8/9, then host updates0/1 before submission. | Initial restoration and later updates are distinct even when the bytes happen to match. |
+| Postpass control | Event28 supplies four fragment push bytes from handle19 before event29; scene event19 supplies eight bytes from handle18. | Values require helper extraction, not inference from resource handles. |
+
+Four fixed-capture native readers use each project's unchanged generated
+`ReadOnlyDatabase`/`DataScope` helper. Exact capture/producer and helper/database
+hashes are enforced before initialization; only the thirteen independently
+source-verified handles are accepted. They are reproducible trusted-capture
+experiments, not a generic database parser or product extraction API.
+Pinned resource bundles (reference/fault):
+`bundle-aa4a38db5c92874565fb1f012e5bd5ce` /
+`bundle-45d9b15ae9b8b7c34e1890878457c179` for 2026.3, and
+`bundle-c5a443e432cee3eb2f4c59cec48b71b4` /
+`bundle-56e9ef3c57706b145d64d0013a2244af` for 2026.2.
+
+Comparison snapshot `bundle-79ab7d070ca805b5f0284066f7c0e7c5` retains readers,
+build/run commands, logs, comparison source/results, and a fresh GPU/driver
+observation. Independent review verifies **52 resource lengths/hashes** and
+**16 shader byte matches** to the frozen application inputs, including complete
+retained GLSL text in those SPIR-V modules. Each draw-indirect payload is
+`(vertexCount=3, instanceCount=2, firstVertex=0, firstInstance=0)`; scene push
+values are `(0,0)`. Postpass push value `channel_order` is **0 reference / 1 fault**.
+The byte-matched GLSL swaps red/blue when this value is nonzero, supporting a
+postpass channel-swap diagnosis. The original snapshot phrase “post-draw push constant” refers to this postpass
+value, set **before** the draw. The final qualification snapshot
+`bundle-cb069965dca0cc90e2b672194195beb5` corrects that wording in its retained
+`raw/imported/combined-resource-comparison/report.json` and script.
+
+Of eleven inspected non-descriptor blocks, only that postpass value differs.
+Opaque serialized descriptor blocks 16/17 also differ, so additional descriptor
+state differences are not excluded. I-017 preserves the initial overstrong
+byte-comparison assertion and its correction. Descriptor mapping remains
+unresolved; validate a generated-helper interpretation contract before claiming
+array slot selection or exact descriptor offsets/ranges.
+
+Independent BMP decoding finds **24,472 differing pixels**, maximum RGB8 channel
+error 97, mean 8.603407118055555. Corresponding reference/fault images match across
+releases. This compares the captured outputs, not a separate application baseline
+or source repair. R-007 still requires the edit/build/recapture verification.
+
+## Current R-006 capability and gap matrix
+
+This matrix applies to the exact matching 2026.3.1.0/build 38722833 and
+2026.2.0.0/build 37991608 producers on the recorded host. R-006 completes after
+fresh-context acceptance review of real examples, retained failures, and explicit
+next actions. This is completion of the inspection investigation/interface item,
+not a claim that every detailed-state capability or R-007 is implemented.
+
+| Required category | Demonstrated path | Remaining gap and chosen next action |
+| --- | --- | --- |
+| Events and object identity | Typed retained metadata/events/objects pass on 54 basic/advanced graphics captures; IDs remain capture-scoped. | Inventory exports lack argument/state joins. Use generated API source for demonstrated associations. |
+| Draw → pipeline → shaders | Basic and combined generated source records exact draw, pipeline, stage, module, and resource references; source is retrievable over MCP. | No generic typed state reconstruction. R-007 will add bounded queries over the proven evidence and return explicit limits. |
+| Shader contents/source correlation | Fixed-capture generated helpers extract SPIR-V exactly matching frozen compiler output; debug GLSL is retained. | Extraction is restricted to verified captures/helpers. Qualify bounded product access before advertising a generic extractor. |
+| Descriptor bindings | Generated layouts, bound sets, counts/types, and setup annotations identify basic resources and scene-to-post sampling. | Packed descriptor writes do not expose array-slot mapping or exact offsets/ranges through the implemented reader. Next probe must establish the generated StructHydrator calling contract; do not decode private formats or infer slots from comments. |
+| Selected resource contents | Generated helper yields palette buffers, push constants, shader bytes, and indirect arguments with exact source references and temporal meaning. | Arbitrary after-event buffers/images remain unavailable from these exercised interfaces. Preserve that limit and revisit only with a documented export/helper path. |
+| Pass relationships | Generated render-pass/framebuffer/view/image links and barriers demonstrate offscreen scene → sampled postpass → presentation. | Initial attachment restoration is not post-draw output. R-007 can use final output and shader/control evidence; do not claim intermediate pixels. |
+| Bindless and indirect evidence | Combined source records descriptor-array features/layout, push ranges, indirect buffer/offset/count/stride; extracted indirect payload is (3,2,0,0). Standalone feature capture/source matrices pass too. | Bindless slot selection remains incomplete until descriptor interpretation is validated. Other defect variants need their own R-007 diagnosis/fix runs. |
+| Output comparison | Independently decoded Nsight screenshots distinguish correct/faulty output on both releases; basic references match application baselines. | Product image previews/comparison and source-fix verification remain R-007 work. File equality in the MCP capture harness is separately labelled. |
+| Standalone GPU replay | Bounded replay failures with confirmed cleanup are retained in I-007/I-009/I-010/I-011. Metadata export and C++ generation succeed independently. | Replay execution remains unqualified. The next repair workflow uses fresh captured outputs; revisit replay when a documented prerequisite or tool behavior changes. |
+
+**Selected next workflow:** R-007 starts with bounded image comparison and the
+basic shader-calculation defect, using the proven draw/module/SPIR-V/source link.
+Use a source-isolated fixture, edit the implicated shader, rebuild, make fresh
+captures on both releases, and compare repaired output to an equivalent correct
+reference while retaining source diffs and executable/shader identities. Extend
+to pipeline, resource binding, and all advanced defects; descriptor helper
+qualification remains an explicit prerequisite where diagnosis needs array-slot
+mapping. Selecting a prebuilt correct scenario is not repair.
+
+The separate advanced MCP matrix adds 18 standalone feature captures and 6 combined
+captures, all successful with cleanup and persistent pins. Its complete report,
+exact invocation records, corrected resource comparison, and evidence IDs are
+pinned as **`bundle-cb069965dca0cc90e2b672194195beb5`**. Exact cases and remaining
+unrun variants are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md).

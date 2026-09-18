@@ -105,8 +105,11 @@ A generated project is useful inspection evidence. Success does not establish
 compilation of that project, standalone GPU replay, decoded image correspondence,
 a generic resource extractor, arbitrary event-state reconstruction, or source
 repair. Fixed-capture shader/resource experiments and independent image comparison
-are recorded separately in [INSPECTION.md](INSPECTION.md). Advanced workload
-qualification remains separate from the basic pair.
+are recorded separately in [INSPECTION.md](INSPECTION.md). Separate advanced qualification adds 24 captures across standalone multipass,
+bindless, indirect, and a combined pass-defect pair on both releases. The pinned
+matrix is `bundle-cb069965dca0cc90e2b672194195beb5`; exact scope and unrun variants
+are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). R-006's investigation is complete;
+R-007 still owns typed deeper queries, preview/comparison, and actual source repair.
 NVIDIA's [release notes](https://docs.nvidia.com/nsight-graphics/ReleaseNotes/index.html#deprecations)
 deprecate Vulkan C++ Capture and announce future removal; this backend is scoped
 to the exact tested producers, not a promise of future-release support.
