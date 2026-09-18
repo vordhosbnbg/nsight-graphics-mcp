@@ -82,11 +82,26 @@ Json query_capabilities(Client& client) {
     const auto report = result["structuredContent"];
     require(Json::parse(result["content"][0]["text"].get<std::string>()) == report, "text and structured result agree");
     require(report["server"]["version"] == ngm::project_version(), "capabilities use project version");
-    require(report["implemented_tools"] ==
-                Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
-                             "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                             "artifact_prune", "artifact_import", "artifact_compare_images", "artifact_preview_image",
-                             "capture_metadata", "capture_events", "capture_objects"}),
+    require(report["implemented_tools"] == Json::array({"capabilities",
+                                                        "capture",
+                                                        "capture_cpp",
+                                                        "job_status",
+                                                        "job_cancel",
+                                                        "artifact_list",
+                                                        "artifact_info",
+                                                        "artifact_files",
+                                                        "artifact_read",
+                                                        "artifact_pin",
+                                                        "artifact_usage",
+                                                        "artifact_prune",
+                                                        "artifact_import",
+                                                        "artifact_compare_images",
+                                                        "artifact_preview_image",
+                                                        "capture_metadata",
+                                                        "capture_events",
+                                                        "capture_objects",
+                                                        "capture_cpp_source",
+                                                        "capture_cpp_draws"}),
             "exactly the implemented tools advertised");
     for(const auto* name : {"profiling", "fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
@@ -109,7 +124,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 18, "discover exactly the implemented tools");
+    require(listing.size() == 20, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -633,6 +648,26 @@ void workflow_check(const std::string& server, const std::string& standin, const
                     .find("CPU stand-in") != std::string::npos,
             "generated source is retrievable using bounded artifact reads");
     expect_tool_error(call(client, "capture_metadata", {{"capture_id", cpp_id}}), "not_capture");
+    const auto source_page =
+        successful_call(client, "capture_cpp_source",
+                        {{"capture_id", cpp_id}, {"source_path", cpp_index["source_files"][0]}, {"max_lines", 2}});
+    require(source_page["lines"].size() == 2 && source_page["next_line"] == 3 &&
+                source_page["source"]["sha256"].get<std::string>().size() == 64,
+            "numbered source pagination/hash");
+    const auto cpp_draws = successful_call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"limit", 1}});
+    require(cpp_draws["draws_total"] == 1 && cpp_draws["unsupported_recordings_total"] == 0 &&
+                cpp_draws["draws"][0]["pipeline"]["symbol"] == "VkPipeline_uid_38" &&
+                cpp_draws["draws"][0]["pipeline"]["stages"][0]["resource_handle"] == 14,
+            "typed source associations through MCP");
+    const auto cpp_coverage =
+        successful_call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"section", "unsupported_objects"}});
+    require(cpp_coverage["total"] == 0 && cpp_coverage["draws"].empty(), "separate coverage section");
+    expect_tool_error(call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"section", "invalid"}}));
+    expect_tool_error(call(client, "capture_cpp_source", {{"capture_id", cpp_id}, {"source_path", "../escape.cpp"}}));
+    expect_tool_error(call(client, "capture_cpp_source",
+                           {{"capture_id", cpp_id}, {"source_path", cpp_index["source_files"][0]}, {"start_line", 0}}));
+    expect_tool_error(call(client, "capture_cpp_draws", {{"capture_id", first_id}}), "not_capture");
+
     const auto page = successful_call(client, "artifact_list", {{"limit", 1}});
     require(page["artifacts"].size() == 1 && page["next_after"].is_string(), "artifact list pagination");
     require(!successful_call(client, "artifact_list", {{"after_id", page["next_after"]}})["artifacts"].empty(),

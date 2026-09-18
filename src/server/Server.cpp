@@ -79,8 +79,10 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "from observed Nsight 2026.3.1.0 build 38722833 or 2026.2.0.0 build 37991608 Vulkan exports. "
                        "Also compares and previews retained P6/PNG/BMP images without inferring workload equivalence. "
                        "Requires --artifact-root; "
-                       "inventory queries validate their bundle and producer. Detailed pipeline/shader/resource state "
-                       "and event associations remain unavailable from these exports."}}},
+                       "inventory queries validate their bundle and producer. Generated C++ queries return numbered "
+                       "source and literal draw/pipeline/shader relationships for qualified recording forms, with "
+                       "explicit unsupported coverage. These are source references, not GPU state, descriptor "
+                       "contents or extracted shader/resource bytes."}}},
           {"profiling", unavailable("GPU profiling and metric extraction are pending.")},
           {"fixture_via_mcp",
            unavailable("No fixture-specific tool; the generic capture tool accepts its absolute executable path.")}}},
@@ -388,8 +390,9 @@ int serve_stdio(const ServerOptions& options) {
         "Capture requires --artifact-root and starts a fresh application for each asynchronous job. Poll job_status "
         "and use artifact tools to inspect bounded retained evidence; explicitly pin important baselines. "
         "Use capture_metadata/capture_events/capture_objects for supported retained export inventories. "
-        "Found executable paths are not evidence of Nsight or GPU compatibility. Detailed pipeline/shader/resource "
-        "state and event associations are unavailable from these exports; profiling is not implemented.");
+        "Use capture_cpp_source/capture_cpp_draws for qualified generated-source relationships and coverage limits. "
+        "Found executable paths are not evidence of Nsight or GPU compatibility. Generated-source relationships "
+        "do not establish GPU state or extracted resource bytes; profiling is not implemented.");
     const auto result = run_stdio(handler, protocol_version);
     if(!workflow.shutdown()) {
         std::cerr << "nsight-graphics-mcp: job shutdown did not confirm all owned-process cleanup\n";

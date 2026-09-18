@@ -113,7 +113,10 @@ surface to 17 tools. The basic shader source edit/build/recapture case passes on
 both releases, with exact repaired/reference RGB equality and retained pins; see
 docs/SHADER_REPAIR.md. At **0.2.5**, PNG comparison and bounded P6/PNG/BMP
 image previews bring the surface to 18 tools; docs/IMAGE_PREVIEWS.md records
-retained-file validation. Descriptor array mapping, generic deeper queries,
+retained-file validation. At **0.2.6**, numbered generated-source queries and qualified draw/pipeline/shader
+relationships bring the surface to 20 tools. Retained MCP queries pass for 36
+C++ captures and 48 draws on both exact profiles; see docs/CPP_INSPECTION.md.
+Descriptor array mapping, generic resource extraction, executed GPU state,
 and all other visual defect repairs remain unfinished.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,

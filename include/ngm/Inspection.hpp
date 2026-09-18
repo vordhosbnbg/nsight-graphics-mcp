@@ -46,6 +46,12 @@ public:
     nlohmann::json events(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json objects(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
 
+    // Generated C++ capture evidence uses a separate producer/index contract.
+    nlohmann::json cpp_source(const std::string& capture_id, const std::string& source_path, std::size_t start_line = 1,
+                              std::size_t max_lines = 100) const;
+    nlohmann::json cpp_draws(const std::string& capture_id, const std::string& section = "draws",
+                             std::size_t offset = 0, std::size_t limit = 50) const;
+
 private:
     ArtifactStore& artifacts_;
 };

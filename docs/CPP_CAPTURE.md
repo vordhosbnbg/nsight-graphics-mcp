@@ -116,3 +116,7 @@ releases; see [SHADER_REPAIR.md](SHADER_REPAIR.md).
 NVIDIA's [release notes](https://docs.nvidia.com/nsight-graphics/ReleaseNotes/index.html#deprecations)
 deprecate Vulkan C++ Capture and announce future removal; this backend is scoped
 to the exact tested producers, not a promise of future-release support.
+
+At **0.2.6**, [CPP_INSPECTION.md](CPP_INSPECTION.md) adds numbered source excerpts
+and qualified draw/pipeline/shader source relationships over these retained
+projects. Those queries preserve the resource-extraction and GPU-state limits.

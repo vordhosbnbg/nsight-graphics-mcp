@@ -813,6 +813,78 @@ array-element mapping until that path is actually qualified. Final snapshot
 with “postpass push constant” wording, clarifying that the update precedes its draw;
 the original comparison/failure snapshot remains pinned.
 
+### I-018 — Generated-source qualification rejected the resource progress message
+
+Date: 2026-09-18. State: **Resolved**. Related: R-007/R-015.
+The first 0.2.6 retained MCP association probe expected a source relationship for
+basic reference `bundle-10af9199c5194f650980d5d896ed07bf`, produced by matching
+Nsight 2026.3.1.0/build 38722833 on RTX 3080 Ti / driver 615.71.09, KDE
+Wayland/Xwayland. This attempt read existing documented Generate C++ Capture
+source; it invoked no Nsight process, SDK or GPU work.
+
+Reproduction used `ngm_retained_cpp_integration SERVER artifacts/nsight-repair-evidence
+build/cpp-query-validation/nsight-repair-evidence-cases.json
+build/cpp-query-validation/repair`, with the absolute GCC Debug server/harness
+identified by SHA-256 in the run report. Run
+`build/cpp-query-validation/repair/cpp-inspection-QWancs` exited 1. The MCP tool
+returned draw 18 and its explicit bind to pipeline 38, but no pipeline association,
+and six unsupported-object records. A diagnostic pure-parser read identified
+`resource setup parent contains unsupported direct statements`. The source parent
+contains the generated `NV_MESSAGE_VERBOSE("literal")` progress statement, which
+the initial narrow parent grammar omitted.
+
+The correction accepts exactly that literal logging form, retaining rejection of
+unknown executable statements and helpers. A synthetic regression and successful
+final retained MCP runs establish resolution; this did not require a different
+capture backend or relaxed creation checks. Revisit if a new producer introduces
+a different progress expression. The failed report/transcript, diagnostic outputs,
+and final qualification are explicitly pinned in **bundle-ce6ae6385721977dfd7091469cb57888** in
+`artifacts/nsight-repair-evidence`. This is a product grammar limitation, not a
+finding that Nsight lacks the source relationship.
+
+### I-019 — Nested platform setup scopes failed resource-statement qualification
+
+Date: 2026-09-18. State: **Resolved**. Related: I-018, R-007/R-015.
+After adding stricter sibling-block checks and the literal progress-message form,
+the same retained MCP command/profile/input exited 1 in
+`build/cpp-query-validation/repair/cpp-inspection-slupXt`. It still returned the
+literal draw/bind but refused the object association. The diagnostic parser
+reported `unterminated resource setup statement`: unrelated window-system setup
+contains nested anonymous scopes under platform preprocessor branches, which do
+not end in a statement semicolon.
+
+The correction recursively qualifies those scopes, preserving the same helper,
+statement, and handle-reference restrictions at every level. Relevant conditional
+creation definitions remain unsupported. A nested-platform regression and the
+final 36-capture query matrix pass. No GPU or capture was rerun. Failed MCP and
+diagnostic records are explicitly pinned with the final results in
+**bundle-ce6ae6385721977dfd7091469cb57888** in `artifacts/nsight-repair-evidence`.
+Revisit when a generated nested scope contains a new supported setup construct;
+do not treat arbitrary nested code as safe simply because unrelated setup exists.
+
+### I-020 — Native XCB handle expressions exceeded the generated helper grammar
+
+Date: 2026-09-18. State: **Resolved**. Related: I-019, R-007/R-015.
+A pure-parser retry after nested-scope support, using
+`build/capture-acceptance/cpp-parser-probe-review7` on the same basic reference
+bundle, returned draw/bind evidence but unavailable pipeline association.
+`build/cpp-query-validation/repair/sibling-probe-reason3.json` records
+`unrecognized helper in resource sibling: ,`. The generated XCB surface initializer
+uses grouped pointer dereferences of `reinterpret_cast<xcb_connection_t**>` and
+`reinterpret_cast<xcb_window_t*>` over the generated window-system accessors.
+The scanner treated the preceding comma as an unknown function-call prefix.
+
+The correction accepts the two exact observed native-handle expressions, with a
+regression rejecting a substituted unknown accessor. It does not allow arbitrary
+casts, calls, or assignments. The corrected pure parser resolves 48 draws in all
+36 retained projects from the two existing producer profiles; final MCP queries,
+source hashes, pagination, and restart checks also pass. This was a retained
+source-analysis retry, not a new capture or GPU run. Diagnostic output, input
+references, test sources, and successful follow-up records are explicitly pinned
+in **bundle-ce6ae6385721977dfd7091469cb57888** in `artifacts/nsight-repair-evidence`.
+Revisit for another documented generated window-system form after recording its
+actual source; this result does not qualify other window systems or platforms.
+
 ## Entry template
 
 Use the next unused I-### ID. An unsuccessful retry gets a new entry linked to the

@@ -1,5 +1,7 @@
 #include "ngm/Inspection.hpp"
 
+#include "ngm/CppEvidence.hpp"
+#include "ngm/Hash.hpp"
 #include "ngm/NsightEvidence.hpp"
 
 #include <algorithm>
@@ -88,6 +90,8 @@ struct Capture {
     Json report;
     std::map<std::string, std::uint64_t> files;
     NsightMetadata metadata;
+    NsightCppMetadata cpp_metadata;
+    Json cpp_index;
     Json producer;
     const ProducerProfile* profile = nullptr;
 };
@@ -152,7 +156,7 @@ auto parse_export(ArtifactStore& store, Capture& capture, const std::string& kin
     }
 }
 
-Capture load_capture(ArtifactStore& store, const std::string& id) {
+Capture load_capture(ArtifactStore& store, const std::string& id, bool cpp = false) {
     Capture capture;
     capture.lease = store.lease(id);
     capture.info = store.inspect(id);
@@ -161,14 +165,18 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
                                        "for completion and confirmed cleanup or submit a fresh capture");
     }
     const auto& manifest = capture.info.provenance;
-    if(!manifest.is_object() || manifest.value("evidence_origin", Json()) != "nsight_capture" ||
+    if(!manifest.is_object() ||
+       manifest.value("evidence_origin", Json()) != (cpp ? "nsight_cpp_capture" : "nsight_capture") ||
        manifest.value("backend", Json()) != "documented_nsight_cli") {
         fail(Error::NotCapture, "Inspection accepts only server capture bundles; imported/application-provided "
                                 "evidence remains accessible through artifact_files/artifact_read");
     }
     require(number(manifest, "schema_version") == 1 && text(manifest, "report_path", 512) == report_path,
             "Unsupported capture manifest/report schema");
-    for(const auto* path : {"raw/capture.ngfx-capture", "raw/exports/metadata.raw", "raw/report.json"}) {
+    const std::vector<std::string> required =
+        cpp ? std::vector<std::string>{"derived/cpp-project.json", "raw/report.json"}
+            : std::vector<std::string>{"raw/capture.ngfx-capture", "raw/exports/metadata.raw", "raw/report.json"};
+    for(const auto& path : required) {
         require(std::find(capture.info.required_outputs.begin(), capture.info.required_outputs.end(), path) !=
                     capture.info.required_outputs.end(),
                 "Capture manifest omits a required output");
@@ -192,7 +200,7 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
         require(member(report, field) == member(manifest, field),
                 std::string("Capture report and manifest disagree on ") + field);
     }
-    require(number(report, "schema_version") == 1 && member(report, "readable_capture") == true &&
+    require(number(report, "schema_version") == 1 && member(report, "readable_capture") == !cpp &&
                 member(report, "cleanup_confirmed") == true && member(report, "worker_outcome") == "succeeded",
             "Capture report does not record successful capture and cleanup");
     (void)text(report, "project_version", 64);
@@ -203,7 +211,9 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
     const auto& nsight = member(report, "nsight");
     require(member(nsight, "interface_ready") == true, "Capture report lacks a verified tool interface");
     capture.producer = Json::object();
-    for(const auto* name : {"capture", "replay"}) {
+    for(const auto* name : {"capture", "replay", "cli"}) {
+        if(!cpp && std::string_view(name) == "cli")
+            continue;
         const auto& observed = member(nsight, name);
         const auto& retained = member(member(manifest, "nsight"), name);
         Json producer{{"path", text(observed, "path")},
@@ -225,6 +235,85 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
         }
         capture.profile = &*profile;
         capture.producer[std::string(name) + "_tool"] = std::move(producer);
+    }
+    if(cpp) {
+        for(const auto* field : {"capture_settings", "generated_cpp_project"})
+            require(member(report, field) == member(manifest, field), "C++ capture manifest/report disagreement");
+        require(member(report, "generated_cpp_project") == true &&
+                    text(member(report, "capture_settings"), "format", 16) == "cpp" &&
+                    text(report, "cpp_project_index", 512) == "derived/cpp-project.json",
+                "Report does not identify a completed C++ capture");
+        inventoried(capture, "derived/cpp-project.json", report_limit);
+        capture.cpp_index = parse_report(store.read(id, "derived/cpp-project.json", report_limit));
+        const auto& index = capture.cpp_index;
+        require(number(index, "schema_version") == 1 && text(index, "evidence_origin", 64) == "nsight_generated_cpp" &&
+                    member(index, "job") == job,
+                "C++ index origin/schema/identity differs from report");
+        const auto directory = text(index, "project_directory", 450);
+        const auto clean_path = [](const std::string& value) {
+            const std::filesystem::path path(value);
+            if(path.is_absolute() || path.generic_string() != value ||
+               path.lexically_normal().generic_string() != value)
+                return false;
+            for(const auto& component : path)
+                if(component == "." || component == ".." || component.empty())
+                    return false;
+            return true;
+        };
+        require(clean_path(directory) && directory.starts_with("raw/cpp/"), "C++ project directory is invalid");
+        for(const auto& [field, filename] :
+            std::array<std::pair<const char*, const char*>, 3>{{{"metadata_path", "metadata.json"},
+                                                                {"database_path", "data.bin"},
+                                                                {"screenshot_path", "screenshot.bmp"}}}) {
+            const auto path = text(index, field, 512);
+            require(path == directory + "/" + filename && inventoried(capture, path, SIZE_MAX) > 0,
+                    "C++ project evidence path is invalid or empty");
+        }
+        const auto& sources = member(index, "source_files");
+        require(sources.is_array() && !sources.empty() && sources.size() <= 256, "C++ source inventory exceeds bounds");
+        std::set<std::string> unique;
+        for(const auto& value : sources) {
+            require(value.is_string(), "C++ source path must be a string");
+            const auto path = value.get<std::string>();
+            require(path.size() <= 512 && clean_path(path) && path.find('\0') == std::string::npos &&
+                        std::filesystem::path(path).parent_path() == directory && path.ends_with(".cpp") &&
+                        unique.insert(path).second && inventoried(capture, path, SIZE_MAX) > 0,
+                    "C++ source path must uniquely name an inventoried direct project source file");
+        }
+        std::set<std::string> published_sources;
+        for(const auto& [path, unused] : capture.files) {
+            (void)unused;
+            if(std::filesystem::path(path).parent_path() == directory && path.ends_with(".cpp"))
+                published_sources.insert(path);
+        }
+        require(unique == published_sources && unique.contains(directory + "/CommandList00.cpp") &&
+                    unique.contains(directory + "/Resources00.cpp"),
+                "C++ source index omits published project sources");
+        const auto& operation = member(report, "capture");
+        const auto path = text(index, "metadata_path", 512);
+        require(member(operation, "outcome") == "success" && text(operation, "output", 512) == path &&
+                    text(operation, "executable") == text(capture.producer.at("cli_tool"), "path") &&
+                    number(operation, "output_bytes") == inventoried(capture, path, 1024U * 1024U),
+                "C++ capture operation does not match retained metadata/producer");
+        successful_process(operation);
+        try {
+            capture.cpp_metadata = parse_nsight_cpp_metadata(store.read(id, path, 1024U * 1024U));
+        } catch(const NsightEvidenceError& error) {
+            fail(Error::InvalidExport, "C++ metadata failed validation: " + std::string(error.what()));
+        }
+        const auto& metadata = capture.cpp_metadata;
+        if(metadata.nsight_version != capture.profile->metadata_version ||
+           std::to_string(metadata.build_id) != capture.profile->build || metadata.primary_api != "vulkan")
+            fail(Error::UnsupportedProducer,
+                 "C++ metadata must match the retained tool version/build and Vulkan profile");
+        require(text(index, "nsight_version", 64) == metadata.nsight_version &&
+                    number(index, "nsight_version_build_id") == metadata.build_id &&
+                    text(index, "primary_api", 32) == metadata.primary_api &&
+                    text(index, "primary_gpu") == metadata.primary_gpu &&
+                    member(index, "has_unsupported_operation") == metadata.has_unsupported_operation &&
+                    std::filesystem::path(directory).filename() == metadata.project_filename,
+                "C++ index and same-bundle metadata disagree");
+        return capture;
     }
     const auto& operation = member(report, "capture");
     require(member(operation, "outcome") == "success" && text(operation, "output", 512) == "raw/capture.ngfx-capture" &&
@@ -404,5 +493,104 @@ Json InspectionService::objects(const std::string& capture_id, std::size_t offse
                                        {"type_name", object.type_name},
                                        {"access_flags", object.access_flags}};
                        });
+}
+namespace {
+Json cpp_base_result(const Capture& capture) {
+    return {{"capture_id", capture.info.summary.id},
+            {"evidence_origin", "nsight_generated_cpp"},
+            {"schema_profile", std::string(capture.profile->name) + "-cpp"},
+            {"producer", capture.producer},
+            {"index_source", "derived/cpp-project.json"},
+            {"metadata_source", capture.cpp_index.at("metadata_path")},
+            {"report_source", report_path},
+            {"has_unsupported_operation", capture.cpp_metadata.has_unsupported_operation}};
+}
+Json source_identity(const std::string& path, const std::string& content) {
+    return {{"path", path},
+            {"bytes", content.size()},
+            {"sha256", sha256(std::as_bytes(std::span(content.data(), content.size())))}};
+}
+} // namespace
+
+Json InspectionService::cpp_source(const std::string& capture_id, const std::string& source_path,
+                                   std::size_t start_line, std::size_t max_lines) const {
+    if(start_line == 0 || start_line > 4U * 1024U * 1024U || max_lines == 0 || max_lines > 200)
+        throw std::invalid_argument("Source start_line must be 1..4194304 and max_lines 1..200");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    const auto& sources = capture.cpp_index.at("source_files");
+    if(std::find(sources.begin(), sources.end(), source_path) == sources.end())
+        fail(Error::ExportUnavailable, "source_path must name a file in derived/cpp-project.json source_files");
+    inventoried(capture, source_path, 4U * 1024U * 1024U);
+    const auto content = artifacts_.read(capture_id, source_path, 4U * 1024U * 1024U);
+    if(content.find('\0') != std::string::npos)
+        fail(Error::InvalidExport, "Generated source contains a NUL byte");
+    try {
+        (void)Json(content).dump();
+    } catch(const Json::exception&) {
+        fail(Error::InvalidExport, "Generated source contains invalid UTF-8");
+    }
+    auto result = cpp_base_result(capture);
+    result["source"] = source_identity(source_path, content);
+    result["start_line"] = start_line;
+    result["next_line"] = nullptr;
+    result["lines"] = Json::array();
+    std::vector<std::string_view> lines;
+    for(std::size_t start = 0; start < content.size();) {
+        const auto end = content.find('\n', start);
+        const auto count = (end == std::string::npos ? content.size() : end) - start;
+        lines.emplace_back(content.data() + start, count);
+        start += count + 1;
+    }
+    result["total_lines"] = lines.size();
+    for(auto line = start_line; line <= lines.size() && line - start_line < max_lines; ++line) {
+        result["lines"].push_back({{"number", line}, {"text", lines[line - 1]}});
+        result["next_line"] = line < lines.size() ? Json(line + 1) : Json(nullptr);
+        if(result.dump().size() > maximum_page_bytes || !fits_response(result)) {
+            result["lines"].erase(result["lines"].end() - 1);
+            if(line == start_line)
+                fail(Error::LimitExceeded, "One generated source line exceeds the response budget; use artifact_read");
+            result["next_line"] = line;
+            break;
+        }
+    }
+    return result;
+}
+
+Json InspectionService::cpp_draws(const std::string& capture_id, const std::string& section, std::size_t offset,
+                                  std::size_t limit) const {
+    page_arguments(offset, limit);
+    if(section != "draws" && section != "unsupported_recordings" && section != "unsupported_objects")
+        throw std::invalid_argument("C++ section must be draws, unsupported_recordings, or unsupported_objects");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    if(capture.cpp_metadata.has_unsupported_operation)
+        fail(Error::ExportUnavailable,
+             "Capture reports unsupported operations; use capture_cpp_source to inspect raw evidence");
+    std::vector<CppSource> sources;
+    auto identities = Json::array();
+    std::size_t bytes = 0;
+    for(const auto& value : capture.cpp_index.at("source_files")) {
+        const auto path = value.get<std::string>();
+        const auto name = std::filesystem::path(path).filename().string();
+        if(!name.starts_with("CommandList") && !name.starts_with("Resources"))
+            continue;
+        bytes += inventoried(capture, path, 4U * 1024U * 1024U);
+        if(sources.size() >= 64 || bytes > 16U * 1024U * 1024U)
+            fail(Error::LimitExceeded, "Generated command/resource sources exceed the aggregate inspection budget");
+        auto content = artifacts_.read(capture_id, path, 4U * 1024U * 1024U);
+        identities.push_back(source_identity(path, content));
+        sources.push_back({path, std::move(content)});
+    }
+    const auto parsed = inspect_cpp_draws(sources);
+    auto result = cpp_base_result(capture);
+    result["section"] = section;
+    result["source_files"] = std::move(identities);
+    result["association_scope"] = parsed.at("association_scope");
+    for(const auto* key : {"draws", "unsupported_recordings", "unsupported_objects"}) {
+        result[std::string(key) + "_total"] = parsed.at(key).size();
+        result[key] = Json::array();
+    }
+    const auto records = parsed.at(section).get<std::vector<Json>>();
+    return page_result(std::move(result), section.c_str(), records, offset, limit,
+                       [](const Json& value) { return value; });
 }
 } // namespace ngm

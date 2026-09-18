@@ -7,7 +7,7 @@ checks, a real Codex capability query, and local GPU fixture validation.
 
 The capture/evidence group completed at **0.2.0**: asynchronous jobs, managed
 artifact storage, a documented Nsight CLI adapter, and **15 MCP tools** including
-bounded metadata/event/object queries. The recorded complete CPU suite passes
+bounded metadata/event/object queries. The 0.2.0 complete CPU suite passed
 20 checks; focused parser, inspection, MCP, and version checks pass at **0.2.1**.
 The current basic/advanced matrix passes **54 fresh captures** across nine
 workload pairs on matching Nsight **2026.3.1.0/build 38722833** and
@@ -30,7 +30,12 @@ At **0.2.5**, `artifact_preview_image` adds bounded PNG previews for retained
 P6/PNG/BMP images, with explicit crop/downsampling metadata (**18 tools**).
 PNG input also works for original-image comparisons. See
 [IMAGE_PREVIEWS.md](docs/IMAGE_PREVIEWS.md).
-Typed deep state and the remaining visual diagnosis/repair cases remain unfinished.
+At **0.2.6**, `capture_cpp_source` and `capture_cpp_draws` add numbered source
+excerpts and qualified draw/pipeline/shader source relationships (**20 tools**).
+Retained MCP queries pass for 36 generated projects and 48 draws on both releases;
+see [CPP_INSPECTION.md](docs/CPP_INSPECTION.md). The final 0.2.6 CPU suite passes
+22 checks. Generic resource extraction,
+executed GPU state, and the remaining visual diagnosis/repair cases remain unfinished.
 Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
@@ -120,6 +125,8 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_nsight_check` | CLI discovery, argument delivery, export validation, failures, and owned-process cleanup using executable Nsight stand-ins. |
 | `ngm_nsight_evidence_check` | Bounded parsing of sanitized observed metadata/event/object exports, invalid schemas, duplicate IDs/keys, and input limits. |
 | `ngm_capture_service_check` | Shared job/storage/backend workflow, retained success/failure evidence, timeout, and cancellation using executable stand-ins. |
+| `ngm_cpp_evidence_check` | Bounded generated-source associations, unsupported forms, malformed input, and result budgets. |
+| `ngm_cpp_inspection_check` | C++ bundle provenance/index completeness, source pagination, coverage, limits, and leases. |
 | `ngm_inspection_check` | Retained capture provenance, producer profiles, pagination, response bounds, and leased artifact image comparisons. |
 | `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |
 | `ngm_mcp_check` | Actual stdio protocol and capture/job/artifact tools through executable stand-ins, including input validation, output isolation, and shutdown. |

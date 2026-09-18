@@ -66,6 +66,13 @@ ngm_add_hardware_check(ngm_retained_image_integration SOURCES RetainedImageInteg
         "${NGM_IMAGE_CASES}" "${NGM_CAPTURE_VALIDATION_ROOT}")
 add_dependencies(ngm_retained_image_integration nsight-graphics-mcp)
 
+set(NGM_CPP_CASES "" CACHE FILEPATH "Explicit retained C++ inputs for opt-in validation")
+ngm_add_hardware_check(ngm_retained_cpp_integration SOURCES RetainedCppIntegration.cpp
+    LIBRARIES ngm_core nlohmann_json::nlohmann_json
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "${NGM_CAPTURE_ARTIFACT_ROOT}"
+        "${NGM_CPP_CASES}" "${NGM_CAPTURE_VALIDATION_ROOT}")
+add_dependencies(ngm_retained_cpp_integration nsight-graphics-mcp)
+
 ngm_register_check(ngm_cli_check
     COMMAND "${CMAKE_COMMAND}"
         "-DSERVER=$<TARGET_FILE:nsight-graphics-mcp>"

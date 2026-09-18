@@ -1,3 +1,4 @@
+#include "CppEvidenceFixture.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -210,7 +211,12 @@ int main(int argc, char** argv) {
                 continue;
             }
             std::ofstream stream(project / file);
-            stream << "CPU stand-in generated project; not real Nsight source or serialized resource data\n";
+            stream << "// CPU stand-in generated project; not real Nsight source or serialized resource data\n";
+            if(std::string_view(file) == "CommandList00.cpp")
+                stream << ngm::check::cpp::recording(ngm::check::cpp::begin + ngm::check::cpp::draw +
+                                                     ngm::check::cpp::end);
+            if(std::string_view(file) == "Resources00.cpp")
+                stream << ngm::check::cpp::resources;
         }
         {
             std::ofstream cmake(project / "CMakeLists.txt");

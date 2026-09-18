@@ -394,6 +394,9 @@ the process supervisor, job coordinator, and JSON-manifest artifact store are
 implemented. Basic/advanced capture and typed inventory queries through MCP are
 verified on the recorded 2026.3.1.0 and 2026.2.0.0 setups; broader compatibility,
 remaining source-repair cases, and performance retention measurements remain outstanding.
+At 0.2.6 the inspection core also exposes qualified generated-source relationships
+through MCP; this is bounded parsing of retained source, not a C++ interpreter or
+executed GPU-state reconstruction (CPP_INSPECTION.md).
 Run validation locally, including real GPU workflows on at least two Nsight
 releases. R-013 owns the build/toolchain choices, R-005 the fixture/windowing setup,
 R-011 process control, R-012 storage, and R-015 the exact compatibility matrix.

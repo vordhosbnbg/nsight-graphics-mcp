@@ -574,3 +574,64 @@ report/source/transcript/preview/audit snapshot is explicitly pinned as
 `bundle-f9e131446027c6dd2a10f64c5d4a1d2b` in `artifacts/nsight-repair-evidence`.
 [IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md) records invocation, format, sampling,
 and evidence limitations. R-007/R-015 remain in progress.
+
+## Generated-source queries at 0.2.6
+
+`capture_cpp_source` and `capture_cpp_draws` bring the stdio surface to **20 tools**.
+[CPP_INSPECTION.md](CPP_INSPECTION.md) defines source lines, literal associations,
+unsupported coverage, producer/index validation, and limits. Two new CPU checks
+cover the pure grammar and retained C++ service. The executable Nsight stand-in
+now supplies explicitly synthetic source records for the MCP boundary checks.
+
+The final GCC Debug `ngm_check` run passes **22/22 checks in 186.54 seconds**:
+`build/capture-acceptance/check-0.2.6-final.log`. This includes the new parser and
+service checks, ordinary inspection/MCP behavior, source dependency checks and
+actual ELF linkage. Focused checks preceded the aggregate. An additional build of
+`CppEvidence.cpp` and `CppEvidenceCheck.cpp` with AddressSanitizer and
+UndefinedBehaviorSanitizer passes with exit 0 and no diagnostics
+(`check-0.2.6-cpp-sanitized-final.log`); supporting libraries in that executable use
+their ordinary Debug build, so this is not a full-project sanitizer qualification.
+A first retained-evidence harness build exposed string/JSON comparison type errors; explicit
+string extraction corrected that CPU compile failure before any retained MCP run.
+
+Fresh-context reviews identified and corrected false associations from executable
+arguments, ambiguous initializer forms, duplicate outputs, scope/shadowing,
+declaration order, unknown sibling constructors/helpers, and C++ line splicing.
+Additional corrections bound all output categories, reject incomplete source
+indexes, and cache invalid parent qualification. The observed generated progress,
+nested platform setup, and exact native XCB handle forms received explicit
+qualification and regression coverage. Failed retained-source probes are preserved
+as I-018–I-020, rather than interpreted as universal Nsight limitations.
+
+The final opt-in `ngm_retained_cpp_integration` runs use:
+
+```sh
+build/linux-gcc-debug/tests/ngm_retained_cpp_integration \
+  build/linux-gcc-debug/nsight-graphics-mcp artifacts/nsight-repair-evidence \
+  build/cpp-query-validation/nsight-repair-evidence-cases.json \
+  build/cpp-query-validation/repair-final
+build/linux-gcc-debug/tests/ngm_retained_cpp_integration \
+  build/linux-gcc-debug/nsight-graphics-mcp artifacts/nsight-evidence \
+  build/cpp-query-validation/nsight-evidence-cases.json \
+  build/cpp-query-validation/captures-final
+```
+
+Both pass: **36 retained C++ captures, 48 resolved draws**, from the exact matching
+2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 producers. These include
+basic reference/fault/repaired captures and standalone/combined advanced captures.
+The run directories are `repair-final/cpp-inspection-QTer55` (six cases) and
+`captures-final/cpp-inspection-d9RvYz` (30 cases), under `build/cpp-query-validation`.
+The harness verifies explicit pins, single-row draw pagination, source excerpts,
+file hashes, coverage pages, and stable results after server restart without
+desktop or Nsight environment. It runs no new capture, GPU work, shader/resource
+extraction, source repair, or Codex client session.
+
+A separate Python audit validates all **276 tool calls** against the advertised
+input/output schemas and compares source spans, event annotations, pipeline
+outputs, stage/module references and declared resource handles/lengths against
+the retained text. Its source and results are retained with both MCP transcripts,
+exact executable hashes, parser/service/test sources, generated-source subsets,
+failed probes, and check logs in explicitly pinned **`bundle-ce6ae6385721977dfd7091469cb57888`**
+in `artifacts/nsight-repair-evidence` (204 inventoried payload files; 5,436,164 total bundle bytes including management files). The copied input
+subsets are qualification evidence; original service capture bundles remain
+separately pinned. R-007/R-015 stay In Progress, and no pending item is marked Done.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(NsightGraphicsMCP VERSION 0.2.5 LANGUAGES C CXX)
+project(NsightGraphicsMCP VERSION 0.2.6 LANGUAGES C CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Only Linux builds are currently supported.")

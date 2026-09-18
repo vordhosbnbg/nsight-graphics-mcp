@@ -170,6 +170,102 @@ Schema inventory_schema(const char* name, Schema record) {
     return result;
 }
 
+Schema cpp_inspection_schema() {
+    const auto tool = object_schema(
+        {{"path", string_schema(4096, 1)}, {"version", string_schema(64, 1)}, {"build", string_schema(64, 1)}},
+        {"path", "version", "build"});
+    return object_schema(
+        {{"capture_id", string_schema(39, 39)},
+         {"evidence_origin", {{"type", "string"}, {"enum", {"nsight_generated_cpp"}}}},
+         {"schema_profile", string_schema(80, 1)},
+         {"producer", object_schema({{"capture_tool", tool}, {"replay_tool", tool}, {"cli_tool", tool}},
+                                    {"capture_tool", "replay_tool", "cli_tool"})},
+         {"index_source", string_schema(512, 1)},
+         {"metadata_source", string_schema(512, 1)},
+         {"report_source", string_schema(512, 1)},
+         {"has_unsupported_operation", boolean_schema()}},
+        {"capture_id", "evidence_origin", "schema_profile", "producer", "index_source", "metadata_source",
+         "report_source", "has_unsupported_operation"});
+}
+Schema cpp_file_schema() {
+    return object_schema({{"path", string_schema(512, 1)},
+                          {"bytes", integer_schema(0, 4U * 1024U * 1024U)},
+                          {"sha256", string_schema(64, 64)}},
+                         {"path", "bytes", "sha256"});
+}
+Schema cpp_source_schema() {
+    auto result = cpp_inspection_schema();
+    result["properties"]["source"] = cpp_file_schema();
+    result["properties"]["start_line"] = integer_schema(1, 4194304);
+    result["properties"]["total_lines"] = integer_schema(0, 4194304);
+    result["properties"]["next_line"] = nullable(integer_schema(1, 4194304));
+    result["properties"]["lines"] =
+        array_schema(object_schema({{"number", integer_schema(1, 4194304)},
+                                    {"text", string_schema(InspectionService::maximum_page_bytes)}},
+                                   {"number", "text"}),
+                     200);
+    for(const auto* key : {"source", "start_line", "total_lines", "next_line", "lines"})
+        result["required"].push_back(key);
+    return result;
+}
+Schema cpp_draws_schema() {
+    auto result = cpp_inspection_schema();
+    const auto span = object_schema({{"path", string_schema(512, 1)},
+                                     {"start_line", integer_schema(1, 4194304)},
+                                     {"end_line", integer_schema(1, 4194304)}},
+                                    {"path", "start_line", "end_line"});
+    const auto stage = object_schema({{"stage", string_schema(64, 1)},
+                                      {"module", string_schema(64, 1)},
+                                      {"entry_point_expression", string_schema(258, 1)},
+                                      {"stage_source", span},
+                                      {"module_source", span},
+                                      {"resource_handle", integer_schema()},
+                                      {"declared_bytes", integer_schema(1, 16U * 1024U * 1024U)}},
+                                     {"stage", "module", "entry_point_expression", "stage_source", "module_source",
+                                      "resource_handle", "declared_bytes"});
+    const auto pipeline =
+        object_schema({{"symbol", string_schema(64, 1)}, {"source", span}, {"stages", array_schema(stage, 8)}},
+                      {"symbol", "source", "stages"});
+    const auto binding =
+        object_schema({{"symbol", string_schema(64, 1)}, {"event_index", integer_schema()}, {"source", span}},
+                      {"symbol", "event_index", "source"});
+    const auto draw = object_schema(
+        {{"recording", string_schema(65536, 1)},
+         {"event_index", integer_schema()},
+         {"function", string_schema(64, 1)},
+         {"arguments", array_schema(string_schema(16384, 1), 5)},
+         {"source", span},
+         {"association_status", {{"type", "string"}, {"enum", {"resolved_source_relationship", "unavailable"}}}},
+         {"reason", nullable(string_schema(256, 1))},
+         {"pipeline_bind", nullable(binding)},
+         {"pipeline", nullable(pipeline)}},
+        {"recording", "event_index", "function", "arguments", "source", "association_status", "reason", "pipeline_bind",
+         "pipeline"});
+    result["properties"]["draws"] = array_schema(draw, 100);
+    result["properties"]["unsupported_recordings"] = array_schema(
+        object_schema({{"recording", string_schema(65536, 1)}, {"source", span}, {"reason", string_schema(256, 1)}},
+                      {"recording", "source", "reason"}),
+        100);
+    result["properties"]["unsupported_objects"] = array_schema(
+        object_schema({{"symbol", string_schema(65536)}, {"source", span}, {"reason", string_schema(256, 1)}},
+                      {"symbol", "reason"}),
+        100);
+    result["properties"]["source_files"] = array_schema(cpp_file_schema(), 64);
+    result["properties"]["association_scope"] = string_schema(512, 1);
+    result["properties"]["section"] = {
+        {"type", "string"}, {"maxLength", 32}, {"enum", {"draws", "unsupported_recordings", "unsupported_objects"}}};
+    for(const auto* key :
+        {"draws_total", "unsupported_recordings_total", "unsupported_objects_total", "offset", "total"})
+        result["properties"][key] = integer_schema(0, 100000);
+    result["properties"]["next_offset"] = nullable(integer_schema(0, 100000));
+    for(const auto& [key, unused] : result["properties"].items()) {
+        (void)unused;
+        if(std::find(result["required"].begin(), result["required"].end(), key) == result["required"].end())
+            result["required"].push_back(key);
+    }
+    return result;
+}
+
 // fastmcpp's optional validator maps failures to protocol errors and does not
 // enforce closed objects. This small validator applies the declared input
 // subset before any operation; malformed tool arguments become tool errors.
@@ -327,10 +423,26 @@ void add_tool(fastmcpp::tools::ToolManager& tools, const char* name, Schema inpu
 } // namespace
 
 Json implemented_tool_names() {
-    return Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
-                        "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                        "artifact_prune", "artifact_import", "artifact_compare_images", "artifact_preview_image",
-                        "capture_metadata", "capture_events", "capture_objects"});
+    return Json::array({"capabilities",
+                        "capture",
+                        "capture_cpp",
+                        "job_status",
+                        "job_cancel",
+                        "artifact_list",
+                        "artifact_info",
+                        "artifact_files",
+                        "artifact_read",
+                        "artifact_pin",
+                        "artifact_usage",
+                        "artifact_prune",
+                        "artifact_import",
+                        "artifact_compare_images",
+                        "artifact_preview_image",
+                        "capture_metadata",
+                        "capture_events",
+                        "capture_objects",
+                        "capture_cpp_source",
+                        "capture_cpp_draws"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -777,5 +889,41 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  return InspectionService(service().artifacts())
                      .objects(id, arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
              });
+    add_tool(
+        tools, "capture_cpp_source",
+        object_schema({{"capture_id", string_schema(39, 39)},
+                       {"source_path", string_schema(512, 1)},
+                       {"start_line", integer_schema(1, 4194304)},
+                       {"max_lines", integer_schema(1, 200)}},
+                      {"capture_id", "source_path"}),
+        cpp_source_schema(),
+        "Read numbered lines from an indexed generated C++ source file in a complete capture_cpp bundle. "
+        "Validates same-bundle producer, report, index and metadata under a usage lease. Source is limited to 4 MiB; "
+        "default 100 lines, maximum 200 and 256 KiB per page. Continue with next_line. Hash identifies inspected "
+        "bytes, not producer authenticity. This reads generated replay source, not original shader source.",
+        true, false, [this](const Json& arguments) {
+            const auto id = artifact_id(arguments, "capture_id");
+            const auto path = arguments.at("source_path").get<std::string>();
+            relative_path(path);
+            return InspectionService(service().artifacts())
+                .cpp_source(id, path, arguments.value("start_line", std::size_t{1}),
+                            arguments.value("max_lines", std::size_t{100}));
+        });
+    auto cpp_input = inventory_input;
+    cpp_input["properties"]["section"] = {
+        {"type", "string"}, {"maxLength", 32}, {"enum", {"draws", "unsupported_recordings", "unsupported_objects"}}};
+    add_tool(
+        tools, "capture_cpp_draws", cpp_input, cpp_draws_schema(),
+        "Page literal draw-to-pipeline-to-shader source relationships in a retained capture_cpp bundle. "
+        "Accepts qualified straight-line single-part recording functions and direct creation initializers. "
+        "Does not establish GPU execution, descriptor contents or extracted shader bytes. Counts report unsupported "
+        "recordings/objects; page those sections separately for reasons and source references. Default section draws, "
+        "limit 50; maximum 100 and 256 KiB per page. Source identities are capture-scoped. "
+        "Unrecognized producers or captures reporting unsupported operations fail explicitly.",
+        true, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts())
+                .cpp_draws(artifact_id(arguments, "capture_id"), arguments.value("section", std::string("draws")),
+                           arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
 }
 } // namespace ngm

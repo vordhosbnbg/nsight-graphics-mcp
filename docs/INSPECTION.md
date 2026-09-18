@@ -12,8 +12,10 @@ exact inventory profiles and selected workloads, not arbitrary Nsight releases.
 incomplete.** The demonstrated extraction paths and explicit gaps below guide
 diagnosis. At 0.2.4 the basic shader edit/build/recapture case passes on both
 releases; [SHADER_REPAIR.md](SHADER_REPAIR.md) records the retained evidence.
-Other defect repairs and deeper product queries still require implementation and
-validation. This document records the parser contract and observed
+At 0.2.6, bounded generated-source queries and literal draw/pipeline/shader
+relationships are implemented and qualified on retained captures; see
+[CPP_INSPECTION.md](CPP_INSPECTION.md). Other defect repairs and resource extraction
+still require implementation and validation. This document records the parser contract and observed
 exports; [MCP.md](MCP.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md) own the
 integrated tool surface and executed validation results.
 
@@ -469,7 +471,7 @@ not a claim that every detailed-state capability or R-007 is implemented.
 | Required category | Demonstrated path | Remaining gap and chosen next action |
 | --- | --- | --- |
 | Events and object identity | Typed retained metadata/events/objects pass on 54 basic/advanced graphics captures; IDs remain capture-scoped. | Inventory exports lack argument/state joins. Use generated API source for demonstrated associations. |
-| Draw → pipeline → shaders | Basic and combined generated source records exact draw, pipeline, stage, module, and resource references; source is retrievable over MCP. | No generic typed state reconstruction. R-007 will add bounded queries over the proven evidence and return explicit limits. |
+| Draw → pipeline → shaders | Basic and combined generated source records exact draw, pipeline, stage, module, and resource references; source is retrievable over MCP. | At 0.2.6, bounded source and literal draw/pipeline/shader queries pass on 36 retained captures (48 draws), with explicit unsupported coverage. No generic executed-state reconstruction; see CPP_INSPECTION.md. |
 | Shader contents/source correlation | Fixed-capture generated helpers extract SPIR-V exactly matching frozen compiler output; debug GLSL is retained. | Extraction is restricted to verified captures/helpers. Qualify bounded product access before advertising a generic extractor. |
 | Descriptor bindings | Generated layouts, bound sets, counts/types, and setup annotations identify basic resources and scene-to-post sampling. | Packed descriptor writes do not expose array-slot mapping or exact offsets/ranges through the implemented reader. Next probe must establish the generated StructHydrator calling contract; do not decode private formats or infer slots from comments. |
 | Selected resource contents | Generated helper yields palette buffers, push constants, shader bytes, and indirect arguments with exact source references and temporal meaning. | Arbitrary after-event buffers/images remain unavailable from these exercised interfaces. Preserve that limit and revisit only with a documented export/helper path. |

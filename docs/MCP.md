@@ -11,7 +11,9 @@ state/resource extraction and profiling remain pending. At 0.2.4, the seventeent
 qualified in [SHADER_REPAIR.md](SHADER_REPAIR.md); broader diagnosis/fix coverage remains pending. At 0.2.5 the eighteenth tool,
 `artifact_preview_image`, returns bounded PNG image content for retained
 P6/PNG/BMP sources; see [IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md). A capture submission returns job and artifact IDs; it does not
-assert that capture or replay succeeded.
+assert that capture or replay succeeded. At **0.2.6**, `capture_cpp_source` and
+`capture_cpp_draws` bring the surface to **20 tools** with bounded generated-source
+inspection; [CPP_INSPECTION.md](CPP_INSPECTION.md) defines its exact grammar and limits.
 
 `capabilities` accepts `{}` or omitted `arguments`. It reports the product version,
 negotiated MCP revision, implemented tools, configured artifact limits, and
@@ -42,6 +44,8 @@ and the equivalent mechanism in
 | --- | --- |
 | `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, or `graphics_capture_api`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. Returns `identity` and `artifact_id`. |
 | `capture_cpp` | Required absolute `executable` and `working_directory`; optional `arguments`, `wait_frames` (default 2, range 2–1000000), `timeout_ms`, `pin`, and `application_output_option` with the same bounds as `capture`. Generates a C++ project in a fresh target. Read `derived/cpp-project.json` and its source paths through artifact tools. Does not accept `capture_frame` or `delimiter`; see CPP_CAPTURE.md. |
+| `capture_cpp_source` | Required `capture_id` and indexed `source_path`; optional `start_line` (default 1, range 1–4194304), `max_lines` (default 100, range 1–200). Returns numbered generated replay source lines, content hash and `next_line`; source cap 4 MiB, page cap 256 KiB. |
+| `capture_cpp_draws` | Required `capture_id`; optional `offset` (0–100000), `limit` (default 50, range 1–100), and `section` (`draws`, default; `unsupported_recordings`; `unsupported_objects`). Returns literal draw/pipeline/shader references and separate coverage totals for qualified generated source. Page selected sections with `next_offset`; no executed GPU-state or resource-byte claim. |
 | `job_status` | Required `job_id`; returns state, stop reason, cleanup/reservation flags, elapsed milliseconds, a bounded diagnostic error, and evidence IDs. IDs belong to this server session. |
 | `job_cancel` | Required `job_id`; requests cancellation and reports whether it was already requested or terminal. Poll status for cleanup completion. |
 | `artifact_list` | Optional `after_id` and `limit` (default 50, range 1–100); includes staging, complete, failed, and expired summaries with `next_after`. |
