@@ -702,3 +702,85 @@ CPU/warning logs, and review notes. `raw/imported/qualification.json` identifies
 payload hashes and scope. Original four capture bundles remain separately pinned
 in `artifacts/nsight-evidence`; copied inputs are qualification evidence, not
 new service captures. R-007/R-015 remain active and no roadmap status changes.
+
+## Postpass C++ source repair at 0.2.8
+
+`ngm_source_repair_integration` now validates a supplied normal source-build
+record for `combined-pass-error` and `pass-output-error`. The isolated fixture
+source is archived commit `744cb68` (product0.2.7), with one channel-order
+assignment changed and recompiled through CMake/Ninja. Original and repaired
+embedded build identities differ only in `src/fixture/Fixture.cpp`; the server
+and harness are product0.2.8. All three roles use one frozen shader bundle.
+[Source patch, hashes, invocation, and limits](SOURCE_REPAIR.md) are retained.
+
+The serial matrix under `build/source-repair-validation/matrix` passes all four
+invocations, terminal exit0: combined and standalone multipass cases on matching
+Nsight 2026.3.1.0/build38722833 and 2026.2.0.0/build37991608. This totals **12 fresh
+C++ captures** and **12 independent frame-2 application-readback launches** with
+synchronization validation, seed42, 192×128, no SDK, and C++ wait_frames2.
+The observed host remains RTX3080Ti/driver615.71.09, KDE Wayland/Xwayland/XCB,
+GCC16.2.1 20260810 Debug. No system settings were changed.
+
+Every capture exactly matches its separate application PPM. Fault/reference
+comparisons differ at 24,472 pixels for combined and 24,529 for standalone;
+all four rebuilt/reference comparisons have **zero differing pixels and zero
+maximum/mean RGB error** at tolerance0. Fresh source queries resolve two draws
+per capture, preserve direct/indirect workload mode, and identify the postpass
+fragment module through that capture's own source symbols. Numbered source
+excerpts match their retained file hash and draw line. Cleanup, released GPU
+reservation, source indexes, pin state, and comparison after server restart pass.
+No standalone GPU replay or fresh generic resource extraction was attempted.
+
+The four complete run reports are explicitly pinned in
+`artifacts/nsight-repair-evidence`:
+
+| Release / case | Run report bundle |
+| --- | --- |
+| 2026.3 combined | `bundle-6502aaa90e78a89e5bbbb56635b8f01d` |
+| 2026.3 standalone | `bundle-c274a92c04336d5e65e3f80b59c89a56` |
+| 2026.2 combined | `bundle-74dbef8e7502dc966effa15694e6b993` |
+| 2026.2 standalone | `bundle-f7979c5e98e987501167cbdba378f8c9` |
+
+Each report names its three separately pinned capture bundles and three pinned
+application baseline imports: **28 protected bundles** across the matrix. Full
+payloads include frozen server/target/shader inputs, source/build records,
+application observations, MCP capture/restart transcripts, source queries and
+pixel comparisons. Expected answer checks remain in the harness; the capture
+server does not synthesize diagnoses from fixture scenario names.
+
+Five deliberate negative preflight cases pass under
+`build/source-repair-validation/preflight`: extra source edit, reused executable,
+changed build identity, missing executable link record, and changed shader bytes.
+Each exits2 before GPU work with a structured `preflight.json` failure record.
+There was no unexpected integration failure to add to INVESTIGATIONS.md.
+Fresh-context implementation review corrected the configurable original-input
+paths and structured preflight recording before hardware runs; excerpt and
+workload verification were also strengthened.
+
+The separate read-only evidence review writes
+`build/source-repair-validation/independent-audit/audit.py` and `report.json`.
+It independently decodes all twelve BMP/PPM pairs with Pillow, checks all eighteen
+original build-input hashes against the archived commit, the sole source delta,
+shared shader files, exact tool profiles and executable roles, generated-source
+associations, before/after metrics, cleanup/pins/restart, and all five refusals.
+It does not execute the helper/fixture or open an ArtifactStore. These results
+qualify the supplied postpass repairs; they do not finish R-007/R-015 or establish
+an autonomous diagnosis harness for other defect families.
+
+The final GCC Debug CPU aggregate passes **22/22 checks in 188.50 seconds**
+(`build/capture-acceptance/check-0.2.8-final.log`). Scoped clang-format, diff, and
+local-document-link checks pass. Fresh-context implementation and evidence
+reviews found no remaining blocker for these two cases.
+
+The compact qualification snapshot is explicitly pinned as
+**`bundle-59b3155112a30535883c2d4fc68a3c1d`** in
+`artifacts/nsight-repair-evidence`: **758 inventoried payload files** and
+**9,063,594 total bundle bytes** including its outer manifest and pin record.
+`raw/imported/qualification.json` records payload hashes, scope, CPU results,
+source identities, audit, and the 28 separately pinned bundle references.
+The snapshot retains matrix argv/results/reports/transcripts, source/build records,
+common shaders, all five negative input mutations/rejection reports, and the
+independent audit. It omits repeated executable and image copies, recording their
+identities instead; the full successful inputs and images remain in the separately
+pinned run/capture/baseline bundles above. It is an imported qualification record,
+not a new service capture. R-007 and R-015 remain in progress.

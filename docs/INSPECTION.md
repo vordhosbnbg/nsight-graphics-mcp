@@ -507,3 +507,16 @@ including offsets/ranges and image layout. Typed fields agree across reference
 and postpass-fault captures despite different serialized bytes. This resolves
 I-017's uncertainty for those setup fields only. Generic product resource access,
 executed shader selection, and the remaining actual repairs stay unfinished.
+
+## Postpass source repair at 0.2.8
+
+The shared channel-order assignment is now repaired in an isolated source build.
+Both `combined-pass-error` and `pass-output-error` retain their faulty scenario
+names and use one unchanged shader bundle across original/repaired executables.
+On each release, three fresh captures and three separate frame-2 application
+readbacks pass: faulty output differs, repaired output exactly matches its correct
+reference, and every capture matches its application baseline. Fresh generated
+source queries establish both draw associations and the postpass fragment module.
+[Source/build evidence and limits](SOURCE_REPAIR.md) distinguish this supplied
+repair qualification from an autonomous diagnosis harness or new generic resource
+extraction. Other defect families remain unfinished.

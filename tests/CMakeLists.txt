@@ -59,6 +59,18 @@ ngm_add_hardware_check(ngm_shader_repair_integration SOURCES ShaderRepairIntegra
         "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")
 add_dependencies(ngm_shader_repair_integration nsight-graphics-mcp ngm-vulkan-fixture)
 
+set(NGM_REPAIR_FIXTURE "" CACHE FILEPATH "Rebuilt C++ fixture for opt-in source repair validation")
+set(NGM_SOURCE_REPAIR_ORIGINAL_FIXTURE "$<TARGET_FILE:ngm-vulkan-fixture>" CACHE FILEPATH
+    "Frozen original fixture matching the source repair record")
+set(NGM_SOURCE_REPAIR_SHADERS "${NGM_FIXTURE_SHADER_OUTPUT_DIR}" CACHE PATH
+    "Common frozen shader bundle matching the source repair record")
+ngm_add_hardware_check(ngm_source_repair_integration SOURCES SourceRepairIntegration.cpp
+    LIBRARIES ngm_capture ngm_experiments
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "${NGM_SOURCE_REPAIR_ORIGINAL_FIXTURE}" "${NGM_REPAIR_FIXTURE}"
+        "${NGM_SOURCE_REPAIR_SHADERS}" "${NGM_REPAIR_RECORD_ROOT}" "${NGM_NSIGHT_ROOT}"
+        "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}" "combined-reference" "combined-pass-error")
+add_dependencies(ngm_source_repair_integration nsight-graphics-mcp ngm-vulkan-fixture)
+
 set(NGM_IMAGE_CASES "" CACHE FILEPATH "Explicit retained-image inputs for opt-in validation")
 ngm_add_hardware_check(ngm_retained_image_integration SOURCES RetainedImageIntegration.cpp
     LIBRARIES ngm_core fastmcpp_core

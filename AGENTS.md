@@ -119,7 +119,12 @@ C++ captures and 48 draws on both exact profiles; see docs/CPP_INSPECTION.md.
 At 0.2.7, the opt-in fixed-capture descriptor hydration experiment qualifies setup
 array-element mappings for four combined captures; docs/DESCRIPTOR_HYDRATION.md
 records the trusted helper/data contract. Generic descriptor/resource extraction,
-executed GPU state, and all other visual defect repairs remain unfinished.
+executed GPU state, and the remaining visual defect families remain unfinished.
+At 0.2.8, an isolated C++ source repair passes combined/standalone postpass cases
+on both releases with 12 fresh captures and 12 application baselines; exact image
+comparison, build/source identities, queries, pins, and restart are verified.
+See docs/SOURCE_REPAIR.md. Binding, pipeline, resource-index, and indirect-parameter
+repairs remain R-007 work.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,

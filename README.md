@@ -40,6 +40,11 @@ At **0.2.7**, an opt-in fixed-capture descriptor hydration experiment qualifies
 setup array-slot mappings on four retained combined captures; see
 [DESCRIPTOR_HYDRATION.md](docs/DESCRIPTOR_HYDRATION.md). The MCP surface remains
 20 tools; this experiment is not a generic product resource reader.
+At **0.2.8**, an isolated C++ source repair passes for the combined and standalone
+postpass defects on both releases: 12 fresh captures match their application
+baselines, and repaired output exactly matches each correct reference. See
+[SOURCE_REPAIR.md](docs/SOURCE_REPAIR.md). Other defect families and generic
+resource access remain unfinished.
 Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
