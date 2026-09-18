@@ -1101,3 +1101,34 @@ actual repair/build records, executable baselines and audit script/results.
 Working publication records are `build/compute-qualification/publication.json`
 and `verification.json`. No second-release compute success, generic Nsight
 compute buffer/state inspection or standalone GPU replay success is claimed.
+
+## Persistent loopback HTTP — 0.3.2
+
+R-004 adds a private-token-authenticated Streamable HTTP listener over the same
+22-tool registry and capture/inspection core. The GCC Debug `ngm_check` aggregate
+passes **26/26 CPU checks**, no skips, in **254.13 seconds**; this includes the
+existing stdio check (19.57 seconds), new HTTP integration (4.05 seconds), process/
+job/artifact checks and static vendored-code linkage audit. No new dependency or
+vendored-source change was required. The focused HTTP run also passes separately.
+
+The HTTP check uses a real listener, independent per-client protocol sessions,
+the pinned fastmcpp HTTP client/raw-result interface, and executable Nsight
+stand-ins. It verifies actual capture lifecycle, shared cancellation, persistence
+across session deletion, retained pins after restart, and SIGTERM/SIGINT cleanup.
+Incomplete-header and acknowledged-incomplete-body requests exercise bounded
+shutdown. Invalid bearer credentials, Host/Origin, versions, malformed messages,
+body/header budgets and insecure token files are covered. These are CPU checks,
+not new hardware qualification.
+
+A separate **Codex CLI 0.154.0** session connects to the real 0.3.2 HTTP server,
+negotiates MCP **2025-06-18**, discovers all 22 tools, calls `capabilities`, then
+retrieves complete/pinned compute qualification bundle
+`bundle-1ed0b5e17d49e24b6333d6ae4b10ffc1`. The server stays alive after Codex exits
+and subsequently exits zero on SIGTERM with empty stdout. No persistent Codex
+configuration was changed. The transcript preserves the artifact's original
+0.3.1 provenance; HTTP retrieval is a distinct 0.3.2 observation.
+
+Working evidence is in `build/http-qualification`; fresh-context transport and
+acceptance reviews are in `build/http-review` and `build/http-acceptance-review`.
+[HTTP.md](HTTP.md) records deployment policy, commands, protocol limits, client
+library limitations, and the managed qualification reference.

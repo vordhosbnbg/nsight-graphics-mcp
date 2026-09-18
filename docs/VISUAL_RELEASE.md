@@ -95,5 +95,5 @@ evidence; the server reports these limits rather than inferring missing state.
 
 All failed integration attempts and revisit conditions remain in
 [INVESTIGATIONS.md](INVESTIGATIONS.md). The subsequent compute milestone is
-qualified in [COMPUTE.md](COMPUTE.md); performance analysis and Streamable HTTP
-remain unfinished work in [ROADMAP.md](ROADMAP.md).
+qualified in [COMPUTE.md](COMPUTE.md), and local Streamable HTTP in
+[HTTP.md](HTTP.md). Performance analysis remains unfinished in [ROADMAP.md](ROADMAP.md).

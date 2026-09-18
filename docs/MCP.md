@@ -1,4 +1,4 @@
-# Local stdio MCP server
+# Local MCP server
 
 The visual release completes at **0.3.0**, preserving the 22-tool surface qualified
 at 0.2.12. [INSTALL.md](INSTALL.md) provides the exercised source-build and repair
@@ -6,7 +6,7 @@ walkthrough; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates acceptance scop
 The clean 0.2.12 build also passes a real Codex CLI 0.154.0 capability/artifact
 retrieval check; exact evidence is in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 
-The local stdio server exposes capability discovery, asynchronous fresh-process
+The default local stdio server exposes capability discovery, asynchronous fresh-process
 capture, job status/cancellation, and bounded access to managed artifact bundles.
 Retained capture metadata and paginated event/object inventories are implemented
 for the observed Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608
@@ -46,6 +46,11 @@ and actionable text. Malformed protocol parameters, including non-object
 the MCP [2025-11-25 tool error contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#error-handling)
 and the equivalent mechanism in
 [2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#error-handling).
+
+The optional persistent HTTP adapter uses this same tool implementation.
+[HTTP.md](HTTP.md) defines loopback binding, bearer authentication, independent
+client sessions, shared jobs and shutdown behavior. The framing/lifecycle details
+below describe stdio unless explicitly identified otherwise.
 
 ## Workflow tools
 

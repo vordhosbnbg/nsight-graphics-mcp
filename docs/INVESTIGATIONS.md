@@ -1208,3 +1208,73 @@ against the captured build-input hash in `investigation/I030-Compute.cpp`.
 I-031's additional real MCP unsupported result is retained in failed pinned
 `bundle-c9f0d80ba38641d2106f390558a4967c`; its report and transcript are in the
 snapshot. The native attempt pins above remain independent and protected.
+
+### I-032 — GPU Trace probe's separated platform option reaches Qt
+
+- **Context:** R-009 initial interface probe, product fixture 0.3.1, Nsight
+  2026.3.1.0/build 38722833, RTX 3080 Ti / driver 615.71.09.
+- **Reproduction:** The private C++ runner
+  `build/performance-investigation/TraceProbe-v1.cpp` passes the documented
+  platform name as two argv entries: `--platform`, `Linux (x86_64)`, alongside
+  GPU Trace Profiler, automatic export and unchanged clocks. The request is in
+  `build/performance-investigation/trace-2026.3/request.json`.
+- **Expected/observed:** Expected a GPU Trace prerequisite check/trace. Qt instead
+  treats the platform value as a Qt plugin name and aborts initialization; the
+  crash reporter remains until the owned-process deadline. No profiling export
+  is produced. The corrected probe uses `--platform=Linux (x86_64)`, matching the
+  already qualified C++ capture adapter. This failure does not establish anything
+  about performance-counter availability.
+- **Evidence/retention:** Working logs and request are in the directory above;
+  managed retention will be recorded with the corrected probe result.
+- **Revisit:** A changed documented command-line parser or Nsight/Qt release.
+  Keep the joined platform form in backend argument construction.
+
+### I-033 — GPU Trace cannot access performance counters as the current user
+
+- **Context:** Nsight 2026.3.1.0/build 38722833, fixture 0.3.1, RTX 3080 Ti /
+  driver 615.71.09, uid 1000 in the existing KDE Wayland/Xwayland session.
+- **Reproduction:** Build/run the private `TraceProbe.cpp` C++ runner, using the
+  joined platform option, `GPU Trace Profiler`, `--auto-export`, Throughput
+  Metrics for Ampere GA10x, start after five presents, limit three frames/1000 ms,
+  and `--set-gpu-clocks unaltered`. Exact argv/environment and executable hashes
+  are retained in `trace-2026.3-v2/request.json`.
+- **Expected/observed:** The fixture launches and presents; Nsight connects, then
+  reports `GPU Performance Counters unavailable`. The tool exits 1, cleanup is
+  confirmed, and the export directory is empty. `/proc/driver/nvidia/params`
+  reports `RmProfilingAdminOnly: 1`; profiling capability minors 4324/4325/4326
+  are root-owned mode 0400 without extended ACLs. This establishes a local
+  prerequisite failure, not absence of a documented metric export interface.
+- **Evidence/retention:** Working request, logs and report are under
+  `build/performance-investigation/trace-2026.3-v2`. Managed snapshot reference
+  follows below. No GPU/system permission or clock change was made.
+- **Revisit:** Explicitly authorized per-user access through the installed R610+
+  capability mechanism, or an administrator-provided profiling environment.
+  The exact temporary grant/restore proposal is retained with the investigation.
+  R-009 cannot claim successful profiling acceptance from this failed probe.
+
+I-032/I-033 retention update (2026-09-18): both probe attempts, runner source and
+binaries, exact requests, logs, cleanup reports, CLI help, system observations
+and proposed permission changes are retained in complete/pinned
+`bundle-8d30dab0cf976915a34adff7b483ad10`, store `artifacts/performance-evidence`.
+
+### I-034 — Pinned fastmcpp HTTP client compatibility edges
+
+- **Context:** R-004 HTTP adapter at 0.3.2, fastmcpp 3.4.7.1 at the existing pinned
+  source revision, its StreamableHttpTransport/Client, and the real local server.
+- **Reproduction:** The initial `ngm_http_check` uses `Client::initialize`,
+  `list_tools`, and `call_tool("capabilities", {})` against the authenticated
+  ephemeral loopback listener. Failed logs are retained in
+  `build/http-review/client-{duplicate-header,nullable-schema}-failure.log`.
+- **Expected/observed:** Initialization first fails with HTTP 400 because the
+  transport explicitly supplies Content-Type and cpp-httplib appends another.
+  The adapter now accepts equivalent JSON media declarations but still rejects
+  conflicts. After initialization/discovery succeed, high-level result coercion
+  throws a JSON type error on valid nullable schema type arrays. The public
+  `Client::call` raw-result API works without that optional coercion; tests use it.
+  Tool schemas remain unchanged. Actual Codex CLI HTTP calls also succeed.
+- **Evidence/retention:** Failed logs, reviewed corrections, passing HTTP check,
+  Codex transcript and full aggregate are included in R-004's managed qualification
+  snapshot referenced by HTTP.md. No claim is made that fastmcpp's high-level
+  typed result conversion works for this tool surface.
+- **Revisit:** A future pinned client revision handling nullable schema types and
+  duplicate media headers; retest high-level conversion before claiming support.

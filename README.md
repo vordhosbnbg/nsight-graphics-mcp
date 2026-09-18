@@ -1,7 +1,7 @@
 # nsight-graphics-mcp
 
 A C++20 MCP server for investigating Vulkan rendering defects with NVIDIA Nsight
-Graphics on Linux. Codex uses **22 local stdio tools** to capture a fresh application,
+Graphics on Linux. Codex uses **22 tools over local stdio or authenticated loopback HTTP** to capture a fresh application,
 inspect retained evidence, preview/compare images and verify source fixes. Codex's
 normal development tools perform source edits and builds.
 
@@ -19,6 +19,10 @@ Nsight 2026.3; the measured 2026.2 path lacks its required extension/feature.
 [COMPUTE.md](docs/COMPUTE.md) records evidence origins, exact limits and validation.
 The 0.3.1 GCC Debug aggregate passes all 25 CPU checks.
 
+Version **0.3.2** adds optional persistent loopback HTTP with private-token
+authentication and the same 22 tools. All 26 CPU checks pass, and real Codex HTTP
+capability/artifact calls verify interoperability. See [HTTP.md](docs/HTTP.md).
+
 Start with [INSTALL.md](docs/INSTALL.md) for the source-build-to-repair walkthrough.
 [VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md) consolidates capability/repair evidence
 and exact limits; [BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) preserves versioned
@@ -28,7 +32,7 @@ The server provides asynchronous captures, managed/pinned evidence, metadata/eve
 object queries, generated-source draw/pipeline/shader relationships, and optional
 confined serialized-resource readers. Those relationships and bytes do not establish
 arbitrary executed GPU state. Standalone GPU replay remains unqualified after
-recorded timeouts. General uninstrumented compute state inspection remains unqualified; performance profiling and HTTP are later work.
+recorded timeouts. General uninstrumented compute state inspection remains unqualified; performance profiling remains unfinished. [HTTP.md](docs/HTTP.md) describes the optional persistent loopback service and its access/lifecycle policies.
 
 ## Build on Linux
 
@@ -120,6 +124,7 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_cpp_inspection_check` | C++ bundle provenance/index completeness, source pagination, coverage, limits, and leases. |
 | `ngm_inspection_check` | Retained capture provenance, producer profiles, pagination, response bounds, and leased artifact image comparisons. |
 | `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |
+| `ngm_http_check` | Real loopback HTTP listener, bearer authentication, sessions, client interoperability, cross-client jobs, incomplete-request shutdown and artifact persistence. |
 | `ngm_mcp_check` | Actual stdio protocol and capture/job/artifact tools through executable stand-ins, including input validation, output isolation, and shutdown. |
 | `ngm_fixture_contract_check` | Standalone option and shader-provenance validation without initializing Vulkan. |
 | `ngm_experiment_check` | Isolated repeated runs and retained failed/malformed results using a CPU executable stand-in. |

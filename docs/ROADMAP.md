@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; performance analysis (R-009) is next in progress and Streamable HTTP (R-004) remains pending.**
+Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; Streamable HTTP (R-004) completes at 0.3.2; performance analysis (R-009) remains in progress, with real profiling awaiting an explicit permission decision.**
 Last updated: **2026-09-18**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -14,7 +14,7 @@ items follow the sequence below. Support applications with source access and unm
 applications, targeting visual diagnosis and fix verification through Codex over
 local stdio. Exact component versions, capability availability, and measured
 defaults are implementation investigations assigned below. Compute correctness,
-performance analysis, and a persistent Streamable HTTP service follow later.
+performance analysis, and a persistent Streamable HTTP service follow the visual milestone.
 
 ## Planning Decisions
 
@@ -185,26 +185,26 @@ Title: Analyze GPU and shader performance bottlenecks
 Goal: Add performance investigation after visual and compute correctness workflows are established.
 Scope: Controlled performance workloads in the test app, Nsight GPU Trace collection and supported metric exports, bounded metric queries, and repeatable comparisons with capture/build/hardware provenance.
 Acceptance: A known inefficient workload yields usable profiling evidence; Codex can identify a bottleneck supported by the available metrics; a corrected variant preserves output and shows a repeatable measured change; reports include warmup/repetition policy, units, variability, and relevant clock/replay settings.
-Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path.
+Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path. The first real 2026.3 GPU Trace probe reaches the target but fails because the current user lacks performance-counter access (I-033). An explicit temporary per-user permission proposal is pending owner response; no machine settings were changed.
 ```
 
 ## Pending
 
+## Blocked
+
+## Done
+
 ### R-004
 
 ```text
-Status: Pending
+Status: Done
 Area: mcp/platform/docs
 Title: Add a persistent Streamable HTTP service
 Goal: Expose the server's tools through a persistent process using MCP Streamable HTTP after the local stdio release.
 Scope: An HTTP transport adapter over the shared core, service startup/shutdown and configuration, client connection behavior, and deployment documentation.
 Acceptance: A supported HTTP client discovers and invokes the same implemented tools with equivalent results; service lifecycle and client-disconnection behavior are documented and checked; listener exposure and access controls are explicit; local stdio integration continues to pass its checks.
-Notes: Accepted later work in interview round 3, outside the first release. Depends on R-003's shared MCP/core boundary. Deployment environment, authentication, multiple-client policy, and job ownership across disconnects remain to be scoped before implementation; the stdio milestone should not absorb these requirements.
+Notes: Accepted later work in interview round 3, outside the first release. Depends on R-003's shared MCP/core boundary. Implementation selects local loopback access with a required private-file bearer token, one shared workspace for trusted clients, and service-owned jobs that survive client disconnect/session deletion. Service shutdown cancels and cleans up jobs. Remote deployment and multi-tenant isolation are not selected. Completed 2026-09-18 at 0.3.2 after fresh-context transport review, corrections and independent acceptance. The shared 22-tool core serves independent HTTP sessions; executable stand-ins verify capture, cross-client cancellation, session deletion, restart retention and partial-request shutdown. The GCC Debug aggregate passes 26/26 CPU checks, including stdio. Actual Codex CLI 0.154.0 HTTP discovery and capability/artifact calls pass; service persistence and clean SIGTERM exit verify. Qualification is complete/pinned as bundle-237e85b8b723970aeb424b0e98b19ae8 in artifacts/http-qualification, with all 233 payload hashes and restart pin state verified. See docs/HTTP.md.
 ```
-
-## Blocked
-
-## Done
 
 ### R-008
 

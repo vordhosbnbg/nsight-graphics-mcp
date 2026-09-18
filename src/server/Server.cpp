@@ -11,6 +11,7 @@
 #include <csignal>
 #include <functional>
 #include <iostream>
+#include <mutex>
 #include <string>
 
 namespace ngm {
@@ -68,7 +69,7 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
         {"server",
          {{"name", "nsight-graphics-mcp"},
           {"version", project_version()},
-          {"transport", "stdio"},
+          {"transport", options.http ? "streamable_http" : "stdio"},
           {"protocol_version", protocol_version}}},
         {"implemented_tools", implemented_tool_names()},
         {"operations",
@@ -142,7 +143,7 @@ Json output_schema() {
                 "required": ["name", "version", "transport", "protocol_version"],
                 "properties": {
                     "name": {"type": "string"}, "version": {"type": "string"},
-                    "transport": {"type": "string", "enum": ["stdio"]},
+                    "transport": {"type": "string", "enum": ["stdio", "streamable_http"]},
                     "protocol_version": {"type": "string"}
                 }
             },
@@ -285,13 +286,117 @@ std::optional<Json> validate_request(const Json& request) {
     return std::nullopt;
 }
 
-// The pinned StdioServerWrapper maps parse failures to internal errors and has
-// no input-size limit. Keep framing here, and use the documented fastmcpp handler
-// for negotiation, tool listing/invocation, and MCP result construction.
-int run_stdio(const std::function<Json(const Json&)>& handler, std::string& protocol_version) {
-    constexpr std::size_t maximum_line_bytes = 64 * 1024;
-    enum class Phase { Initialize, Initialized, Ready };
-    auto phase = Phase::Initialize;
+} // namespace
+
+ParsedRpc parse_rpc(std::string_view input) {
+    if(input.size() > 65536)
+        return {{}, rpc_error(nullptr, -32600, "Request exceeds the 65536-byte line limit.")};
+    if(input.find('\0') != std::string_view::npos)
+        return {{}, rpc_error(nullptr, -32700, "Parse error: raw NUL bytes are not valid JSON.")};
+    Json request;
+    try {
+        request = Json::parse(input, limit_json_nesting, false);
+    } catch(const JsonNestingLimit&) {
+        return {{}, rpc_error(nullptr, -32600, "Request exceeds the 64-container JSON nesting limit.")};
+    }
+    if(request.is_discarded())
+        return {{}, rpc_error(nullptr, -32700, "Parse error: expected one JSON request per line.")};
+    return {std::move(request), {}};
+}
+
+struct ProtocolService::Impl {
+    ServerOptions options;
+    WorkflowTools workflow;
+    fastmcpp::tools::ToolManager tools;
+    std::function<Json(const Json&)> handler;
+    std::string protocol_version;
+    std::mutex mutex;
+    explicit Impl(const ServerOptions& input) : options(input), workflow(options) {
+        fastmcpp::tools::Tool capabilities(
+            "capabilities", {{"type", "object"}, {"properties", Json::object()}, {"additionalProperties", false}},
+            output_schema(), [this](const Json& arguments) {
+                // The pinned validator checks types/required fields, but ignores
+                // additionalProperties. Enforce the exact public contract ourselves.
+                if(!arguments.is_object() || !arguments.empty()) {
+                    // A valid CallToolRequest with invalid tool input is a tool
+                    // error, distinct from malformed protocol params rejected above.
+                    return Json{{"isError", true},
+                                {"content", Json::array({{{"type", "text"},
+                                                          {"text", "capabilities accepts only an empty object (no "
+                                                                   "arguments). Remove all argument properties."}}})}};
+                }
+                return capability_report(options, protocol_version);
+            });
+        capabilities.set_description("Report implemented MCP operations and local prerequisite observations. "
+                                     "Does not launch applications or verify Nsight/GPU compatibility.");
+        capabilities.set_validate_args(true);
+        capabilities.set_annotations({{"readOnlyHint", true}, {"destructiveHint", false}, {"openWorldHint", false}});
+        tools.register_tool(capabilities);
+        workflow.register_tools(tools);
+        handler = fastmcpp::mcp::make_mcp_handler(
+            "nsight-graphics-mcp", std::string(project_version()), tools, {}, {},
+            "Call capabilities to discover implemented operations and prerequisite observations. "
+            "Capture requires --artifact-root and starts a fresh application for each asynchronous job. Poll "
+            "job_status "
+            "and use artifact tools to inspect bounded retained evidence; explicitly pin important baselines. "
+            "Use capture_metadata/capture_events/capture_objects for supported retained export inventories. "
+            "Use capture_cpp_source/capture_cpp_draws for qualified generated-source relationships and coverage "
+            "limits. "
+            "Found executable paths are not evidence of Nsight or GPU compatibility. Generated-source relationships "
+            "do not establish GPU state or extracted resource bytes; profiling is not implemented.");
+    }
+};
+ProtocolService::ProtocolService(const ServerOptions& options) : impl_(std::make_unique<Impl>(options)) {}
+ProtocolService::~ProtocolService() = default;
+bool ProtocolService::shutdown() {
+    return impl_->workflow.shutdown();
+}
+std::optional<Json> ProtocolService::respond(const Json& request, RpcSession& session) {
+    std::lock_guard lock(impl_->mutex);
+    using Phase = RpcSession::Phase;
+    if(auto error = validate_request(request)) {
+        // Valid JSON-RPC notifications never receive replies, including
+        // invalid method parameters. Invalid envelopes are not notifications.
+        if(error->at("error").at("code") != -32600 && !request.contains("id")) {
+            return std::nullopt;
+        }
+        return *error;
+    }
+    if(!request.contains("id")) {
+        if(request["method"] == "notifications/initialized" && session.phase == Phase::Initialized) {
+            session.phase = Phase::Ready;
+        }
+        return std::nullopt;
+    }
+    const auto& method = request["method"];
+    if(method != "initialize" && method != "ping" && method != "tools/list" && method != "tools/call") {
+        return rpc_error(request, -32601, "Method not found.");
+    }
+    if(method == "initialize" && session.phase != Phase::Initialize) {
+        return rpc_error(request, -32600, "This connection has already initialized.");
+    }
+    if(method != "initialize" && method != "ping" && session.phase != Phase::Ready) {
+        return rpc_error(request, -32002, "Initialize and send notifications/initialized first.");
+    }
+    impl_->protocol_version = session.protocol_version;
+    auto response = impl_->handler(request);
+    if(request["method"] == "initialize" && response.contains("result")) {
+        // fastmcpp also recognizes older revisions, including one requiring
+        // JSON-RPC batches. This adapter only supports the two revisions
+        // below. Offer the latest supported revision for any other request,
+        // as MCP version negotiation requires; the client can disconnect.
+        session.protocol_version = request["params"]["protocolVersion"] == "2025-06-18" ? "2025-06-18" : "2025-11-25";
+        response["result"]["protocolVersion"] = session.protocol_version;
+        session.phase = Phase::Initialized;
+        std::cerr << "nsight-graphics-mcp " << project_version() << ": negotiated MCP " << session.protocol_version
+                  << '\n';
+    }
+    return response;
+}
+
+int serve_stdio(const ServerOptions& options) {
+    ProtocolService service(options);
+    RpcSession session;
     std::signal(SIGPIPE, SIG_IGN);
     const auto respond = [](const Json& response) {
         std::cout << response.dump() << '\n';
@@ -299,63 +404,17 @@ int run_stdio(const std::function<Json(const Json&)>& handler, std::string& prot
         return static_cast<bool>(std::cout);
     };
     const auto process = [&](const std::string& line, bool oversized) {
-        if(oversized) {
+        if(oversized)
             return respond(rpc_error(nullptr, -32600, "Request exceeds the 65536-byte line limit."));
-        }
-        if(line.empty()) {
+        if(line.empty())
             return true;
-        }
-        // The pinned JSON lexer treats raw NUL as end-of-input. Do not let a
-        // valid prefix of a malformed line execute or change lifecycle state.
-        if(line.find('\0') != std::string::npos) {
-            return respond(rpc_error(nullptr, -32700, "Parse error: raw NUL bytes are not valid JSON."));
-        }
-        Json request;
-        try {
-            request = Json::parse(line, limit_json_nesting, false);
-        } catch(const JsonNestingLimit&) {
-            return respond(rpc_error(nullptr, -32600, "Request exceeds the 64-container JSON nesting limit."));
-        }
-        if(request.is_discarded()) {
-            return respond(rpc_error(nullptr, -32700, "Parse error: expected one JSON request per line."));
-        }
-        if(auto error = validate_request(request)) {
-            // Valid JSON-RPC notifications never receive replies, including
-            // invalid method parameters. Invalid envelopes are not notifications.
-            if(error->at("error").at("code") != -32600 && !request.contains("id")) {
-                return true;
-            }
-            return respond(*error);
-        }
-        if(!request.contains("id")) {
-            if(request["method"] == "notifications/initialized" && phase == Phase::Initialized) {
-                phase = Phase::Ready;
-            }
-            return true;
-        }
-        const auto& method = request["method"];
-        if(method != "initialize" && method != "ping" && method != "tools/list" && method != "tools/call") {
-            return respond(rpc_error(request, -32601, "Method not found."));
-        }
-        if(method == "initialize" && phase != Phase::Initialize) {
-            return respond(rpc_error(request, -32600, "This connection has already initialized."));
-        }
-        if(method != "initialize" && method != "ping" && phase != Phase::Ready) {
-            return respond(rpc_error(request, -32002, "Initialize and send notifications/initialized first."));
-        }
-        auto response = handler(request);
-        if(request["method"] == "initialize" && response.contains("result")) {
-            // fastmcpp also recognizes older revisions, including one requiring
-            // JSON-RPC batches. This adapter only supports the two revisions
-            // below. Offer the latest supported revision for any other request,
-            // as MCP version negotiation requires; the client can disconnect.
-            protocol_version = request["params"]["protocolVersion"] == "2025-06-18" ? "2025-06-18" : "2025-11-25";
-            response["result"]["protocolVersion"] = protocol_version;
-            phase = Phase::Initialized;
-            std::cerr << "nsight-graphics-mcp " << project_version() << ": negotiated MCP " << protocol_version << '\n';
-        }
-        return respond(response);
+        auto parsed = parse_rpc(line);
+        if(parsed.error)
+            return respond(*parsed.error);
+        auto reply = service.respond(*parsed.request, session);
+        return !reply || respond(*reply);
     };
+    int result = 0;
     std::string line;
     line.reserve(4096);
     bool oversized = false;
@@ -363,64 +422,24 @@ int run_stdio(const std::function<Json(const Json&)>& handler, std::string& prot
     while(std::cin.get(character)) {
         if(character == '\n') {
             if(!process(line, oversized)) {
-                return 1;
+                result = 1;
+                break;
             }
             line.clear();
             oversized = false;
-        } else if(line.size() < maximum_line_bytes) {
+        } else if(line.size() < 65536)
             line.push_back(character);
-        } else {
+        else
             oversized = true;
-        }
     }
-    if((!line.empty() || oversized) && !process(line, oversized)) {
-        return 1;
-    }
+    if(!result && (!line.empty() || oversized) && !process(line, oversized))
+        result = 1;
     if(std::cin.bad()) {
         std::cerr << "nsight-graphics-mcp: error reading stdin\n";
-        return 1;
+        result = 1;
     }
     std::cerr << "nsight-graphics-mcp " << project_version() << ": stdio closed\n";
-    return 0;
-}
-} // namespace
-
-int serve_stdio(const ServerOptions& options) {
-    std::string protocol_version;
-    WorkflowTools workflow(options);
-    fastmcpp::tools::ToolManager tools;
-    fastmcpp::tools::Tool capabilities(
-        "capabilities", {{"type", "object"}, {"properties", Json::object()}, {"additionalProperties", false}},
-        output_schema(), [&options, &protocol_version](const Json& arguments) {
-            // The pinned validator checks types/required fields, but ignores
-            // additionalProperties. Enforce the exact public contract ourselves.
-            if(!arguments.is_object() || !arguments.empty()) {
-                // A valid CallToolRequest with invalid tool input is a tool
-                // error, distinct from malformed protocol params rejected above.
-                return Json{{"isError", true},
-                            {"content", Json::array({{{"type", "text"},
-                                                      {"text", "capabilities accepts only an empty object (no "
-                                                               "arguments). Remove all argument properties."}}})}};
-            }
-            return capability_report(options, protocol_version);
-        });
-    capabilities.set_description("Report implemented MCP operations and local prerequisite observations. "
-                                 "Does not launch applications or verify Nsight/GPU compatibility.");
-    capabilities.set_validate_args(true);
-    capabilities.set_annotations({{"readOnlyHint", true}, {"destructiveHint", false}, {"openWorldHint", false}});
-    tools.register_tool(capabilities);
-    workflow.register_tools(tools);
-    const auto handler = fastmcpp::mcp::make_mcp_handler(
-        "nsight-graphics-mcp", std::string(project_version()), tools, {}, {},
-        "Call capabilities to discover implemented operations and prerequisite observations. "
-        "Capture requires --artifact-root and starts a fresh application for each asynchronous job. Poll job_status "
-        "and use artifact tools to inspect bounded retained evidence; explicitly pin important baselines. "
-        "Use capture_metadata/capture_events/capture_objects for supported retained export inventories. "
-        "Use capture_cpp_source/capture_cpp_draws for qualified generated-source relationships and coverage limits. "
-        "Found executable paths are not evidence of Nsight or GPU compatibility. Generated-source relationships "
-        "do not establish GPU state or extracted resource bytes; profiling is not implemented.");
-    const auto result = run_stdio(handler, protocol_version);
-    if(!workflow.shutdown()) {
+    if(!service.shutdown()) {
         std::cerr << "nsight-graphics-mcp: job shutdown did not confirm all owned-process cleanup\n";
         return 1;
     }

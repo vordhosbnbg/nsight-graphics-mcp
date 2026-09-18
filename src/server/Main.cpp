@@ -29,7 +29,17 @@ ngm::ServerOptions parse_options(int argc, char** argv) {
             throw std::invalid_argument("Every option requires one value and may be supplied only once; use --help");
         }
         const std::string_view value = argv[index + 1];
-        if(name == "--nsight-root") {
+        if(name == "--transport") {
+            if(value != "stdio" && value != "http")
+                throw std::invalid_argument("--transport requires stdio or http");
+            options.http = value == "http";
+        } else if(name == "--http-port") {
+            options.http_port = static_cast<unsigned>(unsigned_option(name, value, 65535));
+        } else if(name == "--http-token-file") {
+            if(!std::filesystem::path(value).is_absolute() || value.size() > 4096)
+                throw std::invalid_argument("--http-token-file requires an absolute path");
+            options.http_token_file = value;
+        } else if(name == "--nsight-root") {
             const std::filesystem::path path(value);
             std::error_code error;
             if(!path.is_absolute() || !std::filesystem::is_directory(path, error) || error) {
@@ -64,6 +74,10 @@ ngm::ServerOptions parse_options(int argc, char** argv) {
        (seen.contains("--artifact-max-bytes") || seen.contains("--artifact-max-age-seconds"))) {
         throw std::invalid_argument("Artifact retention options require --artifact-root ABS_PATH");
     }
+    if(options.http && options.http_token_file.empty())
+        throw std::invalid_argument("HTTP requires --http-token-file ABS_PATH");
+    if(!options.http && (seen.contains("--http-port") || seen.contains("--http-token-file")))
+        throw std::invalid_argument("HTTP options require --transport http");
     return options;
 }
 } // namespace
@@ -75,7 +89,10 @@ int main(int argc, char** argv) {
     }
     if(argc == 2 && std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: nsight-graphics-mcp [OPTIONS] | --version | --help\n"
-                     "Serve MCP on stdin/stdout until EOF. Diagnostics use stderr.\n"
+                     "Serve MCP over stdio (default) or loopback HTTP. Diagnostics use stderr.\n"
+                     "  --transport stdio|http           Select transport; default stdio.\n"
+                     "  --http-port N                    HTTP port; default 18080, 0 selects a free port.\n"
+                     "  --http-token-file ABS_PATH       Required private bearer-token file for HTTP.\n"
                      "  --nsight-root ABS_PATH           Select an existing Nsight installation.\n"
                      "  --artifact-root ABS_PATH         Enable capture/job/artifact workflow tools.\n"
                      "  --artifact-max-bytes N           Retention limit; default 2147483648, 0 disables.\n"
@@ -94,7 +111,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
-        return ngm::serve_stdio(options);
+        return options.http ? ngm::serve_http(options) : ngm::serve_stdio(options);
     } catch(const std::exception& error) {
         std::cerr << "nsight-graphics-mcp: " << error.what() << '\n';
         return 1;

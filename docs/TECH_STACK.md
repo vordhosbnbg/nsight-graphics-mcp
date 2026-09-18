@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness completes at 0.3.1 for the measured 2026.3 source-available path (COMPUTE.md); performance is next and HTTP remains pending.**
+Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness completes at 0.3.1 for the measured 2026.3 source-available path (COMPUTE.md); performance awaits a local profiling-permission decision and loopback HTTP completes at 0.3.2 (HTTP.md).**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
@@ -212,7 +212,7 @@ architecture.
 | Nsight compatibility | At least two distinct releases, with matching tools/SDK configuration and real GPU workflow evidence for each. |
 | JSON | Reuse fastmcpp's nlohmann/json types where appropriate; avoid an additional JSON stack. |
 | MCP client | Codex CLI 0.154.0; a real 0.1.0 capability query negotiated MCP 2025-06-18. |
-| MCP transport | Local stdio for the first release; persistent Streamable HTTP later. |
+| MCP transport | Local stdio is qualified. R-004 qualifies loopback-only Streamable HTTP at 0.3.2 with a required private-file bearer token, shared trusted-user workspace, CPU lifecycle checks and real Codex HTTP calls. |
 | Display | System XCB desktop dependency, Vulkan XCB surface; actual KDE Wayland/Xwayland path exercised by the fixture. |
 | Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation, seven-shader provenance, and basic/advanced fixture rendering exercised. Fixed-capture generated-helper SPIR-V/GLSL correlation is demonstrated on both releases; generic product extraction and remaining source-repair cases are unfinished; the basic shader repair passes at 0.2.4 (SHADER_REPAIR.md). |
 | Nsight integration | Documented capture/replay CLI adapter and shared CaptureService implemented; native ngm-capture and MCP workflow use it. At 0.2.1, focused CPU checks and 54 real basic/advanced captures pass on matching 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools. Typed retained queries pass on all 54 captures using two explicit producer profiles. Actual GPU replay stalls during initialization on both releases. See NSIGHT_VALIDATION.md and INVESTIGATIONS.md. |
@@ -364,6 +364,14 @@ version negotiation, tool/schema handling, needed structured/image/resource
 results, concurrent requests, progress/cancellation, and clean stdio shutdown.
 Also review its dependency footprint, license, maintenance, and tests. Protocol
 support claims or a successful hello-world exchange alone are insufficient.
+
+R-004's HTTP adapter retains the same fastmcpp handler/tool registry and uses
+pinned cpp-httplib parsing/routing with first-party lifecycle and bounded stream
+handling. Codex CLI 0.154.0's actual HTTP capability/artifact calls pass at 0.3.2.
+The pinned fastmcpp HTTP client sends duplicate equivalent Content-Type fields;
+the adapter accepts those but refuses conflicting values. Its high-level result
+coercion fails on nullable JSON Schema type arrays; the C++ check uses the public
+raw-result `call` API and preserves valid schemas. See HTTP.md for exact limits.
 
 ## Interview record
 

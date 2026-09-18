@@ -71,12 +71,20 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-004 completes at **0.3.2** with optional persistent Streamable HTTP on IPv4
+loopback, required private-file bearer authentication and a shared trusted-user
+workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass.
+Client disconnect/session deletion preserves jobs; service shutdown cleans them
+up. See [docs/HTTP.md](docs/HTTP.md). R-009 performance remains unfinished; its
+first real trace fails the local counter-permission prerequisite (I-033), and
+permission changes require an explicit owner decision.
+
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual
 shader repairs. The extension boundary is unsupported on the measured 2026.2
 injection path. Application source/readback stays distinct from Nsight dispatch
 and object inventories. See [docs/COMPUTE.md](docs/COMPUTE.md) for the pinned
-acceptance evidence. Performance and HTTP are subsequent roadmap work.
+acceptance evidence. Performance remains subsequent roadmap work; HTTP completes as described above.
 
 The repository now implements the **0.3.0 visual first-release group**
 (R-010/R-002/R-006/R-007/R-015/R-014), following the build/basic-fixture group at
@@ -104,8 +112,8 @@ referenced evidence are explicitly pinned. General executed event state and
 executed descriptor selection remain unavailable. Fixed-input descriptor hydration
 experiments are not a generic product API. Standalone GPU replay timed out on both
 releases and remains unqualified. Compute correctness is qualified within the
-R-008 scope above; performance analysis is next in progress and Streamable HTTP
-remains pending. Update these instructions as the project develops.
+R-008 scope above; performance analysis is in progress and Streamable HTTP
+is qualified within the local policy above. Update these instructions as the project develops.
 
 Local baseline, inspected on 2026-09-17:
 
