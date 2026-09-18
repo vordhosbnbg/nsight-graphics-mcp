@@ -84,6 +84,14 @@ ngm_add_hardware_check(ngm_retained_image_integration SOURCES RetainedImageInteg
         "${NGM_IMAGE_CASES}" "${NGM_CAPTURE_VALIDATION_ROOT}")
 add_dependencies(ngm_retained_image_integration nsight-graphics-mcp)
 
+set(NGM_RESOURCE_CASES "" CACHE FILEPATH "Explicit retained-resource oracle cases for opt-in validation")
+ngm_add_hardware_check(ngm_retained_resource_integration SOURCES RetainedResourceIntegration.cpp
+    LIBRARIES ngm_core nlohmann_json::nlohmann_json
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_RESOURCE_CASES}"
+        "${NGM_CAPTURE_VALIDATION_ROOT}" "${CMAKE_BINARY_DIR}/ngm-resource-worker-2026_3"
+        "${CMAKE_BINARY_DIR}/ngm-resource-worker-2026_2")
+add_dependencies(ngm_retained_resource_integration nsight-graphics-mcp)
+
 set(NGM_CPP_CASES "" CACHE FILEPATH "Explicit retained C++ inputs for opt-in validation")
 ngm_add_hardware_check(ngm_retained_cpp_integration SOURCES RetainedCppIntegration.cpp
     LIBRARIES ngm_core nlohmann_json::nlohmann_json

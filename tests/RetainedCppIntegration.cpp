@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
                         "server version matches harness");
                 client.send({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}});
                 const auto listing = request("tools/list", Json::object());
-                require(listing.at("tools").size() == 20, "twenty implemented tools");
+                require(listing.at("tools").size() == 22, "twenty-two implemented tools");
                 if(session == 0)
                     save(run / "tools.json", listing);
                 for(std::size_t n = 0; n < cases.size(); ++n) {

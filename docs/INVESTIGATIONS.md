@@ -1046,3 +1046,31 @@ only if a different generated helper changes its resource-access contract.
   Do not modify or reverse-engineer the vendor format to mask this result. Revisit
   on a changed helper profile or if a malformed-input run defeats the process
   boundary or returns evidence that the parent incorrectly accepts.
+
+### I-026 — Resource MCP qualification included pre-product probe bundles
+
+- **Context:** 0.2.12 working tree, GCC 16.2.1 Debug; retained inputs from Nsight
+  2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608. No new GPU execution.
+- **Attempt:** Run `ngm_retained_resource_integration` with the 35 `nsight-evidence`
+  cases from the 0.2.11 worker-only qualification matrix. The exact cases and
+  transcript are retained at
+  `build/resource-query-validation/retained/resource-inspection-NJ2p1r/`.
+- **Expected:** Resource-reference listing and byte reads for every selected case.
+- **Observed:** Six cases and 72 reads completed, then listing
+  `bundle-31416cc9a35fef45aa1ef5a828473393` returned `not_capture`. Its manifest
+  origin is `documented_nsight_cpp_capture_probe`, not `nsight_cpp_capture`.
+  Four other selected cases have the same historical provenance class.
+- **Cause/correction:** The worker-only matrix accepted raw database inputs and
+  did not qualify the parent capture/report contract. The product correctly
+  rejects these experimental bundles. The retained MCP runner now checks those
+  five expected refusals explicitly and keeps all 37 server-produced captures
+  across the two source stores as positive byte-query cases. No provenance gate
+  was relaxed and no historical manifest was rewritten.
+- **Evidence retention:** Source captures and completed read attempts are pinned.
+  The failed qualification directory is included under `raw/imported/retained/`
+  in pinned resource-query qualification `bundle-6365322f8eb3922893e1d2256983f732`
+  in `artifacts/nsight-resource-query-evidence`. All source/read references and
+  persistent pins verify after publication.
+- **Revisit:** If support for imported or historical probe captures is accepted,
+  define and validate their provenance contract explicitly before allowing typed
+  capture queries. This failure establishes no limitation in the reader helpers.

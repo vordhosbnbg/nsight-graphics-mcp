@@ -1378,6 +1378,80 @@ ArtifactUsage ArtifactStore::usage() const {
     std::lock_guard lock(state_->mutex);
     return state_->usage_locked();
 }
+ArtifactFile ArtifactStore::snapshot_file(const std::string& id, const std::string& relative_path,
+                                          ArtifactWriter& destination, const std::string& destination_path,
+                                          std::size_t maximum_bytes, std::chrono::steady_clock::time_point deadline) {
+    check_relative(relative_path);
+    check_relative(destination_path);
+    if(std::chrono::steady_clock::now() >= deadline)
+        throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
+    if(maximum_bytes > 256U * 1024U * 1024U || destination.state_ != state_ || !destination.state_)
+        throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Invalid snapshot writer or byte limit");
+    auto protection = lease(id);
+    std::uint64_t expected = 0;
+    {
+        std::lock_guard lock(state_->mutex);
+        if(!state_->entry(destination.id_).staged)
+            throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Snapshot destination is already published");
+        const auto& files = state_->entry(id).manifest.at("files");
+        const auto found =
+            std::find_if(files.begin(), files.end(), [&](const auto& f) { return f.at("path") == relative_path; });
+        if(found == files.end())
+            throw ArtifactError(ArtifactErrorCode::NotFound, "Snapshot source is not inventoried");
+        expected = json_unsigned(found->at("bytes"));
+        if(expected > maximum_bytes)
+            throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Snapshot source exceeds the byte limit");
+    }
+    auto from_dir = directory_at(state_->bundles.get(), id);
+    const std::filesystem::path source(relative_path), target(destination_path);
+    for(const auto& part : source.parent_path())
+        from_dir = directory_at(from_dir.get(), part.string());
+    auto to_dir = directory_at(state_->staging.get(), destination.id_);
+    for(const auto& part : target.parent_path())
+        to_dir = directory_at(to_dir.get(), part.string(), true);
+    Descriptor from(openat(from_dir.get(), source.filename().c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC));
+    if(from.get() < 0)
+        fail_errno("Open snapshot source");
+    struct stat before{};
+    if(fstat(from.get(), &before) != 0)
+        fail_errno("Inspect snapshot source");
+    regular_attributes(before, relative_path);
+    if(static_cast<std::uint64_t>(before.st_size) != expected)
+        corrupt("Snapshot inventory size changed");
+    Descriptor to(
+        openat(to_dir.get(), target.filename().c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600));
+    if(to.get() < 0)
+        fail_errno("Create exclusive snapshot file");
+    std::array<char, 65536> buffer;
+    std::uint64_t copied = 0;
+    while(copied < expected) {
+        if(std::chrono::steady_clock::now() >= deadline)
+            throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
+        const auto count = ::read(from.get(), buffer.data(), std::min<std::uint64_t>(buffer.size(), expected - copied));
+        if(count < 0 && errno == EINTR)
+            continue;
+        if(count <= 0)
+            corrupt("Snapshot source changed or failed while reading");
+        write_all(to.get(), std::string_view(buffer.data(), static_cast<std::size_t>(count)));
+        copied += static_cast<std::uint64_t>(count);
+    }
+    char extra;
+    ssize_t count;
+    do {
+        count = ::read(from.get(), &extra, 1);
+    } while(count < 0 && errno == EINTR);
+    struct stat after{};
+    if(count != 0 || fstat(from.get(), &after) != 0 || before.st_size != after.st_size ||
+       before.st_mtim.tv_sec != after.st_mtim.tv_sec || before.st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
+       before.st_ctim.tv_sec != after.st_ctim.tv_sec || before.st_ctim.tv_nsec != after.st_ctim.tv_nsec)
+        corrupt("Snapshot source changed while copying");
+    if(fchmod(to.get(), 0400) != 0 || fsync(to.get()) != 0)
+        fail_errno("Finalize snapshot file");
+    sync_directory(to_dir.get());
+    if(std::chrono::steady_clock::now() >= deadline)
+        throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
+    return {destination_path, copied};
+}
 ArtifactPruneResult ArtifactStore::prune() {
     return state_->prune();
 }

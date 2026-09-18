@@ -47,15 +47,16 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
     const bool capture_ready = storage && tool_paths && desktop;
     const Json capture{{"available", capture_ready},
                        {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
-                       {"reason", "Implemented asynchronous fresh-process capture. Requires --artifact-root, matching "
-                                  "Nsight tools, a working desktop, and a compatible GPU/driver. Paths/environment "
-                                  "only establish observable prerequisites; each job checks tools and retains results. "
-                                  "Captures one delimiter interval, using presentation by default. Optional "
-                                  "graphics_capture_api boundaries require application SDK initialization and calls; "
-                                  "qualification is specific to the application, SDK, and matching Nsight release. "
-                                  "capture_cpp selects documented Generate C++ Capture with its separate wait_frames "
-                                  "control; it retains generated source/data on qualified 2026.2/2026.3 builds. "
-                                  "That mode has no SDK delimiter or automatic resource extraction/replay."}};
+                       {"reason",
+                        "Implemented asynchronous fresh-process capture. Requires --artifact-root, matching "
+                        "Nsight tools, a working desktop, and a compatible GPU/driver. Paths/environment "
+                        "only establish observable prerequisites; each job checks tools and retains results. "
+                        "Captures one delimiter interval, using presentation by default. Optional "
+                        "graphics_capture_api boundaries require application SDK initialization and calls; "
+                        "qualification is specific to the application, SDK, and matching Nsight release. "
+                        "capture_cpp selects documented Generate C++ Capture with its separate wait_frames "
+                        "control; it retains generated source/data on qualified 2026.2/2026.3 builds. "
+                        "That mode has no SDK delimiter or automatic replay. Resource reads are separate requests."}};
     const Json store{{"available", storage},
                      {"status", storage ? "configured" : "missing_prerequisites"},
                      {"reason", storage ? "Implemented; storage is opened lazily by a workflow call. "
@@ -81,8 +82,17 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "Requires --artifact-root; "
                        "inventory queries validate their bundle and producer. Generated C++ queries return numbered "
                        "source and literal draw/pipeline/shader relationships for qualified recording forms, with "
-                       "explicit unsupported coverage. These are source references, not GPU state, descriptor "
-                       "contents or extracted shader/resource bytes."}}},
+                       "explicit unsupported coverage. Literal resource references can be listed without a reader. "
+                       "Separate resource byte queries require a configured qualified worker for the producer. "
+                       "Source relationships and serialized bytes do not establish executed GPU state or descriptor "
+                       "selection."}}},
+          {"resource_bytes",
+           {{"available", storage && (!options.resource_workers.nsight_2026_3.empty() ||
+                                      !options.resource_workers.nsight_2026_2.empty())},
+            {"status", "configuration_observed"},
+            {"reason", "Each read requires a matching configured worker, exact qualified capture helpers and Linux "
+                       "confinement. Configuration does not verify the binary or kernel support; the read checks both. "
+                       "Each read retains database snapshots, output and logs as a quota-managed artifact."}}},
           {"profiling", unavailable("GPU profiling and metric extraction are pending.")},
           {"fixture_via_mcp",
            unavailable("No fixture-specific tool; the generic capture tool accepts its absolute executable path.")}}},
@@ -101,6 +111,13 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
             {"compatibility", "not_verified"},
             {"note", "Paths are executable-file observations only; this query runs no Nsight command or capture. "
                      "PATH entries may belong to different releases; select --nsight-root for one installation."}}},
+          {"resource_readers",
+           {{"nsight_2026_3", options.resource_workers.nsight_2026_3.empty()
+                                  ? Json(nullptr)
+                                  : Json(options.resource_workers.nsight_2026_3.string())},
+            {"nsight_2026_2", options.resource_workers.nsight_2026_2.empty()
+                                  ? Json(nullptr)
+                                  : Json(options.resource_workers.nsight_2026_2.string())}}},
           {"desktop",
            {{"display_environment_present", observations.display_present},
             {"wayland_display_environment_present", observations.wayland_display_present},
@@ -195,7 +212,7 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation : {"jobs", "artifacts"}) {
+    for(const auto* operation : {"jobs", "artifacts", "resource_bytes"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }
@@ -209,6 +226,13 @@ Json output_schema() {
           {"root", {{"type", {"string", "null"}}}},
           {"max_bytes", {{"type", "integer"}, {"minimum", 0}}},
           {"max_age_seconds", {{"type", "integer"}, {"minimum", 0}}}}}};
+    schema["properties"]["prerequisites"]["required"].push_back("resource_readers");
+    schema["properties"]["prerequisites"]["properties"]["resource_readers"] = {
+        {"type", "object"},
+        {"additionalProperties", false},
+        {"required", {"nsight_2026_3", "nsight_2026_2"}},
+        {"properties",
+         {{"nsight_2026_3", {{"type", {"string", "null"}}}}, {"nsight_2026_2", {{"type", {"string", "null"}}}}}}};
     return schema;
 }
 

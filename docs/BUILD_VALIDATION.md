@@ -914,3 +914,79 @@ bundle `bundle-78b10c057ee352241bb5eb276b22ff11` is pinned in
 source-capture references. Every inventoried payload hash, implementation hash,
 source manifest and pin verifies after publication. Runtime enforcement was
 tested on Linux 7.2.6-zen2-1-zen x86-64; no host configuration was changed.
+
+
+## Bounded resource MCP queries at 0.2.12
+
+The implementation adds `capture_cpp_resources` and `capture_cpp_resource` (22
+MCP tools), with literal source reference IDs, streaming leased snapshots,
+compiled-in helper profiles, supervised workers and strict response validation.
+[RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) defines the byte and provenance limits.
+Every read retains its exact database snapshots, including on publication failure.
+
+The GCC 16.2.1 Debug CPU aggregate passes **25/25**, with no skips, in **217.67
+seconds** (`build/resource-query-validation/cpu-aggregate.log`). New focused
+checks cover macro grammar/conflicts/identity, streaming files larger than the
+ordinary read cap, links/traversal/ownership, worker failures and malformed
+responses, binary/range handling, child timeout cleanup, quota failure after
+successful extraction, pins and restart. MCP checks exercise both valid explicit
+listing sections and missing-worker errors. A separate default configuration with
+both optional helper paths empty builds `ngm_inspection`; configure/build logs
+are retained in the same validation directory.
+
+The actual MCP qualification uses matching producer/worker profiles:
+2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608. The environment remains
+Linux 7.2.6-zen2-1-zen x86-64, RTX 3080 Ti, driver 615.71.09, KDE Wayland with
+Xwayland/XCB, and GCC 16.2.1 Debug. It comprises:
+
+| Run | Positive captures | Byte oracles | Oracle reads | Range-only reads | Expected provenance refusals |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Retained `resource-inspection-kg5d7v` | 30 | 84 | 336 | 0 | 5 |
+| Advanced retained `resource-inspection-Kh56jH` | 7 | 33 | 132 | 0 | 0 |
+| Fresh `resource-inspection-f785lB` | 6 | 42 | 168 | 30 | 0 |
+
+The 43 positive captures therefore cover **159 byte oracles / 636 oracle reads**,
+plus six 98,304-byte resources tested for range consistency with **30 reads**.
+The six larger resources have no independent content oracle and do not establish
+intermediate image contents. Each small resource is read whole, in two parts and
+at its end offset; larger resources use two initial pages, a differently split
+reconstruction and an end-offset read. Source references are paginated and hashes
+checked. Every positive/negative listing and every result pin is checked again
+after a server restart.
+
+The six fresh captures come from `cpp-validation-VZ2w33` (2026.3) and
+`cpp-validation-7t0CVj` (2026.2), each passing reference/repeat/indirect-fault runs,
+cleanup, source retention, screenshot equality/difference and restart. The new
+resource queries then compare shader bytes to unique separately retained SPIR-V
+artifacts, push constants to the independently known seed-42/frame-2 fixture
+inputs, and indirect data to the fixture's `(3,2,0,0)` or `(3,1,0,0)` tuple.
+This qualification performs no source repair or standalone GPU replay; the
+previous repair evidence remains separately recorded.
+
+Fresh-context review found and corrected deletion of snapshot inputs before
+publication, and a missing string bound that rejected explicit valid listing
+sections. Review of the qualification harness added exact producer/helper/worker
+identity and original-database checks. Independent offline audits validate
+advertised schemas, exact source spans, original-versus-snapshot hashes/sizes,
+worker hashes, raw worker stdout and retained reports, byte ranges and cleanup.
+The first corrected run is additionally audited against the strengthened checks
+because its harness preceded that strengthening. I-026 records the initial
+qualification's mistaken inclusion of five historical probe bundles as positive
+product cases; those remain explicit negative cases rather than weakening the
+capture provenance contract.
+
+Validation outputs are under `build/resource-query-validation/`. The independent
+review script/results and exact implementation/tool identities accompany the
+qualification snapshot.
+
+Qualification is complete and pinned as **bundle-6365322f8eb3922893e1d2256983f732** in
+`artifacts/nsight-resource-query-evidence`. It contains **238 payload files,
+81,116,253 payload bytes**, or **81,142,535 bytes** including bundle metadata,
+with **788 referenced pins** covering captures, read attempts and fresh-capture
+matrix reports. Publication verification checks every inventoried length, all
+237 independently recorded payload hashes, exact implementation snapshots, and
+all referenced manifest hashes and persistent pins. The initial I-026 failure
+is retained alongside the three successful query matrices. Independent acceptance
+passes 1,332 input snapshots, 624 source references and 1,621 output-schema checks.
+R-007 and R-015 remain in progress for complete workflow acceptance; this patch
+completes the bounded resource-query slice, not the whole visual release.

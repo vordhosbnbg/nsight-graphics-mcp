@@ -164,6 +164,14 @@ public:
     // The default remains 1 MiB. Transport tools impose their own smaller caps.
     std::string read(const std::string& id, const std::string& relative_path,
                      std::size_t maximum_bytes = 1024 * 1024) const;
+    // Stream one inventoried regular file into a fresh path in an owned staging
+    // writer, with no symlink traversal and a usage lease throughout the copy.
+    // Destination is exclusive and read-only after completion. The caller must
+    // not concurrently publish/mutate that writer. Detects observed source
+    // changes; the copied bytes, not a later reopening of the source, are evidence.
+    ArtifactFile snapshot_file(const std::string& id, const std::string& relative_path, ArtifactWriter& destination,
+                               const std::string& destination_path, std::size_t maximum_bytes,
+                               std::chrono::steady_clock::time_point deadline);
     ArtifactUsage usage() const;
     ArtifactPruneResult prune();
     // Copies a source directory below raw/imported without following links.

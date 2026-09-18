@@ -149,6 +149,13 @@ confine database parsing with Landlock/seccomp and process limits. Retained-inpu
 byte checks are separate from unfinished source-reference, snapshot, parent
 validation and MCP resource-query integration; see `docs/RESOURCE_WORKER.md`.
 
+At 0.2.12, `capture_cpp_resources` and `capture_cpp_resource` expose literal
+source references and bounded serialized resource bytes through the qualified
+workers, bringing the surface to 22 tools. Each byte request retains exact input
+snapshots and logs; quotas and source-capture pinning remain explicit. See
+`docs/RESOURCE_QUERIES.md`. These queries do not reconstruct arbitrary event
+state or replace the remaining R-007/R-015 workflow acceptance checks.
+
 Local baseline, inspected on 2026-09-17:
 
 - Nsight Graphics **2026.3.1.0**, installed under

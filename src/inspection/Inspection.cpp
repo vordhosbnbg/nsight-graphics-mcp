@@ -1,5 +1,6 @@
 #include "ngm/Inspection.hpp"
 
+#include "ResourceProfiles.hpp"
 #include "ngm/CppEvidence.hpp"
 #include "ngm/Hash.hpp"
 #include "ngm/NsightEvidence.hpp"
@@ -453,7 +454,8 @@ InspectionErrorCode InspectionError::code() const noexcept {
     return code_;
 }
 
-InspectionService::InspectionService(ArtifactStore& artifacts) : artifacts_(artifacts) {}
+InspectionService::InspectionService(ArtifactStore& artifacts, ResourceWorkers workers) :
+    artifacts_(artifacts), workers_(std::move(workers)) {}
 
 Json InspectionService::metadata(const std::string& capture_id) const {
     auto capture = load_capture(artifacts_, capture_id);
@@ -592,5 +594,73 @@ Json InspectionService::cpp_draws(const std::string& capture_id, const std::stri
     const auto records = parsed.at(section).get<std::vector<Json>>();
     return page_result(std::move(result), section.c_str(), records, offset, limit,
                        [](const Json& value) { return value; });
+}
+namespace {
+std::pair<Json, Json> resource_sources(ArtifactStore& store, const Capture& capture) {
+    if(capture.cpp_metadata.has_unsupported_operation)
+        fail(Error::ExportUnavailable, "Capture reports unsupported operations; inspect generated source directly");
+    std::vector<CppSource> sources;
+    Json identities = Json::array();
+    std::size_t bytes = 0;
+    for(const auto& value : capture.cpp_index.at("source_files")) {
+        const auto path = value.get<std::string>();
+        const auto name = std::filesystem::path(path).filename().string();
+        if(!name.starts_with("CommandList") && !name.starts_with("Resources") && !name.starts_with("Frame"))
+            continue;
+        bytes += inventoried(capture, path, 4U * 1024U * 1024U);
+        if(sources.size() >= 64 || bytes > 16U * 1024U * 1024U)
+            fail(Error::LimitExceeded, "Resource source files exceed the aggregate budget");
+        auto content = store.read(capture.info.summary.id, path, 4U * 1024U * 1024U);
+        identities.push_back(source_identity(path, content));
+        sources.push_back({path, std::move(content)});
+    }
+    return {inspect_cpp_resources(sources), identities};
+}
+} // namespace
+Json InspectionService::cpp_resources(const std::string& capture_id, const std::string& section, std::size_t offset,
+                                      std::size_t limit) const {
+    page_arguments(offset, limit);
+    if(section != "resources" && section != "unsupported")
+        throw std::invalid_argument("Resource section must be resources or unsupported");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    auto [parsed, identities] = resource_sources(artifacts_, capture);
+    auto result = cpp_base_result(capture);
+    result["source_files"] = std::move(identities);
+    result["source_scope"] = "CommandList*, Resources* and Frame* indexed .cpp files; helper implementations excluded";
+    result["association_scope"] = parsed.at("association_scope");
+    result["section"] = section;
+    for(const auto* key : {"resources", "unsupported"}) {
+        result[std::string(key) + "_total"] = parsed.at(key).size();
+        result[key] = Json::array();
+    }
+    return page_result(std::move(result), section.c_str(), parsed.at(section).get<std::vector<Json>>(), offset, limit,
+                       [](const Json& value) { return value; });
+}
+Json InspectionService::cpp_resource(const std::string& capture_id, const std::string& resource_ref, std::size_t offset,
+                                     std::size_t length, bool pin) const {
+    if(resource_ref.size() != 64 || resource_ref.find_first_not_of("0123456789abcdef") != std::string::npos ||
+       offset > 16U * 1024U * 1024U || length == 0 || length > 65536)
+        throw std::invalid_argument("Invalid resource reference or byte range");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    const auto [parsed, identities] = resource_sources(artifacts_, capture);
+    const auto& rows = parsed.at("resources");
+    const auto found =
+        std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.at("resource_ref") == resource_ref; });
+    if(found == rows.end())
+        fail(Error::ExportUnavailable, "Resource reference is absent or source changed; list resources again");
+    if(found->at("readable") != true)
+        fail(Error::ExportUnavailable, "Resource has conflicting or invalid byte declarations");
+    const bool newer = std::string_view(capture.profile->cli_version) == "2026.3.1.0";
+    const auto profiles = Json::parse(resource_profiles_json);
+    auto result =
+        read_cpp_resource(artifacts_, {capture_id, capture.cpp_index.at("project_directory").get<std::string>(), *found,
+                                       profiles.at(newer ? "2026_3" : "2026_2"),
+                                       newer ? workers_.nsight_2026_3 : workers_.nsight_2026_2, offset, length, pin});
+    result["producer"] = capture.producer;
+    // Full source identities remain in the listing; the selected reference binds
+    // its complete source hash and span in both the read result and retained log.
+    if(!fits_response(result))
+        fail(Error::LimitExceeded, "Resource response exceeds MCP budget");
+    return result;
 }
 } // namespace ngm

@@ -101,7 +101,9 @@ Json query_capabilities(Client& client) {
                                                         "capture_events",
                                                         "capture_objects",
                                                         "capture_cpp_source",
-                                                        "capture_cpp_draws"}),
+                                                        "capture_cpp_draws",
+                                                        "capture_cpp_resources",
+                                                        "capture_cpp_resource"}),
             "exactly the implemented tools advertised");
     for(const auto* name : {"profiling", "fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
@@ -124,7 +126,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 20, "discover exactly the implemented tools");
+    require(listing.size() == 22, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -663,6 +665,21 @@ void workflow_check(const std::string& server, const std::string& standin, const
         successful_call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"section", "unsupported_objects"}});
     require(cpp_coverage["total"] == 0 && cpp_coverage["draws"].empty(), "separate coverage section");
     expect_tool_error(call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"section", "invalid"}}));
+    const auto resource_refs = successful_call(client, "capture_cpp_resources", {{"capture_id", cpp_id}, {"limit", 1}});
+    require(resource_refs["resources"].size() == 1 && resource_refs["resources"][0]["handle"] == 14,
+            "resource references exposed through MCP");
+    require(successful_call(client, "capture_cpp_resources",
+                            {{"capture_id", cpp_id}, {"section", "resources"}, {"limit", 1}}) == resource_refs,
+            "explicit resources section");
+    require(successful_call(client, "capture_cpp_resources",
+                            {{"capture_id", cpp_id}, {"section", "unsupported"}})["unsupported_total"] == 0,
+            "explicit unsupported section");
+    const auto resource_ref = resource_refs["resources"][0]["resource_ref"];
+    expect_tool_error(call(client, "capture_cpp_resource", {{"capture_id", cpp_id}, {"resource_ref", resource_ref}}),
+                      "export_unavailable");
+    expect_tool_error(call(client, "capture_cpp_resource",
+                           {{"capture_id", cpp_id}, {"resource_ref", resource_ref}, {"length", 65537}}));
+    expect_tool_error(call(client, "capture_cpp_resources", {{"capture_id", cpp_id}, {"section", "invalid"}}));
     expect_tool_error(call(client, "capture_cpp_source", {{"capture_id", cpp_id}, {"source_path", "../escape.cpp"}}));
     expect_tool_error(call(client, "capture_cpp_source",
                            {{"capture_id", cpp_id}, {"source_path", cpp_index["source_files"][0]}, {"start_line", 0}}));

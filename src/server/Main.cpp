@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unistd.h>
 
 namespace {
 std::uint64_t unsigned_option(std::string_view name, std::string_view value, std::uint64_t maximum) {
@@ -35,6 +36,15 @@ ngm::ServerOptions parse_options(int argc, char** argv) {
                 throw std::invalid_argument("--nsight-root requires an existing absolute directory");
             }
             options.nsight_root = std::filesystem::canonical(path);
+        } else if(name == "--resource-worker-2026-3" || name == "--resource-worker-2026-2") {
+            const std::filesystem::path path(value);
+            std::error_code error;
+            if(!path.is_absolute() || value.size() > 4096 || !std::filesystem::is_regular_file(path, error) || error ||
+               access(path.c_str(), X_OK) != 0)
+                throw std::invalid_argument(std::string(name) + " requires an existing absolute executable file");
+            auto& worker = name == "--resource-worker-2026-3" ? options.resource_workers.nsight_2026_3
+                                                              : options.resource_workers.nsight_2026_2;
+            worker = std::filesystem::canonical(path);
         } else if(name == "--artifact-root") {
             const std::filesystem::path path(value);
             if(!path.is_absolute() || value.size() > 4096 || path.lexically_normal() == path.root_path()) {
@@ -70,6 +80,8 @@ int main(int argc, char** argv) {
                      "  --artifact-root ABS_PATH         Enable capture/job/artifact workflow tools.\n"
                      "  --artifact-max-bytes N           Retention limit; default 2147483648, 0 disables.\n"
                      "  --artifact-max-age-seconds N     Completed age limit; default 2592000, 0 disables.\n"
+                     "  --resource-worker-2026-3 ABS_PATH Qualified reader executable for Nsight 2026.3.\n"
+                     "  --resource-worker-2026-2 ABS_PATH Qualified reader executable for Nsight 2026.2.\n"
                      "Artifact storage is opened lazily on a workflow call. Discovery runs no Nsight commands.\n"
                      "Capture launches a fresh application; EOF cancels and cleans up owned jobs.\n";
         return 0;

@@ -28,6 +28,15 @@ limits are recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
 
 ## Confirmed context
 
+- At 0.2.12, the inspection core composes the qualified resource workers with
+  literal source-reference parsing, leased streaming snapshots, strict parent
+  response checks, and bounded hexadecimal MCP results. Reader paths are trusted
+  operator configuration, never tool arguments. Every read retains its exact
+  database snapshots and logs under normal artifact quotas; this deliberately
+  keeps publication-failure evidence at the cost of up to 272 MiB per read.
+  See [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md). Serialized inputs do not
+  establish executed GPU state or general descriptor interpretation.
+
 - R-007's 0.2.11 resource-reader boundary selects prebuilt optional workers,
   compiled from exact qualified five-file Nsight generated helper closures.
   Project-owned Linux Landlock/seccomp and resource limits apply before database

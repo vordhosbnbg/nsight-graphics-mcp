@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ngm/Artifacts.hpp"
+#include "ngm/ResourceRead.hpp"
 
 #include <cstddef>
 #include <stdexcept>
@@ -41,7 +42,7 @@ public:
     static constexpr std::size_t maximum_page_bytes = 256U * 1024U;
     static constexpr std::size_t maximum_result_bytes = 1024U * 1024U;
 
-    explicit InspectionService(ArtifactStore& artifacts);
+    explicit InspectionService(ArtifactStore& artifacts, ResourceWorkers workers = {});
     nlohmann::json metadata(const std::string& capture_id) const;
     nlohmann::json events(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json objects(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
@@ -51,8 +52,13 @@ public:
                               std::size_t max_lines = 100) const;
     nlohmann::json cpp_draws(const std::string& capture_id, const std::string& section = "draws",
                              std::size_t offset = 0, std::size_t limit = 50) const;
+    nlohmann::json cpp_resources(const std::string& capture_id, const std::string& section = "resources",
+                                 std::size_t offset = 0, std::size_t limit = 50) const;
+    nlohmann::json cpp_resource(const std::string& capture_id, const std::string& resource_ref, std::size_t offset = 0,
+                                std::size_t length = 65536, bool pin = false) const;
 
 private:
     ArtifactStore& artifacts_;
+    ResourceWorkers workers_;
 };
 } // namespace ngm

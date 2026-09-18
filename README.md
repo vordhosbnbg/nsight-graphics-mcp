@@ -1,6 +1,14 @@
 # nsight-graphics-mcp
 
 A C++ MCP server under development for NVIDIA Nsight Graphics on Linux.
+At **0.2.12**, the server exposes **22 tools**, including literal generated-resource
+references and bounded serialized-byte reads through optional confined workers.
+All nine visual defect scenarios have recorded source-repair verification on the
+two tested Nsight releases. Full visual-workflow qualification and source-installation
+acceptance remain active work. See [RESOURCE_QUERIES.md](docs/RESOURCE_QUERIES.md)
+for the new tools, storage costs and evidence limits.
+
+The milestones below record the implementation history.
 The source-build foundation, local stdio integration, and deterministic windowed
 Vulkan fixture completed the R-013/R-005/R-003 group at version 0.1.0, with CPU
 checks, a real Codex capability query, and local GPU fixture validation.

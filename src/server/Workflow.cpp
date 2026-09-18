@@ -266,6 +266,83 @@ Schema cpp_draws_schema() {
     return result;
 }
 
+Schema resource_span_schema() {
+    return object_schema({{"path", string_schema(512, 1)},
+                          {"start_line", integer_schema(1, 4194304)},
+                          {"end_line", integer_schema(1, 4194304)},
+                          {"sha256", string_schema(64, 64)},
+                          {"byte_offset", integer_schema(0, 4194304)},
+                          {"byte_count", integer_schema(1, 4194304)}},
+                         {"path", "start_line", "end_line"});
+}
+Schema resource_reference_schema() {
+    auto span = resource_span_schema();
+    for(const auto* key : {"sha256", "byte_offset", "byte_count"})
+        span["required"].push_back(key);
+    return object_schema(
+        {{"resource_ref", string_schema(64, 64)},
+         {"handle", integer_schema(0, 2147483647)},
+         {"macro",
+          {{"type", "string"}, {"enum", {"NV_GET_RESOURCE", "NV_GET_RESOURCE_CHECKED", "NV_GET_RESOURCE_STATIC"}}}},
+         {"type_expression", string_schema(256, 1)},
+         {"declared_bytes", nullable(integer_schema(1, 16777216))},
+         {"expected_bytes", nullable(integer_schema(1, 16777216))},
+         {"conditional", boolean_schema()},
+         {"readable", boolean_schema()},
+         {"reason", nullable(string_schema(256, 1))},
+         {"source", span}},
+        {"resource_ref", "handle", "macro", "type_expression", "declared_bytes", "expected_bytes", "conditional",
+         "readable", "reason", "source"});
+}
+Schema cpp_resources_schema() {
+    auto result = cpp_inspection_schema();
+    result["properties"]["resources"] = array_schema(resource_reference_schema(), 100);
+    result["properties"]["unsupported"] = array_schema(
+        object_schema({{"source", resource_span_schema()}, {"reason", string_schema(256, 1)}}, {"source", "reason"}),
+        100);
+    result["properties"]["source_files"] = array_schema(cpp_file_schema(), 64);
+    result["properties"]["association_scope"] = string_schema(512, 1);
+    result["properties"]["source_scope"] = string_schema(512, 1);
+    result["properties"]["section"] = {{"type", "string"}, {"enum", {"resources", "unsupported"}}};
+    for(const auto* key : {"resources_total", "unsupported_total", "offset", "total"})
+        result["properties"][key] = integer_schema(0, 100000);
+    result["properties"]["next_offset"] = nullable(integer_schema(0, 100000));
+    for(const auto& [key, unused] : result["properties"].items()) {
+        (void)unused;
+        if(std::find(result["required"].begin(), result["required"].end(), key) == result["required"].end())
+            result["required"].push_back(key);
+    }
+    return result;
+}
+Schema cpp_resource_schema() {
+    const auto input = object_schema({{"bytes", integer_schema(0, 268435456)}, {"sha256", string_schema(64, 64)}},
+                                     {"bytes", "sha256"});
+    auto result = object_schema(
+        {{"capture_id", string_schema(39, 39)},
+         {"resource_ref", string_schema(64, 64)},
+         {"reference", resource_reference_schema()},
+         {"helper_profile", string_schema(128, 1)},
+         {"worker_sha256", string_schema(64, 64)},
+         {"inputs", object_schema({{"data.bin", input}, {"data.bin.rec", input}}, {"data.bin", "data.bin.rec"})},
+         {"offset", integer_schema(0, 16777216)},
+         {"total_bytes", integer_schema(1, 16777216)},
+         {"returned_bytes", integer_schema(0, 65536)},
+         {"next_offset", nullable(integer_schema(0, 16777216))},
+         {"encoding", {{"type", "string"}, {"enum", {"hex"}}}},
+         {"data", string_schema(131072)},
+         {"sha256", string_schema(64, 64)},
+         {"evidence_origin", {{"type", "string"}, {"enum", {"nsight_generated_resource_read"}}}},
+         {"scope", string_schema(256, 1)},
+         {"artifact_id", string_schema(39, 39)},
+         {"report_path", string_schema(512, 1)},
+         {"producer", cpp_inspection_schema()["properties"]["producer"]}});
+    for(const auto& [key, unused] : result["properties"].items()) {
+        (void)unused;
+        result["required"].push_back(key);
+    }
+    return result;
+}
+
 // fastmcpp's optional validator maps failures to protocol errors and does not
 // enforce closed objects. This small validator applies the declared input
 // subset before any operation; malformed tool arguments become tool errors.
@@ -442,7 +519,9 @@ Json implemented_tool_names() {
                         "capture_events",
                         "capture_objects",
                         "capture_cpp_source",
-                        "capture_cpp_draws"});
+                        "capture_cpp_draws",
+                        "capture_cpp_resources",
+                        "capture_cpp_resource"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -924,6 +1003,44 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
             return InspectionService(service().artifacts())
                 .cpp_draws(artifact_id(arguments, "capture_id"), arguments.value("section", std::string("draws")),
                            arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
+    auto resource_input = inventory_input;
+    resource_input["properties"]["section"] = {
+        {"type", "string"}, {"maxLength", 32}, {"enum", {"resources", "unsupported"}}};
+    add_tool(
+        tools, "capture_cpp_resources", resource_input, cpp_resources_schema(),
+        "List literal resource references in indexed CommandList*, Resources* and Frame* generated C++ files. "
+        "Includes capture-local IDs bound to source hashes/spans, byte declarations, preprocessor conditional flags "
+        "and explicit unsupported coverage. Does not establish execution, descriptor selection or GPU event state. "
+        "Default section resources, limit 50; maximum 100 and 256 KiB per page. No reader executable required.",
+        true, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts(), options_.resource_workers)
+                .cpp_resources(artifact_id(arguments, "capture_id"),
+                               arguments.value("section", std::string("resources")),
+                               arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
+    add_tool(
+        tools, "capture_cpp_resource",
+        object_schema({{"capture_id", string_schema(39, 39)},
+                       {"resource_ref", string_schema(64, 64)},
+                       {"offset", integer_schema(0, 16777216)},
+                       {"length", integer_schema(1, 65536)},
+                       {"pin", boolean_schema()}},
+                      {"capture_id", "resource_ref"}),
+        cpp_resource_schema(),
+        "Read a bounded range of opaque serialized bytes using a listed resource reference and the configured "
+        "qualified reader for that producer. Requires --resource-worker-2026-3 or --resource-worker-2026-2. "
+        "Revalidates source, fingerprints helpers, snapshots inputs under leases and validates the worker response. "
+        "Default offset 0, length 65536; returns hex and byte hashes. Each call creates an evidence bundle retaining "
+        "the input databases (up to 272 MiB), output and logs, subject to artifact quotas. Optional pin defaults "
+        "false; "
+        "pinning the read does not pin the source capture. Ten-second operation deadline. Unsupported confinement "
+        "fails closed. This does not reconstruct descriptor contents or resource state after a GPU event.",
+        false, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts(), options_.resource_workers)
+                .cpp_resource(artifact_id(arguments, "capture_id"), arguments.at("resource_ref").get<std::string>(),
+                              arguments.value("offset", std::size_t{0}), arguments.value("length", std::size_t{65536}),
+                              arguments.value("pin", false));
         });
 }
 } // namespace ngm

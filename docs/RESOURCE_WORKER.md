@@ -3,9 +3,10 @@
 Version 0.2.11 adds the worker boundary for R-007's general resource queries.
 Two optional executables use the unchanged, fingerprint-qualified generated
 `ReadOnlyDatabase` and `DataScope` helpers. They accept new database contents and
-resource handles; no capture ID or database hash is compiled into them. The MCP
-surface remains 20 tools. Source-reference listing, service-owned snapshots and
-leases, worker-response validation, and MCP byte queries remain unfinished.
+resource handles; no capture ID or database hash is compiled into them. At the 0.2.11 milestone the MCP
+surface remained 20 tools. Version 0.2.12 adds source-reference listing, leased
+snapshots, parent response validation and MCP byte queries; see
+[RESOURCE_QUERIES.md](RESOURCE_QUERIES.md).
 
 ## Build and dependency boundary
 
@@ -48,8 +49,8 @@ it through `run_process` with an empty environment, `/dev/null` stdin, regular
 write-only stdout/stderr logs, a private immutable input snapshot, and a bounded
 wall-clock deadline. Arguments are `SNAPSHOT HANDLE OFFSET LENGTH DECLARED_BYTES`;
 the snapshot must contain `data.bin` and `data.bin.rec`. Zero declared bytes means
-unknown; otherwise the helper's reported size must match. A future service must
-derive that declaration from source evidence rather than trust an MCP caller.
+unknown; otherwise the helper's reported size must match. The service derives that declaration
+from source evidence rather than trusting an MCP caller.
 
 The worker applies all restrictions before constructing the database reader or
 parsing payloads. It closes inherited descriptors above stderr, disables core
@@ -80,7 +81,7 @@ opaque bytes. The header contains schema version, helper profile, handle, offset
 total bytes, and returned bytes. An offset at the resource end returns zero bytes.
 Missing, oversized and mismatched resources fail. Nonzero exit, signal, timeout,
 partial output or failed cleanup must never be accepted as resource evidence.
-The future parent must independently validate the entire bounded response and
+The parent independently validates the entire bounded response and
 hash the exact input/output bytes. This worker does not authenticate data, detect
 every corrupt database, resolve descriptors, execute Vulkan, or reconstruct
 resource contents after a GPU event.
@@ -99,7 +100,7 @@ directory reads and executable `mprotect` denial.
 Real helper qualification and final evidence references are recorded in
 [BUILD_VALIDATION.md](BUILD_VALIDATION.md). The retained-input tests require no GPU
 execution. Their byte comparisons establish these reader profiles' behavior,
-separately from the pending MCP resource-access implementation.
+separately from the subsequent MCP resource-access qualification.
 
 The final GCC Debug aggregate passes 23/23 with no skips. Fresh-context acceptance
 audits all 636 reader invocations: 614 successful responses and 22 expected

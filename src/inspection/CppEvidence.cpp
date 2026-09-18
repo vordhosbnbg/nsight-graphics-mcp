@@ -1,4 +1,5 @@
 #include "ngm/CppEvidence.hpp"
+#include "ngm/Hash.hpp"
 #include "ngm/Inspection.hpp"
 
 #include <algorithm>
@@ -900,6 +901,98 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
         throw InspectionError(InspectionErrorCode::InvalidExport, "Truncated generated-source expression");
     } catch(const Json::exception&) {
         throw InspectionError(InspectionErrorCode::InvalidExport, "Generated source contains invalid UTF-8");
+    }
+    return result;
+}
+nlohmann::json inspect_cpp_resources(const std::vector<CppSource>& sources) {
+    Json result{{"resources", Json::array()},
+                {"unsupported", Json::array()},
+                {"association_scope", "Literal serialized-resource macro occurrences in generated source; not "
+                                      "execution, effective bindings, resource formats or state at a GPU event."}};
+    ResultBudget budget;
+    std::map<std::uint64_t, std::set<std::uint64_t>> sizes;
+    std::set<std::string> paths;
+    std::size_t total = 0;
+    try {
+        check(sources.size() <= 64, "too many resource source files");
+        for(const auto& source : sources) {
+            check(paths.insert(source.path).second, "duplicate resource source path");
+            total += source.text.size();
+            check(total <= 16U * 1024U * 1024U, "aggregate resource source exceeds 16 MiB");
+            const Document d(source);
+            const auto& tokens = d.tokens;
+            const auto hash = sha256(std::as_bytes(std::span(source.text.data(), source.text.size())));
+            for(std::size_t at = 0; at < tokens.size(); ++at) {
+                const auto macro = tokens[at].value;
+                if(macro.starts_with("#") && macro.find("NV_GET_RESOURCE") != std::string_view::npos) {
+                    budget.append(result["unsupported"],
+                                  {{"source", d.span(at, at)},
+                                   {"reason", "Resource-like spelling in a preprocessor directive is not inspected"}});
+                    continue;
+                }
+                if(!macro.starts_with("NV_GET_RESOURCE"))
+                    continue;
+                auto end = at;
+                if(at + 1 < tokens.size() && tokens[at + 1].value == "(")
+                    end = tokens[at + 1].pair;
+                auto span = d.span(at, end);
+                span["sha256"] = hash;
+                span["byte_offset"] = tokens[at].begin;
+                span["byte_count"] = tokens[end].end - tokens[at].begin;
+                try {
+                    check(macro == "NV_GET_RESOURCE" || macro == "NV_GET_RESOURCE_CHECKED" ||
+                              macro == "NV_GET_RESOURCE_STATIC",
+                          "unqualified resource macro");
+                    check(end > at, "resource macro requires an argument list");
+                    check(tokens[end - 1].value != ",", "resource macro has an empty trailing argument");
+                    const auto args = arguments(d, at + 1);
+                    check(args.size() == (macro == "NV_GET_RESOURCE" ? 2 : 3), "resource macro arity");
+                    const auto type = expr(d, args[0]);
+                    check(!type.empty() && type.size() <= 256, "resource type expression exceeds bounds");
+                    const auto handle = integer(expr(d, args[1]));
+                    check(handle <= 2147483647, "resource handle exceeds signed 32-bit range");
+                    Json declared = nullptr;
+                    if(args.size() == 3) {
+                        const auto bytes = integer(expr(d, args[2]));
+                        sizes[handle].insert(bytes);
+                        check(bytes > 0 && bytes <= 16U * 1024U * 1024U, "declared resource size exceeds bounds");
+                        declared = bytes;
+                    }
+                    const auto identity = source.path + '\0' + hash + ':' + std::to_string(tokens[at].begin) + ':' +
+                                          std::to_string(tokens[end].end);
+                    budget.append(result["resources"],
+                                  {{"resource_ref", sha256(std::as_bytes(std::span(identity.data(), identity.size())))},
+                                   {"handle", handle},
+                                   {"macro", macro},
+                                   {"type_expression", type},
+                                   {"declared_bytes", declared},
+                                   {"expected_bytes", nullptr},
+                                   {"conditional", tokens[at].conditional},
+                                   {"readable", true},
+                                   {"reason", nullptr},
+                                   {"source", span}});
+                } catch(const Unsupported& error) {
+                    budget.append(result["unsupported"], {{"source", span}, {"reason", error.what()}});
+                }
+                // Nested occurrences are not skipped: each literal reference has
+                // its own source span, including one inside an unsupported form.
+            }
+        }
+        for(auto& row : result["resources"]) {
+            const auto& declarations = sizes[row.at("handle").get<std::uint64_t>()];
+            if(declarations.size() > 1 ||
+               (!declarations.empty() && (*declarations.begin() == 0 || *declarations.begin() > 16U * 1024U * 1024U))) {
+                row["readable"] = false;
+                row["reason"] = "Conflicting or invalid literal byte counts for this capture-local handle";
+            } else if(!declarations.empty())
+                row["expected_bytes"] = *declarations.begin();
+        }
+    } catch(const Unsupported& error) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, error.what());
+    } catch(const std::out_of_range&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Truncated resource source expression");
+    } catch(const Json::exception&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Resource source contains invalid UTF-8");
     }
     return result;
 }

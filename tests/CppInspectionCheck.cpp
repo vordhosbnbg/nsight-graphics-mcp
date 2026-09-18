@@ -142,6 +142,15 @@ int main() {
                     draws["source_files"].size() == 2,
                 "draw query lacks source relationship/identities");
         bounded(draws);
+        const auto resources = inspection.cpp_resources(id, "resources", 0, 1);
+        bounded(resources);
+        require(resources["resources"].size() == 1 && resources["resources_total"] == 1 &&
+                    resources["resources"][0]["handle"] == 14,
+                "resource source query");
+        const auto reference = resources["resources"][0]["resource_ref"].get<std::string>();
+        rejected(Error::ExportUnavailable, [&] { (void)inspection.cpp_resource(id, reference); });
+        rejected(Error::ExportUnavailable, [&] { (void)inspection.cpp_resource(id, std::string(64, '0')); });
+        require(inspection.cpp_resources(id, "resources", 100)["resources"].empty(), "past-end resources");
         require(inspection.cpp_draws(id, "draws", 100)["draws"].empty(), "past end draw page");
         require(inspection.cpp_draws(id, "unsupported_objects")["total"] == 0, "coverage pagination");
         require(!store.inspect(id).summary.in_use, "lease leaked after query");
@@ -154,6 +163,7 @@ int main() {
             i["nsight_version_build_id"] = md["nsight_version_build_id"] = 37991608;
         });
         require(inspection.cpp_draws(old)["draws_total"] == 1, "second exact profile");
+        require(inspection.cpp_resources(old)["resources_total"] == 1, "second resource source profile");
         for(const auto& edit :
             std::vector<Edit>{[](Json&, Json& m, Json&, Json&) { m["nsight"]["cli"]["path"] = "/other"; },
                               [](Json& r, Json&, Json&, Json&) { r["capture"]["process"]["cancelled"] = true; },
@@ -168,6 +178,7 @@ int main() {
                               }}) {
             const auto bad = publish(store, edit);
             rejected(Error::InvalidReport, [&] { inspection.cpp_draws(bad); });
+            rejected(Error::InvalidReport, [&] { inspection.cpp_resources(bad); });
             require(!store.inspect(bad).summary.in_use, "failed-query lease leaked");
         }
         const auto mismatched =
@@ -179,6 +190,7 @@ int main() {
         require(inspection.cpp_source(unsupported, source)["has_unsupported_operation"] == true,
                 "unsupported raw source unavailable");
         rejected(Error::ExportUnavailable, [&] { inspection.cpp_draws(unsupported); });
+        rejected(Error::ExportUnavailable, [&] { inspection.cpp_resources(unsupported); });
         rejected(Error::ExportUnavailable, [&] { inspection.cpp_source(id, project + "/data.bin"); });
         const auto failed = publish(store, {}, "synthetic", true);
         rejected(Error::IncompleteCapture, [&] { inspection.cpp_draws(failed); });

@@ -5,8 +5,11 @@ capture, job status/cancellation, and bounded access to managed artifact bundles
 Retained capture metadata and paginated event/object inventories are implemented
 for the observed Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608
 Vulkan export profiles. The separate `capture_cpp` tool retains generated API
-source, metadata, and binary resource files through artifact access. Typed deep
-state/resource extraction and profiling remain pending. At 0.2.4, the seventeenth tool,
+source, metadata, and binary resource files through artifact access. Executed GPU state and profiling remain pending. At **0.2.12**, the surface has
+**22 tools**, including `capture_cpp_resources` and `capture_cpp_resource`. These
+provide literal references and bounded serialized input bytes; see
+[RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) for exact scope and configuration.
+The following versioned milestones record earlier stages. At 0.2.4, the seventeenth tool,
 `artifact_compare_images`, supports the independently prepared basic shader repair
 qualified in [SHADER_REPAIR.md](SHADER_REPAIR.md); broader diagnosis/fix coverage remains pending. At 0.2.5 the eighteenth tool,
 `artifact_preview_image`, returns bounded PNG image content for retained
@@ -61,6 +64,8 @@ and the equivalent mechanism in
 | `capture_metadata` | Required `capture_id` (the capture's `artifact_id`); returns selected typed metadata, capture scope, exact producer observations, raw evidence references, and unavailable evidence categories. Missing optional metadata is null. Process environment and command line are omitted. |
 | `capture_events` | Required `capture_id`; optional `offset` (default 0, range 0–100000) and `limit` (default 50, range 1–100). Returns `events` in exported order with capture-scoped `event_index`, `function_name`, `thread_index`, and nullable opaque `sequence_id` and `indirect_index`, plus `offset`, full `total`, and `next_offset`. |
 | `capture_objects` | Same inputs/pagination as `capture_events`; returns `objects` with capture-scoped `uid`, `api`, `object_name`, `type_name`, and opaque `access_flags`. No event associations, object definitions, or resource contents are inferred. |
+| `capture_cpp_resources` | Required `capture_id`; optional `section` (`resources` or `unsupported`), `offset`, `limit` (default 50, maximum 100). Lists literal source references and qualified byte declarations with hashes/spans; no worker required. |
+| `capture_cpp_resource` | Required `capture_id` and listed `resource_ref`; optional `offset`, `length` (1–65536, default 65536), `pin` (default false). Uses the configured qualified worker and returns hex bytes/hashes plus a retained attempt artifact. Each call retains database snapshots up to 272 MiB. No GPU event-state reconstruction. |
 
 Strings reject NUL bytes; input byte limits are enforced in addition to the
 advertised schemas. Absolute application/import paths are limited to 4096 bytes;

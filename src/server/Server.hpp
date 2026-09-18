@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ngm/Artifacts.hpp"
+#include "ngm/ResourceRead.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -11,6 +12,7 @@ struct ServerOptions {
     // An empty root leaves workflow tools unavailable. Merely configuring the
     // root never opens or creates it during the handshake/capability query.
     ArtifactOptions artifacts;
+    ResourceWorkers resource_workers;
 };
 
 int serve_stdio(const ServerOptions& options);
