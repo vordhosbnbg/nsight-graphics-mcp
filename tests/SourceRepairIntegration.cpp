@@ -108,6 +108,33 @@ private:
     int next_id_ = 1;
     bool closed_ = false;
 };
+struct RepairCase {
+    std::string kind;
+    std::string before_line;
+    std::string after_line;
+    bool multipass = false;
+    bool combined = false;
+};
+
+RepairCase repair_case(const std::string& reference, const std::string& fault) {
+    if((reference == "combined-reference" && fault == "combined-pass-error") ||
+       (reference == "multipass-reference" && fault == "pass-output-error")) {
+        return {"post-channel-order",
+                "    result.channel_order = scenario == \"pass-output-error\" || scenario == \"combined-pass-error\" ? "
+                "1u : 0u;",
+                "    result.channel_order = 0u;", true, reference == "combined-reference"};
+    }
+    if(reference == "reference" && fault == "binding-error") {
+        return {"scene-descriptor-selection",
+                "        const auto descriptor = descriptors_[options_.scenario == \"binding-error\" ? 1 : 0];",
+                "        const auto descriptor = descriptors_[0];"};
+    }
+    if(reference == "reference" && fault == "pipeline-error") {
+        return {"scene-color-write-mask", "            attachment.colorWriteMask &= ~VK_COLOR_COMPONENT_R_BIT;",
+                "            attachment.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;"};
+    }
+    throw std::invalid_argument("Unqualified source-repair scenario pair");
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -125,9 +152,7 @@ int main(int argc, char** argv) {
         const auto repaired_fixture = fs::canonical(argv[3]);
         const auto shaders = fs::canonical(argv[4]);
         const std::string reference_scenario = argv[9], fault_scenario = argv[10];
-        require((reference_scenario == "combined-reference" && fault_scenario == "combined-pass-error") ||
-                    (reference_scenario == "multipass-reference" && fault_scenario == "pass-output-error"),
-                "qualified postpass source-repair scenario pair");
+        const auto selected_case = repair_case(reference_scenario, fault_scenario);
         const auto repair_record = fs::canonical(argv[5]);
         const auto installation = fs::canonical(argv[6]);
         const auto store_root = fs::weakly_canonical(fs::absolute(argv[7]));
@@ -159,7 +184,7 @@ int main(int argc, char** argv) {
         fs::permissions(repaired_target, fs::perms::owner_read | fs::perms::owner_exec);
         fs::copy(repair_record, payload / "repair-record", fs::copy_options::recursive);
         const auto repair = Json::parse(ngm::read_regular_file(payload / "repair-record/repair.json", 65536));
-        require(repair.at("schema_version") == 1 && repair.at("kind") == "post-channel-order",
+        require(repair.at("schema_version") == 1 && repair.at("kind") == selected_case.kind,
                 "qualified source repair record");
         const auto original_identity =
             Json::parse(ngm::read_regular_file(payload / "repair-record/original-identity.json", 262144));
@@ -168,12 +193,11 @@ int main(int argc, char** argv) {
         const auto before_source = ngm::read_regular_file(payload / "repair-record/original-Fixture.cpp", 256 * 1024);
         const auto after_source = ngm::read_regular_file(payload / "repair-record/repaired-Fixture.cpp", 256 * 1024);
         std::string expected_source = before_source;
-        const std::string before_line = "result.channel_order = scenario == \"pass-output-error\" || scenario == "
-                                        "\"combined-pass-error\" ? 1u : 0u;";
+        const auto& before_line = selected_case.before_line;
         const auto changed = expected_source.find(before_line);
         require(changed != std::string::npos && expected_source.find(before_line, changed + 1) == std::string::npos,
-                "single implicated channel-order assignment");
-        expected_source.replace(changed, before_line.size(), "result.channel_order = 0u;");
+                "single implicated source assignment");
+        expected_source.replace(changed, before_line.size(), selected_case.after_line);
         require(expected_source == after_source,
                 "only the responsible C++ assignment changed; scenario selection remains intact");
         const auto before_source_hash = ngm::sha256_file(payload / "repair-record/original-Fixture.cpp");
@@ -219,8 +243,8 @@ int main(int argc, char** argv) {
         }
         require(repair.at("source_patch") == "source.patch", "retained source patch reference");
         const auto patch = ngm::read_regular_file(payload / "repair-record/source.patch", 65536);
-        require(patch.find("-    " + before_line) != std::string::npos &&
-                    patch.find("+    result.channel_order = 0u;") != std::string::npos,
+        require(patch.find("-" + before_line) != std::string::npos &&
+                    patch.find("+" + selected_case.after_line) != std::string::npos,
                 "retained patch corresponds to the actual one-line edit");
         Json actual_shaders = Json::object();
         for(const auto& file : fs::directory_iterator(payload / "inputs/shaders")) {
@@ -254,8 +278,7 @@ int main(int argc, char** argv) {
             {"captures", Json::array()},
             {"inputs", {{"seed", 42}, {"width", 192}, {"height", 128}, {"wait_frames", 2}, {"final_frame", 120}}},
             {"limits",
-             {"Postpass C++ source-control repair only; other defect families remain unqualified",
-              "No standalone GPU replay",
+             {"Only the selected, whitelisted source edit and scenario pair are checked", "No standalone GPU replay",
               "Generated source retrieval does not decode resource blobs or reconstruct arbitrary event state"}}};
         save(payload / "report.json", report);
         std::vector<std::string> environment;
@@ -281,12 +304,11 @@ int main(int argc, char** argv) {
                 baselines.push_back(ngm::run_experiment(options));
                 require(baselines.back().report.at("status") == "pass", "standalone frame-2 baseline succeeds");
                 const auto& observed_workload = baselines.back().report.at("result").at("workload");
-                const bool combined = reference_scenario == "combined-reference";
-                require(observed_workload.at("offscreen_render_target") == true &&
-                            observed_workload.at("post_processing") == true &&
-                            observed_workload.at("render_pass_count") == 2 &&
-                            observed_workload.at("bindless_storage_buffers") == combined &&
-                            observed_workload.at("indirect_draw") == combined,
+                require(observed_workload.at("offscreen_render_target") == selected_case.multipass &&
+                            observed_workload.at("post_processing") == selected_case.multipass &&
+                            observed_workload.at("render_pass_count") == (selected_case.multipass ? 2 : 1) &&
+                            observed_workload.at("bindless_storage_buffers") == selected_case.combined &&
+                            observed_workload.at("indirect_draw") == selected_case.combined,
                         "requested standalone or combined workload features are actually reported");
                 require(baselines.back().report.at("result").at("application").at("build") ==
                             (case_index == 2 ? repaired_identity : original_identity),
@@ -357,45 +379,53 @@ int main(int argc, char** argv) {
                     const auto source = index.at("project_directory").get<std::string>() + "/CommandList00.cpp";
                     const auto read = session.tool("artifact_read", {{"artifact_id", capture_id}, {"path", source}});
                     require(read.at("status") == "text" &&
-                                read.at("text").get<std::string>().find("\"frame.2\"") != std::string::npos,
-                            "real generated command source is retrievable and labels the captured frame");
+                                read.at("text").get<std::string>().find("\"frame.2\"") != std::string::npos &&
+                                read.at("text").get<std::string>().find(selected_case.multipass
+                                                                            ? "\"scene.offscreen\""
+                                                                            : "\"scene.raster\"") != std::string::npos,
+                            "real generated command source is retrievable and labels the captured frame and scene");
                     const auto draw_page = session.tool("capture_cpp_draws", {{"capture_id", capture_id}});
-                    require(draw_page.at("draws_total") == 2 && draw_page.at("unsupported_recordings_total") == 0 &&
+                    require(draw_page.at("draws_total") == (selected_case.multipass ? 2 : 1) &&
+                                draw_page.at("unsupported_recordings_total") == 0 &&
                                 draw_page.at("unsupported_objects_total") == 0 && draw_page.at("next_offset").is_null(),
-                            "fresh source query resolves both scene and postpass draws completely");
-                    require(draw_page.at("draws").at(0).at("function") == (reference_scenario == "combined-reference"
-                                                                               ? "VulkanReplay_CmdDrawIndirect"
-                                                                               : "VulkanReplay_CmdDraw") &&
-                                draw_page.at("draws").at(1).at("function") == "VulkanReplay_CmdDraw",
-                            "generated calls preserve the requested scene draw mode and postpass");
+                            "fresh source query resolves every requested draw completely");
+                    require(
+                        draw_page.at("draws").at(0).at("function") ==
+                                (selected_case.combined ? "VulkanReplay_CmdDrawIndirect" : "VulkanReplay_CmdDraw") &&
+                            (!selected_case.multipass ||
+                             draw_page.at("draws").at(1).at("function") == "VulkanReplay_CmdDraw"),
+                        "generated calls preserve the requested scene draw mode and postpass");
                     capture["draws"] = draw_page;
                     const auto setup_path = index.at("project_directory").get<std::string>() + "/FrameSetup00.cpp";
                     const auto setup =
                         session.tool("artifact_read", {{"artifact_id", capture_id}, {"path", setup_path}});
                     require(setup.at("status") == "text", "fresh shader debug-name source retrievable");
                     const auto setup_text = setup.at("text").get<std::string>();
-                    const auto& post_draw = draw_page.at("draws").back();
-                    require(post_draw.at("association_status") == "resolved_source_relationship",
-                            "qualified post draw pipeline association");
-                    bool post_fragment = false;
-                    for(const auto& stage : post_draw.at("pipeline").at("stages")) {
+                    const auto& implicated_draw = draw_page.at("draws").back();
+                    require(implicated_draw.at("association_status") == "resolved_source_relationship",
+                            "qualified implicated draw pipeline association");
+                    bool named_fragment = false;
+                    for(const auto& stage : implicated_draw.at("pipeline").at("stages")) {
                         if(stage.at("stage") != "VK_SHADER_STAGE_FRAGMENT_BIT")
                             continue;
                         const auto module = stage.at("module").get<std::string>();
-                        const auto marker =
-                            "uint64_t(" + module + "),\n    /* pObjectName = */ \"fixture.post.frag.spv\"";
-                        post_fragment = setup_text.find(marker) != std::string::npos;
+                        const auto marker = "uint64_t(" + module + "),\n    /* pObjectName = */ \"fixture." +
+                                            (selected_case.multipass ? "post" : "scene") + ".frag.spv\"";
+                        named_fragment = setup_text.find(marker) != std::string::npos;
                     }
-                    require(post_fragment &&
-                                read.at("text").get<std::string>().find("\"post.present\"") != std::string::npos,
-                            "postpass label and fragment module name belong to this fresh capture");
-                    const auto& span = post_draw.at("source");
-                    capture["post_draw_source"] =
+                    require(named_fragment, "implicated fragment module name belongs to this fresh capture");
+                    if(selected_case.multipass) {
+                        require(read.at("text").get<std::string>().find("\"post.present\"") != std::string::npos,
+                                "postpass label belongs to this fresh capture");
+                    }
+                    const auto& span = implicated_draw.at("source");
+                    capture[selected_case.multipass ? "post_draw_source" : "scene_draw_source"] =
                         session.tool("capture_cpp_source", {{"capture_id", capture_id},
                                                             {"source_path", span.at("path")},
                                                             {"start_line", span.at("start_line")},
                                                             {"max_lines", 3}});
-                    const auto& excerpt = capture.at("post_draw_source");
+                    const auto& excerpt =
+                        capture.at(selected_case.multipass ? "post_draw_source" : "scene_draw_source");
                     require(excerpt.at("source").at("path") == span.at("path") &&
                                 excerpt.at("source").at("sha256").get<std::string>() ==
                                     ngm::sha256_file(store_root / "bundles" / capture_id /
@@ -403,8 +433,8 @@ int main(int argc, char** argv) {
                                 !excerpt.at("lines").empty() &&
                                 excerpt.at("lines").at(0).at("number") == span.at("start_line") &&
                                 excerpt.at("lines").at(0).at("text").get<std::string>().find(
-                                    post_draw.at("function").get<std::string>()) != std::string::npos,
-                            "numbered excerpt identifies the fresh post draw in the hashed source");
+                                    implicated_draw.at("function").get<std::string>()) != std::string::npos,
+                            "numbered excerpt identifies the fresh implicated draw in the hashed source");
                     // Explicitly pinned terminal evidence remains protected while its local binary reference is hashed.
                     const auto image =
                         store_root / "bundles" / capture_id / index.at("screenshot_path").get<std::string>();

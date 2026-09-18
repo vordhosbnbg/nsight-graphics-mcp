@@ -159,3 +159,11 @@ cases and audit script/results, is explicitly pinned as
 `artifacts/nsight-repair-evidence`. Its bundle-reference manifest identifies all
 28 separately pinned full run/capture/baseline bundles. Repeated binaries and
 images are retained there rather than duplicated into the compact snapshot.
+
+## Binding and pipeline extension at 0.2.9
+
+The same harness now also accepts `reference binding-error` and
+`reference pipeline-error`, with separate exact source edits and build records.
+Basic cases require one scene draw; the original postpass cases keep their
+feature/draw requirements. [STATE_REPAIR.md](STATE_REPAIR.md) records the new
+diagnoses, two-release repair evidence, and postpass regression results.

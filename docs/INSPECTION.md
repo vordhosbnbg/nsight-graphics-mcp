@@ -520,3 +520,14 @@ source queries establish both draw associations and the postpass fragment module
 [Source/build evidence and limits](SOURCE_REPAIR.md) distinguish this supplied
 repair qualification from an autonomous diagnosis harness or new generic resource
 extraction. Other defect families remain unfinished.
+
+## Binding and pipeline source repair at 0.2.9
+
+[STATE_REPAIR.md](STATE_REPAIR.md) records two further diagnosis/edit/build/recapture
+cases on both exact producer profiles. The pipeline diagnosis follows the draw's
+generated pipeline definition to a missing red write-mask bit. The binding
+diagnosis follows a selected named descriptor and fixed-helper setup hydration
+to the secondary uniform buffer; application-source tint semantics are labelled
+separately. These source repairs preserve faulty scenario names and produce exact
+reference pixels. Generic resource access, frame-time palette-byte extraction,
+and arbitrary executed-state reconstruction are not established by those checks.

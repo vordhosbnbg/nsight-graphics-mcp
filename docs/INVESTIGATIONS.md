@@ -941,3 +941,53 @@ worker against its identified helper closure. This was a first-party API-use
 error, not an unavailable Nsight capability. The corrected worker checks
 `resource.Get() != nullptr`; the subsequent four-capture run succeeds. Revisit
 only if a different generated helper changes its resource-access contract.
+
+### I-022 — Diagnosis capture omitted the fixture output option
+
+- **Context:** 2026-09-18, product 0.2.8, matching Nsight 2026.3.1.0/build
+  38722833, original fixture SHA-256
+  `e6ced467def8f7df41d0c9a1b2ff2a60a52d717a6b8462d402bd05041597d302`.
+- **Reproduction:** `build/state-repair-validation/diagnosis/reference.argv.json`
+  records the exact `ngm-capture --format cpp --wait-frames 2` invocation,
+  selecting reference/seed42/192x128/frame120 and the frozen shader directory.
+  It omitted `--application-output-option --output`; this fixture requires
+  an explicit output directory.
+- **Expected/observed:** Expected generated capture; target exited before attachment,
+  and Nsight reported “Failed to connect. The target process may have exited.”
+  CLI exit 1, no outer timeout, cleanup confirmed and GPU reservation released.
+  No generated project was published as complete.
+- **Evidence/retention:** Failed bundle `bundle-d98ea3f9dc96d1fa334898c880883439`
+  is explicitly pinned in `artifacts/nsight-state-repair-evidence`, including
+  raw report, argv and tool stdout/stderr. The omitted required option is
+  established by the invocation and fixture contract; Nsight's generic connection
+  message alone does not establish the target's exit reason.
+- **Next action/revisit:** Repeat with the fixture output option supplied. Revisit
+  Nsight connection behavior only if the corrected invocation also fails. The
+  corrected reference/binding/pipeline attempts all passed; their pinned IDs are
+  in [STATE_REPAIR.md](STATE_REPAIR.md). This failed invocation is not evidence
+  that the scenario is unsupported.
+
+### I-023 — Source-repair regression check required the wrong scene label
+
+- **Context:** 2026-09-18, development product0.2.9, matching
+  Nsight2026.3.1.0/build38722833, existing combined postpass repair inputs.
+- **Reproduction:** After the four binding/pipeline repair runs passed,
+  `build/state-repair-validation/matrix/2026.3-combined-pass-error/invocation.json`
+  records a regression invocation of `ngm_source_repair_integration`.
+- **Expected/observed:** Expected three passing captures. The reference capture
+  itself succeeded and cleanup completed, but the newly added source-label
+  assertion required `scene.raster`. The generated source correctly labels this
+  multipass scene `scene.offscreen`, followed by `post.present`. The harness
+  exited1 before submitting the faulty and repaired captures.
+- **Evidence/retention:** Capture `bundle-f65dcf53cb735b2cddfbe64f00010b2e` and
+  failed qualification report `bundle-cd74be68c7973c40e882599e88812682` are pinned
+  in `artifacts/nsight-state-repair-evidence`. The report contains the frozen
+  pre-correction harness source, transcript, inputs, and independent baselines.
+  Three baseline IDs are in that report and are pinned.
+- **Correction/revisit:** Select `scene.offscreen` for multipass profiles and
+  `scene.raster` for basic profiles. Rerun the final binding/pipeline matrix and
+  both postpass regressions. Revisit if the corrected label check fails on these
+  same qualified scenarios; this was a harness failure, not failed Nsight capture.
+  The final four binding/pipeline runs and both postpass regressions all passed
+  with the corrected harness (18 fresh captures); [STATE_REPAIR.md](STATE_REPAIR.md)
+  records the final report bundles.

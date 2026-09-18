@@ -45,6 +45,11 @@ postpass defects on both releases: 12 fresh captures match their application
 baselines, and repaired output exactly matches each correct reference. See
 [SOURCE_REPAIR.md](docs/SOURCE_REPAIR.md). Other defect families and generic
 resource access remain unfinished.
+At **0.2.9**, binding and pipeline-state source repairs also pass on both releases:
+12 fresh captures match independent application readbacks and repaired references.
+See [STATE_REPAIR.md](docs/STATE_REPAIR.md). Five of nine defect scenarios now have
+verified source repairs; the four resource-selection/indirect-parameter cases and
+generic bounded resource access remain unfinished. The surface remains 20 tools.
 Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),

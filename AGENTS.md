@@ -132,6 +132,12 @@ docs/FIXTURE.md, docs/INSPECTION.md, and docs/INVESTIGATIONS.md. Component contr
 are in docs/ARTIFACTS.md, docs/JOBS.md, docs/NSIGHT_BACKEND.md, and docs/MCP.md.
 Update these instructions as the project develops.
 
+At 0.2.9, binding and pipeline-state C++ source repairs also pass on both releases,
+with 12 fresh captures matching application baselines and exact repaired/reference
+pixels. Five of nine visual defects now have verified source repairs. The four
+resource-selection/indirect-parameter cases and generic bounded resource access
+remain unfinished; see `docs/STATE_REPAIR.md`. The MCP surface remains 20 tools.
+
 Local baseline, inspected on 2026-09-17:
 
 - Nsight Graphics **2026.3.1.0**, installed under

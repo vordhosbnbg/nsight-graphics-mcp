@@ -784,3 +784,45 @@ independent audit. It omits repeated executable and image copies, recording thei
 identities instead; the full successful inputs and images remain in the separately
 pinned run/capture/baseline bundles above. It is an imported qualification record,
 not a new service capture. R-007 and R-015 remain in progress.
+
+## Binding and pipeline source repair at 0.2.9
+
+The extended `ngm_source_repair_integration` accepts two basic scenario pairs with
+independent isolated C++ repairs, preserving its original postpass profiles.
+`docs/STATE_REPAIR.md` records the diagnoses, exact source edits and source-build
+inputs. Normal CMake/Ninja builds of each isolated 0.2.8 source tree produce its
+original and repaired fixture; the MCP server and harness are product0.2.9.
+Only `Fixture.cpp` changes within each build-identity pair; all three roles share
+one frozen shader bundle and use the original faulty scenario after repair.
+
+The final matrix in `build/state-repair-validation/matrix-final` passes both new
+pairs on matching Nsight2026.3.1.0/build38722833 and
+2026.2.0.0/build37991608. It supplies 12 fresh captures plus12 independent
+application baselines at seed42/192x128/frame2, with exact capture/application
+and repaired/reference RGB equality. The observed configuration remains
+RTX3080Ti/driver615.71.09, KDE Wayland/Xwayland/XCB, GCC16.2.1 Debug. Independent
+source and shader semantics are distinguished from generated Nsight source and
+fixed-input descriptor-helper evidence.
+
+The complete GCC Debug CPU aggregate passes **22/22** in **192.61 seconds**
+(`build/state-repair-validation/check-0.2.9.log`). That run preceded the final
+hardware-only label-assertion correction described in I-023; final hardware
+regressions exercise the corrected assertion. No CPU implementation changed.
+Six final-harness negative preflight checks reject wrong repair kinds, extra
+source edits, and reused executables before constructing a store or launching
+an application (`build/state-repair-validation/preflight-final/report.json`).
+No new default CTest or GPU test registration was added.
+
+The final corrected-harness combined and standalone postpass regressions on
+2026.3 also pass, bringing the final matrix to18 captures and18 application
+readbacks. The read-only Pillow/source audit passes all six runs, including
+source-archive inputs, selected descriptor names and color-write masks in each
+basic capture, pins and restart. It is retained under
+`build/state-repair-validation/audit`. The exact report bundles are listed in
+[STATE_REPAIR.md](STATE_REPAIR.md).
+
+The final reviewed compact snapshot is pinned as
+`bundle-c55c149703d53c5a11ec75913cb5d747` in
+`artifacts/nsight-state-repair-evidence`, with 1,779 payload files and 79 pinned
+referenced bundles. Post-publication verification passed all manifest payload
+hashes, current implementation hashes, and referenced pins.
