@@ -290,7 +290,7 @@ workflow behavior. `ngm-experiment` was relinked too. Transcripts:
 and hardware evidence retain their actual 0.1.1 identity; a version increment
 does not relabel existing evidence.
 
-The current implementation has these independently scoped real results:
+At that milestone, the implementation had these independently scoped real results:
 
 - **Basic capture/export:** three fresh MCP captures per release pass on
   2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, with all five exports,
@@ -300,7 +300,7 @@ The current implementation has these independently scoped real results:
   `capture_objects` pass on the real 2026.3.1.0 correct/faulty pair, with 22 events
   and 32 objects each, five-record pages, exact capture scope, bounded protocol
   output, and stable metadata after server restart. The C++ client supplied no
-  desktop variables and set `PATH=/nonexistent`. The current profile rejects the
+  desktop variables and set `PATH=/nonexistent`. The then-current profile rejects the
   retained 2026.2 capture explicitly as `unsupported_producer`. Report, full MCP
   transcripts, and exact probe/client sources are pinned as
   `bundle-e8bedf549310ff13da710678546d0a9f`. This is not a new Codex invocation.
@@ -316,3 +316,74 @@ Those checks do not qualify advanced captures, detailed pipeline/resource/shader
 state, SDK control, source repair, profiling, or the full two-release workflow.
 GPU replay attempts on both releases timed out during initialization, with
 confirmed cleanup and pinned evidence in I-007/I-009/I-010/I-011.
+
+## Two producer profiles and advanced capture validation at 0.2.1
+
+Date: **2026-09-18**, GCC **16.2.1 Debug**, product **0.2.1**. The capture harness
+adds optional workload selection while preserving the basic default. Retained
+inspection adds the exact 2026.2.0.0/build 37991608 Vulkan producer profile next
+to 2026.3.1.0/build 38722833, and preserves the observed optional unsigned
+`indirect_index` field without inferring draw arguments or associations.
+Capture, replay, and same-bundle metadata must match one complete profile.
+Identified sanitized basic/indirect exports from both releases are checked in.
+
+The focused parser, inspection, and actual stdio MCP checks after the indirect
+field change all pass:
+
+```sh
+cmake --build --preset linux-gcc-debug --target \
+  ngm_nsight_evidence_check_run ngm_inspection_check_run ngm_mcp_check_run
+```
+
+The recorded test times are **0.70**, **24.09**, and **14.44 seconds** respectively;
+the complete build/check transcript is
+`build/capture-acceptance/check-indirect-inventory-1.log`. Earlier in this patch,
+the CLI/version check also passed in **0.05 seconds**, with its transcript in
+`build/capture-acceptance/check-0.2.1-mcp-cli.log`. These are focused runs; the
+20-check aggregate described above was not rerun or relabeled as 0.2.1.
+
+Fresh-context reviews independently checked workload mappings and validation
+order, complete producer-tuple matching, optional-field types and response
+schemas, and the retained fixture provenance. Reviewers checked raw source
+hashes, exact sanitization, matching tool tuples, complete manifests, persistent
+pins, and membership in the passing hardware matrix. No actionable findings
+remain in those reviewed changes. The review itself did not execute GPU work.
+
+The final acceptance review found stale single-producer wording in capability
+discovery, a parser comment, and two status documents, plus a mistaken function
+name for the observed indirect marker in the inspection document. Those references now
+describe both qualified producers or explicitly identify the historical result.
+After the capability-text correction, `ngm_mcp_check_run` passes again in
+**14.10 seconds**; transcript:
+`build/capture-acceptance/check-0.2.1-capability-correction.log`.
+`ngm-experiment` was relinked for the 0.2.1 version. The correction changes no
+inventory parsing/query behavior; the retained real-query report below preserves
+its pre-correction server hash. Local Markdown target and roadmap section/status
+checks pass, and `git diff --check` reports no whitespace errors.
+
+The real **18-run capture matrix** passes all nine basic/advanced workload pairs
+on both matching Nsight releases, totaling **54 fresh captures**. Every run also
+retains an independent standalone baseline, all five exports, process cleanup,
+repeat/different PNG checks, durable pins, and clean MCP EOF. The entire batch,
+executed binary snapshots, exact harness/client sources, commands, and inventory
+summary are explicitly pinned as `bundle-a4bce77c1a8d615412702da25e33fa75`.
+Individual baseline/report/capture bundles are pinned too. See
+[NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md) for exact setup and workload coverage.
+
+Typed queries are validated separately from capture. A first C++ MCP probe
+passes on both basic correct/faulty pairs, retaining report/transcripts/sources
+as `bundle-0a4c5bc3e9902c1e0526f5d2d1ff1843`. The final probe then passes on all
+**54** batch captures using the then-current server: metadata, all paginated event
+and object fields/order compared with raw exports, bounded protocol responses,
+and identical metadata for every capture after restart. It supplies no desktop
+variables and sets `PATH=/nonexistent`. Report, expectations, sources, and both
+session transcripts are explicitly pinned as
+`bundle-a1af3b8bb46feebabcc66a3bd821ab80`. This is C++ client coverage, not a new
+Codex invocation. Capture and later query binaries retain their distinct hashes.
+
+Together with the prior 57-launch synchronized application-readback matrix,
+these results and the recorded export gaps complete **R-010**. The larger visual
+workflow group remains unfinished, so this code commit increments patch rather
+than minor. Inventory success does not qualify detailed state, GPU replay, SDK
+control, diagnosis/source repair, compute, or profiling. R-006 and R-015 remain
+in progress; no required skipped case is counted as a pass.

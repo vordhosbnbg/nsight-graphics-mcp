@@ -17,6 +17,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace {
@@ -37,6 +38,30 @@ constexpr std::uint32_t application_final_frame = 20;
 constexpr auto capture_timeout = 120s;
 constexpr auto job_timeout = 180s;
 constexpr std::size_t maximum_file_bytes = 16U * 1024U * 1024U;
+
+struct CaptureWorkload {
+    const char* name;
+    const char* reference;
+    const char* variant;
+};
+
+constexpr std::array workloads{CaptureWorkload{"basic", "reference", "shader-error"},
+                               CaptureWorkload{"binding", "reference", "binding-error"},
+                               CaptureWorkload{"pipeline", "reference", "pipeline-error"},
+                               CaptureWorkload{"multipass", "multipass-reference", "pass-output-error"},
+                               CaptureWorkload{"bindless", "bindless-reference", "resource-selection-error"},
+                               CaptureWorkload{"indirect", "indirect-reference", "indirect-parameter-error"},
+                               CaptureWorkload{"combined-pass", "combined-reference", "combined-pass-error"},
+                               CaptureWorkload{"combined-resource", "combined-reference", "combined-resource-error"},
+                               CaptureWorkload{"combined-indirect", "combined-reference", "combined-indirect-error"}};
+
+const CaptureWorkload& select_workload(std::string_view name) {
+    const auto found = std::find_if(workloads.begin(), workloads.end(),
+                                    [name](const CaptureWorkload& workload) { return name == workload.name; });
+    require(found != workloads.end(), "unknown workload; select basic, binding, pipeline, multipass, bindless, "
+                                      "indirect, combined-pass, combined-resource, or combined-indirect");
+    return *found;
+}
 
 void save_json(const fs::path& path, const Json& value) {
     const auto temporary = fs::path(path.string() + ".tmp");
@@ -433,7 +458,7 @@ void compare_captures(Report& report) {
         checks["different_scenario_png"] = observation(
             captures.at(0).at("screenshot").at("sha256") != captures.at(2).at("screenshot").at("sha256") ? "pass"
                                                                                                          : "fail",
-            "Reference and shader-error PNG files differ; scenario comparison does not verify a source repair");
+            "Selected reference and variant PNG files differ; scenario comparison does not verify a source repair");
     }
     report.save();
 }
@@ -462,7 +487,7 @@ std::string overall_status(const Report& report) {
 }
 
 int run(const fs::path& server, const fs::path& fixture, const fs::path& installation, const fs::path& store,
-        const fs::path& output) {
+        const fs::path& output, const CaptureWorkload& workload) {
     const auto directory = allocate(output);
     fs::create_directory(directory / "report");
     Report report{
@@ -475,7 +500,10 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
          {"artifact_root", store.string()},
          {"nsight_root", installation.string()},
          {"inputs",
-          {{"seed", seed},
+          {{"workload", workload.name},
+           {"reference_scenario", workload.reference},
+           {"variant_scenario", workload.variant},
+           {"seed", seed},
            {"width", width},
            {"height", height},
            {"baseline_application_frame", baseline_frame},
@@ -487,7 +515,7 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
          {"failures", Json::array()},
          {"sessions", Json::object()},
          {"checks", Json::object()}}};
-    for(const auto* scenario : {"reference", "reference", "shader-error"}) {
+    for(const auto* scenario : {workload.reference, workload.reference, workload.variant}) {
         report.value["captures"].push_back(
             {{"scenario", scenario}, {"status", "skipped"}, {"reason", "Not attempted"}});
     }
@@ -541,7 +569,7 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
         ngm::ExperimentOptions baseline_options;
         baseline_options.fixture = executed_fixture;
         baseline_options.output_root = directory / "baselines";
-        baseline_options.scenario = "reference";
+        baseline_options.scenario = workload.reference;
         baseline_options.seed = seed;
         baseline_options.width = width;
         baseline_options.height = height;
@@ -689,7 +717,10 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     try {
-        require(argc == 6, "usage: ngm_capture_integration SERVER FIXTURE NSIGHT_ROOT ARTIFACT_ROOT OUTPUT_ROOT");
+        require(argc == 6 || (argc == 8 && std::string_view(argv[6]) == "--workload"),
+                "usage: ngm_capture_integration SERVER FIXTURE NSIGHT_ROOT ARTIFACT_ROOT OUTPUT_ROOT "
+                "[--workload NAME]");
+        const auto& workload = select_workload(argc == 8 ? argv[7] : "basic");
         const auto server = fs::canonical(argv[1]);
         const auto fixture = fs::canonical(argv[2]);
         const auto installation = fs::canonical(argv[3]);
@@ -701,7 +732,7 @@ int main(int argc, char** argv) {
         require(fs::is_directory(installation), "Nsight root must be an existing installation directory");
         require(!contains_path(store, output) && !contains_path(output, store),
                 "artifact and output roots must not overlap; reports are imported from outside the managed store");
-        return run(server, fixture, installation, store, output);
+        return run(server, fixture, installation, store, output, workload);
     } catch(const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

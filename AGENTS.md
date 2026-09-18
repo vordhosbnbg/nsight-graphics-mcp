@@ -89,12 +89,14 @@ GCC Debug CPU suite passes **20 checks**. Real basic MCP capture/export matrices
 pass on matching Nsight **2026.3.1.0/build 38722833** and
 **2026.2.0.0/build 37991608** tools, with three fresh targets per release and
 persistent pins. The service preserves explicit `XDG_DATA_DIRS` and supplies
-standard defaults when unset or empty. Typed queries pass on the pinned
-2026.3.1.0 correct/faulty pair; another producer is explicitly rejected until
-qualified. The full fixture passes 57 fresh application-readback launches with
-synchronization validation, including advanced workloads. Advanced capture
-compatibility, detailed state, optional SDK control, and source repair remain
-unfinished. Actual GPU replay times out on both releases. These results are
+standard defaults when unset or empty. Typed queries pass on both exact producer
+profiles at **0.2.1**. The basic and advanced matrix passes 54 fresh captures
+across nine workload pairs on matching tools; all 54 retained captures also pass
+typed metadata/event/object pagination and restart queries. The full fixture
+passes 57 fresh application-readback launches with synchronization validation.
+R-010 is complete with recorded advanced capture compatibility and export gaps;
+detailed state, optional SDK control, and source repair remain unfinished.
+Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,
 docs/FIXTURE.md, docs/INSPECTION.md, and docs/INVESTIGATIONS.md. Component contracts

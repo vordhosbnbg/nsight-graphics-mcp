@@ -56,13 +56,14 @@ std::string zero_array(std::size_t count) {
     return result;
 }
 
-void check_observed_pair(const std::filesystem::path& directory) {
+void check_observed_pair(const std::filesystem::path& directory, bool second_release = false) {
     std::optional<std::string> reference_uuid;
     for(const auto* name : {"reference", "shader-error"}) {
         const auto prefix = std::string(name);
         const auto metadata = ngm::parse_nsight_metadata(fixture(directory, prefix + "-metadata.json"));
-        require(metadata.metadata_version == 1 && metadata.nsight_version == "2026.3.1" &&
-                    metadata.nsight_version_build_id == "38722833",
+        require(metadata.metadata_version == 1 &&
+                    metadata.nsight_version == (second_release ? "2026.2.0" : "2026.3.1") &&
+                    metadata.nsight_version_build_id == (second_release ? "37991608" : "38722833"),
                 "actual export schema and reported version/build are retained");
         require(metadata.primary_api == "Vulkan" && metadata.primary_gpu == "NVIDIA GeForce RTX 3080 Ti" &&
                     metadata.driver_vendor == "NVIDIA" && metadata.driver_version == "615.71",
@@ -77,10 +78,16 @@ void check_observed_pair(const std::filesystem::path& directory) {
                     metadata.graphics_features &&
                     metadata.graphics_features->at("general") == std::vector<std::string>{"Vulkan"},
                 "observed API/feature maps retain their actual structure");
-        require(metadata.collection && metadata.collection->info && metadata.collection->info->size() == 6 &&
-                    metadata.collection->warnings && metadata.collection->warnings->size() == 1 &&
-                    metadata.collection->warnings->front().find("replayer version 2026.3") != std::string::npos,
-                "the real replay-version warning is retained, not treated as successful GPU replay");
+        require(metadata.collection && metadata.collection->info && metadata.collection->info->size() == 6,
+                "the observed information collection is retained");
+        if(second_release) {
+            require(!metadata.collection->warnings,
+                    "2026.2 omitted warnings remain absent, not an invented empty array");
+        } else {
+            require(metadata.collection->warnings && metadata.collection->warnings->size() == 1 &&
+                        metadata.collection->warnings->front().find("replayer version 2026.3") != std::string::npos,
+                    "the real replay-version warning is retained, not treated as successful GPU replay");
+        }
         require(metadata.uuid.has_value(), "real capture UUID is present");
         if(reference_uuid) {
             require(metadata.uuid != reference_uuid, "the pair retains distinct capture UUIDs");
@@ -107,8 +114,12 @@ void check_observed_pair(const std::filesystem::path& directory) {
         require(palette.api == "Vulkan" && palette.object_name == "fixture.palette.primary" &&
                     palette.type_name == "Buffer" && palette.access_flags == 32,
                 "object labels, types, and opaque access values are retained");
-        require(object_with_uid(objects, 8).access_flags == 1280 && object_with_uid(objects, 40).access_flags == 524288,
-                "nonzero access_flags are not interpreted as Vulkan flags");
+        require(object_with_uid(objects, 8).access_flags == 1280,
+                "opaque access values retain their observed integers");
+        for(const auto uid : {14U, 40U, 42U}) {
+            require(object_with_uid(objects, uid).access_flags == (second_release ? 0U : 524288U),
+                    "release-specific semaphore/fence access values are preserved without interpretation");
+        }
         const auto& shader = object_with_uid(objects, 35);
         require(shader.type_name == "ShaderModule" &&
                     shader.object_name ==
@@ -166,6 +177,22 @@ void check_metadata_schema(const Json& observed) {
         R"({"metadata_version":1,"extension":{"values":[1,true,null]},"process_environment":["SYNTHETIC_SECRET=do-not-return"],"process_command_line":"synthetic --secret do-not-return"})");
     require(extended.metadata_version == 1 && !extended.process_name,
             "bounded additional fields are accepted without adding environment, command line, or inferred identity");
+}
+
+void check_indirect_pair(const std::filesystem::path& directory, bool second_release) {
+    for(const auto* name : {"indirect-reference", "indirect-parameter-error"}) {
+        const auto events = ngm::parse_nsight_functions(fixture(directory, std::string(name) + "-functions.json"));
+        require(events.size() == 23 && events[14].function_name == "vkCmdDrawIndirect" &&
+                    events[15].function_name == "vkCmdDraw",
+                "retain observed indirect workload inventory order");
+        for(std::size_t index = 0; index < events.size(); ++index) {
+            if(!second_release && index == 15) {
+                require(events[index].indirect_index == 0, "observed indirect_index zero is distinct from absence");
+            } else {
+                require(!events[index].indirect_index, "absent indirect_index is not inferred from function names");
+            }
+        }
+    }
 }
 
 void check_inventory_schema(const Json& functions, const Json& objects) {
@@ -230,12 +257,14 @@ void check_inventory_schema(const Json& functions, const Json& objects) {
     noncontiguous[0]["event_index"] = std::numeric_limits<std::uint64_t>::max();
     noncontiguous[0]["thread_index"] = std::numeric_limits<std::uint64_t>::max();
     noncontiguous[0]["sequence_id"] = std::numeric_limits<std::uint64_t>::max();
+    noncontiguous[0]["indirect_index"] = std::numeric_limits<std::uint64_t>::max();
     noncontiguous[0]["extension"] = {{"value", Json::array({false, nullptr})}};
     const auto preserved = ngm::parse_nsight_functions(noncontiguous.dump());
     require(preserved.front().event_index == std::numeric_limits<std::uint64_t>::max() &&
                 preserved[1].event_index == 1 &&
                 preserved.front().thread_index == std::numeric_limits<std::uint64_t>::max() &&
-                preserved.front().sequence_id == std::numeric_limits<std::uint64_t>::max(),
+                preserved.front().sequence_id == std::numeric_limits<std::uint64_t>::max() &&
+                preserved.front().indirect_index == std::numeric_limits<std::uint64_t>::max(),
             "unsigned 64-bit limits, noncontiguous IDs, extension fields, and export order are supported");
     auto maximum_object = objects;
     maximum_object[0]["uid"] = std::numeric_limits<std::uint64_t>::max();
@@ -245,6 +274,15 @@ void check_inventory_schema(const Json& functions, const Json& objects) {
     require(preserved_object.uid == std::numeric_limits<std::uint64_t>::max() &&
                 preserved_object.access_flags == std::numeric_limits<std::uint64_t>::max(),
             "opaque unsigned object fields keep their full range");
+    for(const auto& invalid : std::vector<Json>{nullptr, true, -1, 1.5, "0", Json::array(), Json::object()}) {
+        auto malformed = functions;
+        malformed[0]["indirect_index"] = invalid;
+        rejected(Error::InvalidField, [&] { ngm::parse_nsight_functions(malformed.dump()); });
+    }
+    rejected(Error::InvalidField, [] {
+        ngm::parse_nsight_functions(
+            R"([{"event_index":0,"function_name":"vkCmdDraw","thread_index":0,"indirect_index":18446744073709551616}])");
+    });
 }
 
 void check_json_limits() {
@@ -342,9 +380,12 @@ void check_json_limits() {
 
 int main(int argc, char** argv) {
     return ngm::check::run([&] {
-        require(argc == 2, "usage: NsightEvidenceCheck <sanitized fixture directory>");
+        require(argc == 3, "usage: NsightEvidenceCheck <2026.3.1 fixture directory> <2026.2.0 fixture directory>");
         const auto directory = std::filesystem::path(argv[1]);
         check_observed_pair(directory);
+        check_observed_pair(argv[2], true);
+        check_indirect_pair(directory, false);
+        check_indirect_pair(argv[2], true);
         // Mutations below are synthetic parser regressions. The checked-in
         // fixture files retain fields/labels observed in actual Nsight exports.
         check_metadata_schema(Json::parse(fixture(directory, "reference-metadata.json")));

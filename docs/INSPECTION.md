@@ -1,11 +1,12 @@
 # Capture inspection evidence
 
-This early R-006 slice parses basic metadata, event inventories, and object
+This R-006 slice parses metadata, event inventories, and object
 inventories from actual Nsight Graphics exports and exposes bounded queries over
-retained server capture bundles. The observations below are from
-**2026.3.1.0, build 38722833**, on Linux with RTX 3080 Ti / driver 615.71.09 and
-the repository's windowed basic Vulkan fixture. They do not establish support for
-another Nsight release or the advanced R-010 scenarios.
+retained server capture bundles. At product **0.2.1**, capture and typed queries
+pass for **54 basic/advanced captures** from matching **2026.3.1.0/build 38722833**
+and **2026.2.0.0/build 37991608** tools, on Linux with RTX 3080 Ti / driver
+615.71.09 and the repository's windowed Vulkan fixture. This qualifies the two
+exact inventory profiles and selected workloads, not arbitrary Nsight releases.
 
 **R-006 and R-007 remain incomplete.** Inventory parsing does not provide the
 detailed state required to diagnose a defect, edit its source, rebuild, recapture,
@@ -15,7 +16,7 @@ integrated tool surface and executed validation results.
 
 ## Observed evidence and limits
 
-The correct/faulty pair is retained in explicitly pinned bundles
+The initial 2026.3.1.0 correct/faulty pair is retained in explicitly pinned bundles
 `bundle-019e2411c941dafdbfba953018451416` (`reference`) and
 `bundle-3f5db7a4c55c1a3e1b6a53636b091066` (`shader-error`), under
 `artifacts/nsight-evidence/bundles/`. Each bundle retains the original capture,
@@ -29,8 +30,8 @@ identifies sanitized regression inputs and exact source hashes.
 | Evidence category | Observed documented export | What it establishes and what remains missing |
 | --- | --- | --- |
 | Capture identity and workload summary | `--metadata`, JSON `metadata_version: 1` | Tool/build, capture UUID, process name, API/GPU/driver, frame/resolution strings, feature inventory, and collection warnings. Fields are exported facts; optional absence stays explicit. |
-| Function/event inventory | `--metadata-functions`, JSON array with 22 entries per capture | `event_index`, `function_name`, `thread_index`, and optional `sequence_id`. No API arguments, object references, or complete event state. |
-| Object inventory and names | `--metadata-objects`, JSON array with 32 entries per capture | `uid`, `api`, `object_name`, `type_name`, and `access_flags`. Includes application labels for pipelines, shaders, and buffers; no object definitions or event associations. |
+| Function/event inventory | `--metadata-functions`, JSON array; 22 entries in each basic capture | `event_index`, `function_name`, `thread_index`, optional `sequence_id`, and optional `indirect_index` in the tested 2026.3 indirect workloads. No API arguments, object references, or complete event state. |
+| Object inventory and names | `--metadata-objects`, JSON array; 32 entries in each basic capture | `uid`, `api`, `object_name`, `type_name`, and `access_flags`. Includes application labels for pipelines, shaders, and buffers; no object definitions or event associations. |
 | Capture screenshot | `--metadata-screenshot`, 192×128 PNG in each pair bundle | A capture screenshot is available as `raw/exports/screenshot.png`. This does not expose an arbitrary selected resource or framebuffer at an event. |
 | Embedded capture logs | `--metadata-logs`, empty file in each pair bundle | These exports contain no log entries. The separate metadata collection contains a version warning and must not be replaced by the empty log result. |
 | Pipeline state and draw-to-pipeline association | Absent from the inspected metadata exports | A `vkCmdBindPipeline` name and a pipeline object label do not identify the pipeline bound at `vkCmdDraw`, nor its raster/depth/blend state. |
@@ -38,7 +39,7 @@ identifies sanitized regression inputs and exact source hashes.
 | Shader bytes, source, and draw-to-shader association | Absent from the inspected metadata exports | Shader-module names are visible. Retained GLSL/SPIR-V under `raw/application/shaders/` is application-provided evidence, not shader extraction by Nsight. |
 | Buffer/texture contents at an event | Absent from the inspected metadata exports | An object inventory and final screenshot do not reveal arbitrary resource bytes, subresources, or event-specific contents. |
 | Debug-label text and pass relationships | Debug-label function names occur, without their arguments | Begin/end function names do not provide label text, command-buffer association, or a verified pass hierarchy. |
-| Bindless, indirect, and multipass evidence | Not established by this basic fixture pair | R-010 workloads and a sufficient documented extraction path remain required. |
+| Bindless, indirect, and multipass evidence | Advanced inventories and final screenshots are exported on both releases | Function names and object labels expose inventory only. Descriptor selection, indirect command arguments/bytes, offscreen contents, and pass relationships remain absent. An opaque `indirect_index` is not a reconstructed command or association. |
 
 These are limits of the inspected export path, not universal claims about Nsight
 capabilities. Metadata export and a captured screenshot also do not, by themselves,
@@ -51,6 +52,41 @@ options](https://docs.nvidia.com/nsight-graphics/UserGuide/graphics-capture-cli.
 Each raw export remains available in its bundle; the typed summary deliberately
 omits `process_environment` and `process_command_line` so it does not automatically
 forward process context into ordinary inspection responses.
+
+## Basic and advanced matrix at 0.2.1
+
+The capture harness now selects nine reference/fault pairs, each repeated with
+three fresh captures on each release. All **54 captures** pass capture, all five
+exports, process cleanup, repeated-reference PNG identity, variant PNG difference,
+and persistent pins after restart. Exact commands, inputs, and evidence are in
+[NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). The batch and its export-inventory
+summary are explicitly pinned as `bundle-a4bce77c1a8d615412702da25e33fa75`.
+
+| Workload pairs | Events per capture | Objects per capture |
+| --- | ---: | ---: |
+| Basic shader, binding, pipeline | 22 | 32 |
+| Multipass / pass-output error | 32 | 44 |
+| Bindless / resource-selection error | 23 | 32 |
+| Indirect / indirect-parameter error | 23 | 34 |
+| Combined / pass, resource, or indirect error | 34 | 46 |
+
+Counts are the same for both releases and correct/faulty members within each
+workload; equal counts do not imply equivalent rendering or state. The inspected
+object records contain only the five fields above. Function records contain the
+three required fields and optional `sequence_id`, plus `indirect_index` for the
+2026.3 indirect/combined records. The observed marker is zero at the exported
+`vkCmdDraw` record following `vkCmdDrawIndirect`; 2026.2 omits it. This is retained as an opaque integer,
+with no assumed parent/child relationship, expanded draw, or buffer offset.
+The basic 2026.2 metadata has no collection `warnings` member, while 2026.3 retains
+its version warning. Some semaphore/fence `access_flags` differ (0 versus 524288)
+and likewise receive no Vulkan interpretation. Small identified inputs for both
+profiles are retained under `tests/fixtures/`, including indirect correct/faulty
+pairs; their README files record exact sanitization and pinned source hashes.
+
+All required deeper-state categories in the table remain absent from these
+basic and advanced metadata exports on both exact producers. This is a measured
+gap in this export path, not a claim about every documented Nsight interface.
+No failing extraction attempt is hidden by a successful inventory query.
 
 ## Retained inspection core and MCP queries
 
@@ -76,12 +112,18 @@ of service-looking reports inside an import does not make it inspectable as a
 server capture. These consistency checks preserve recorded provenance and do
 not provide producer authentication or verify a GPU replay loop.
 
-The current schema profile is deliberately tied to the observed Vulkan producer:
-capture and replay CLI version `2026.3.1.0`, build `38722833`; metadata version
-integer `1`; exported `nsight_version` string `2026.3.1` and build string
-`38722833`. All producer strings retain their exact spelling in query results.
-Another release, build, API, missing producer field, or unsupported metadata
-version fails explicitly until a sample and profile have been validated. The
+The schema profiles are deliberately tied to two observed Vulkan producers,
+both with metadata version integer `1`:
+
+| Capture and replay CLI version | CLI and metadata build | Exported `nsight_version` |
+| --- | --- | --- |
+| `2026.3.1.0` | `38722833` | `2026.3.1` |
+| `2026.2.0.0` | `37991608` | `2026.2.0` |
+
+Capture, replay, and metadata must match one complete row; a mixture is rejected.
+All producer strings retain their exact spelling in query results. Another
+release, build, API, missing producer field, or unsupported metadata version
+fails explicitly until a sample and profile have been validated. The
 metadata export from the **same bundle** is checked before either unversioned
 event/object inventory. A valid inventory alone cannot establish its schema or
 producer. The current installed tools are not consulted when reading retained
@@ -125,8 +167,9 @@ bundles containing the sanitized observed fixtures, without claiming they are
 real captures. It checks metadata selection, exact producer spelling, warnings,
 scope, pagination and byte budgets, invalid reports and producer mismatches,
 failed/missing exports, metadata-before-inventory validation, imported evidence
-rejection, and explicit read/result bounds. Its sole argument is the checked-in
-fixture directory. [McpCheck.cpp](../tests/McpCheck.cpp) independently exercises
+rejection, and explicit read/result bounds. Its two arguments are the checked-in
+2026.3.1 and 2026.2.0 fixture directories, in that order.
+[McpCheck.cpp](../tests/McpCheck.cpp) independently exercises
 the actual tool handlers and server process boundary using the C++ Nsight
 stand-in. These CPU checks do not establish real Nsight compatibility. Build/test
 and real retained-capture MCP results are recorded separately in
@@ -158,14 +201,14 @@ the version/build strings. `has_unsupported_operation` is a boolean;
 arrays. Present empty collections remain distinguishable from missing ones.
 
 Every event requires unsigned 64-bit `event_index` and `thread_index`, plus a
-nonempty `function_name`; only `sequence_id` is optional. Every object requires
+nonempty `function_name`; `sequence_id` and `indirect_index` are optional. Every object requires
 unsigned 64-bit `uid` and `access_flags`, nonempty `api` and `type_name`, and an
 `object_name` string that may be empty. Numeric strings, fractions, negatives, and
 overflow are rejected. Duplicate event indices or object UIDs within an export
 are rejected. IDs are capture-scoped, never Vulkan handles or cross-run keys.
 Repeated sequence IDs are allowed, as observed in the actual exports.
 
-`sequence_id` and `access_flags` remain opaque observed integers. The parser does
+`sequence_id`, `indirect_index`, and `access_flags` remain opaque observed integers. The parser does
 not interpret access flags as Vulkan constants, join events to objects by name or
 order, sort records, require contiguous IDs, infer pass nesting, or reconstruct
 state. Additional JSON fields are accepted within the same safety limits and
@@ -196,12 +239,13 @@ bounded valid text. Unknown fields and excluded process context must also fit
 the global limits. The selected metadata total excludes fields not returned.
 
 [NsightEvidenceCheck.cpp](../tests/NsightEvidenceCheck.cpp) exercises the observed
-correct/faulty pair, optional sequence IDs, preserved warnings and labels,
+basic and indirect correct/faulty pairs from both releases, optional sequence and
+indirect IDs, preserved warnings and labels,
 missing/wrong/range-invalid fields, duplicate IDs and escaped duplicate JSON keys,
 unknown metadata versions, malformed UTF-8/JSON, string and metadata budgets,
 record/value counts, and deeply nested ignored fields. Synthetic mutations are
 kept in the check source rather than attributed to real exports. The check is
-CPU-only and needs the checked-in fixture directory as its sole argument; it
+CPU-only and needs the two checked-in fixture directories in the same order; it
 does not require Nsight or a GPU. Executed build/test results belong in
 [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 
@@ -210,10 +254,22 @@ MCP probe exercises the pinned correct/faulty pair described above, all three
 typed tools, five-record pagination, and identical metadata after server restart
 without desktop variables or a usable tool PATH. Its complete report, transcripts,
 and sources are explicitly pinned as `bundle-e8bedf549310ff13da710678546d0a9f`.
-The retained 2026.2 reference is explicitly rejected by the current producer
-profile. This establishes the implemented inventory queries only; exact test
+That historical 0.2.0 profile explicitly rejected the retained 2026.2 reference.
+This establishes the implemented inventory queries only; exact test
 versions and broader release limits are in [BUILD_VALIDATION.md](BUILD_VALIDATION.md)
 and [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md).
+
+At **0.2.1**, a separate C++ MCP probe first passes on both basic correct/faulty
+pairs; its report and transcripts are pinned as
+`bundle-0a4c5bc3e9902c1e0526f5d2d1ff1843`. After adding the observed optional
+indirect field, the focused parser, inspection, and MCP checks pass again.
+The final real query matrix passes on all **54 captures** above: all three tools,
+every event/object field and ordering checked against raw exports, five-record
+pages, bounded protocol output, no process environment/command-line forwarding,
+and identical metadata after restart. The server has `PATH=/nonexistent` and no
+desktop variables. Exact report, sources, input expectations, and transcripts
+are pinned as `bundle-a1af3b8bb46feebabcc66a3bd821ab80`. These are C++ MCP client
+runs, separate from the historical Codex capability query.
 
 ## Further documented inspection paths
 
@@ -235,7 +291,11 @@ was found in the reviewed official documentation/download sources. This is a
 bounded discovery observation, not a claim that the preview is universally
 unavailable. Recheck availability before choosing a future integration path.
 
-Complete R-006 still requires evidence categories tied to reproducible documented
-extraction or demonstrated gaps for representative basic and advanced captures,
-and a selected next action for unresolved needs. R-007 still requires sufficient
-evidence for the actual source-edit/rebuild/recapture/fix-verification workflow.
+R-006 remains in progress while the next documented deeper-state path is probed:
+Generate C++ Capture with matching 2026.2 tools, following the unsuccessful
+2026.3 attempt in I-006. Preserve any source/build correlation supplied by the
+application as application evidence. I-007/I-009/I-010/I-011 retain the separate
+GPU replay failures. A failed follow-up must retain its exact gap and revisit
+condition; it must not be generalized to universal unavailability. R-007 still
+requires sufficient evidence for the actual source-edit/rebuild/recapture/fix-
+verification workflow; inventories alone do not complete it.

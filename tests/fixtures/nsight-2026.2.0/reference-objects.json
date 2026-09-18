@@ -1,0 +1,226 @@
+[
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Instance_1",
+    "type_name": "Instance",
+    "uid": 1
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "PhysicalDevice_2",
+    "type_name": "PhysicalDevice",
+    "uid": 2
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Device_4",
+    "type_name": "Device",
+    "uid": 4
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.graphics_queue",
+    "type_name": "Queue",
+    "uid": 5
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "DeviceMemory_25",
+    "type_name": "DeviceMemory",
+    "uid": 25
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "DeviceMemory_27",
+    "type_name": "DeviceMemory",
+    "uid": 27
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "DeviceMemory_29",
+    "type_name": "DeviceMemory",
+    "uid": 29
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.application_readback",
+    "type_name": "Buffer",
+    "uid": 24
+  },
+  {
+    "access_flags": 32,
+    "api": "Vulkan",
+    "object_name": "fixture.palette.primary",
+    "type_name": "Buffer",
+    "uid": 26
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.palette.secondary",
+    "type_name": "Buffer",
+    "uid": 28
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.scene.vert.spv",
+    "type_name": "ShaderModule",
+    "uid": 34
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.scene.frag.spv",
+    "type_name": "ShaderModule",
+    "uid": 35
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.scene.raster",
+    "type_name": "RenderPass",
+    "uid": 19
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "DescriptorSetLayout_30",
+    "type_name": "DescriptorSetLayout",
+    "uid": 30
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "PipelineLayout_36",
+    "type_name": "PipelineLayout",
+    "uid": 36
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.scene.graphics",
+    "type_name": "Pipeline",
+    "uid": 37
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "DescriptorPool_31",
+    "type_name": "DescriptorPool",
+    "uid": 31
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "CommandPool_38",
+    "type_name": "CommandPool",
+    "uid": 38
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "SurfaceKHR_3",
+    "type_name": "SurfaceKHR",
+    "uid": 3
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "SwapchainKHR_6",
+    "type_name": "SwapchainKHR",
+    "uid": 6
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.window_color.0",
+    "type_name": "Image",
+    "uid": 7
+  },
+  {
+    "access_flags": 1280,
+    "api": "Vulkan",
+    "object_name": "fixture.window_color.1",
+    "type_name": "Image",
+    "uid": 8
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.window_color.2",
+    "type_name": "Image",
+    "uid": 9
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.window_color.3",
+    "type_name": "Image",
+    "uid": 10
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "ImageView_13",
+    "type_name": "ImageView",
+    "uid": 13
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Framebuffer_21",
+    "type_name": "Framebuffer",
+    "uid": 21
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "fixture.palette_set.0",
+    "type_name": "DescriptorSet",
+    "uid": 33
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "CommandBuffer_39",
+    "type_name": "CommandBuffer",
+    "uid": 39
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Semaphore_14",
+    "type_name": "Semaphore",
+    "uid": 14
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Fence_40",
+    "type_name": "Fence",
+    "uid": 40
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Semaphore_41",
+    "type_name": "Semaphore",
+    "uid": 41
+  },
+  {
+    "access_flags": 0,
+    "api": "Vulkan",
+    "object_name": "Fence_42",
+    "type_name": "Fence",
+    "uid": 42
+  }
+]

@@ -63,6 +63,8 @@ struct Bundle {
     std::function<void(Json&)> report_edit{};
     std::function<void(Json&)> manifest_edit{};
     std::function<void(std::string&)> report_text_edit{};
+    std::string tool_version = "2026.3.1.0";
+    std::string tool_build = "38722833";
 };
 
 Json process() {
@@ -87,8 +89,8 @@ std::string publish(ngm::ArtifactStore& store, Bundle bundle) {
                 {"command_line", "report-command-secret"}};
     for(const auto* tool : {"capture", "replay"}) {
         report["nsight"][tool] = {{"path", std::string("/synthetic/ngfx-") + tool},
-                                  {"version", "2026.3.1.0"},
-                                  {"build", "38722833"},
+                                  {"version", bundle.tool_version},
+                                  {"build", bundle.tool_build},
                                   {"version_valid", true},
                                   {"help_valid", true}};
     }
@@ -322,12 +324,91 @@ void checks(const fs::path& fixtures, const fs::path& root) {
         }
     }
 }
+void profile_checks(const fs::path& first, const fs::path& second, const fs::path& root) {
+    ngm::ArtifactOptions options;
+    options.root = root;
+    options.max_bytes = 0;
+    options.max_age = std::chrono::seconds(0);
+    ngm::ArtifactStore store(options);
+    ngm::InspectionService inspection(store);
+    for(const bool second_release : {false, true}) {
+        const auto& fixtures = second_release ? second : first;
+        const auto& other_fixtures = second_release ? first : second;
+        const std::string version = second_release ? "2026.2.0.0" : "2026.3.1.0";
+        const std::string metadata_version = second_release ? "2026.2.0" : "2026.3.1";
+        const std::string build = second_release ? "37991608" : "38722833";
+        const std::string profile = "nsight-" + metadata_version + "-build-" + build + "-vulkan";
+        for(const auto* prefix : {"reference", "shader-error", "indirect-reference", "indirect-parameter-error"}) {
+            const bool indirect = std::string_view(prefix).starts_with("indirect-");
+            Bundle baseline{read(fixtures / (std::string(prefix) + "-metadata.json")),
+                            read(fixtures / (std::string(prefix) + "-functions.json")),
+                            read(fixtures / (std::string(prefix) + "-objects.json"))};
+            baseline.tool_version = version;
+            baseline.tool_build = build;
+            const auto id = publish(store, baseline);
+            const auto metadata = inspection.metadata(id);
+            bounded_result(metadata);
+            require(metadata.at("schema_profile") == profile && metadata.at("capture_id") == id &&
+                        metadata["producer"]["capture_tool"]["version"] == version &&
+                        metadata["producer"]["replay_tool"]["version"] == version &&
+                        metadata["producer"]["metadata_nsight_version"] == metadata_version &&
+                        metadata["producer"]["metadata_nsight_version_build_id"] == build,
+                    "one exact producer profile governs the complete tool/metadata tuple");
+            const auto& warnings = metadata["metadata"]["_metadata_collection_"]["warnings"];
+            require(second_release ? warnings.is_null() : warnings.size() == 1,
+                    "observed absent warnings and actual warning arrays remain distinct");
+            const auto events = inspection.events(id, 3, 5);
+            bounded_result(events);
+            require(events.at("schema_profile") == profile && events.at("offset") == 3 &&
+                        events.at("total") == (indirect ? 23 : 22) && events.at("events").size() == 5 &&
+                        events.at("next_offset") == 8,
+                    "event pagination retains the selected profile");
+            const auto draw_page = inspection.events(id, 14, 3);
+            const auto marker = draw_page.at("events").at(1).at("indirect_index");
+            require(indirect && !second_release ? marker == 0 : marker.is_null(),
+                    "typed event pages preserve observed indirect_index zero or explicit absence");
+            const auto objects = inspection.objects(id);
+            bounded_result(objects);
+            require(objects.at("schema_profile") == profile && objects.at("total") == (indirect ? 34 : 32) &&
+                        objects.at("next_offset").is_null(),
+                    "object page retains the selected profile");
+            require(objects.at("objects") == Json::parse(baseline.objects),
+                    "all observed object fields, identities, labels, and opaque access integers are preserved");
+
+            auto changed = baseline;
+            changed.report_edit = [second_release](Json& report) {
+                report["nsight"]["replay"]["version"] = second_release ? "2026.3.1.0" : "2026.2.0.0";
+                report["nsight"]["replay"]["build"] = second_release ? "38722833" : "37991608";
+            };
+            rejected(Error::UnsupportedProducer, [&] { inspection.metadata(publish(store, changed)); });
+            changed = baseline;
+            changed.metadata = read(other_fixtures / (std::string(prefix) + "-metadata.json"));
+            changed.functions = "not JSON";
+            rejected(Error::UnsupportedProducer, [&] { inspection.events(publish(store, changed)); });
+            changed = baseline;
+            changed.tool_build = "unqualified-build";
+            rejected(Error::UnsupportedProducer, [&] { inspection.objects(publish(store, changed)); });
+            changed = baseline;
+            changed.tool_version = metadata_version;
+            rejected(Error::UnsupportedProducer, [&] { inspection.metadata(publish(store, changed)); });
+            changed = baseline;
+            auto unsupported_api = Json::parse(changed.metadata);
+            unsupported_api["primary_api"] = "OpenGL";
+            changed.metadata = unsupported_api.dump();
+            rejected(Error::UnsupportedProducer, [&] { inspection.events(publish(store, changed)); });
+            changed = baseline;
+            changed.report_edit = [](Json& report) { report["nsight"]["capture"].erase("version"); };
+            rejected(Error::InvalidReport, [&] { inspection.metadata(publish(store, changed)); });
+        }
+    }
+}
 } // namespace
 
 int main(int argc, char** argv) {
     return ngm::check::run([&] {
-        require(argc == 2, "usage: ngm_inspection_check /path/to/sanitized/nsight-2026.3.1-fixtures");
+        require(argc == 3, "usage: ngm_inspection_check <2026.3.1 fixture directory> <2026.2.0 fixture directory>");
         const Scratch scratch;
         checks(argv[1], scratch.path / "store");
+        profile_checks(argv[1], argv[2], scratch.path / "profiles");
     });
 }

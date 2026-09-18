@@ -58,7 +58,9 @@ per-case evidence, acquisition, and remaining gaps are in
 ## Inputs and isolation
 
 The executable takes five positional arguments, in this order: `SERVER`,
-`FIXTURE`, `NSIGHT_ROOT`, `ARTIFACT_ROOT`, and `OUTPUT_ROOT`. Paths are resolved to
+`FIXTURE`, `NSIGHT_ROOT`, `ARTIFACT_ROOT`, and `OUTPUT_ROOT`, followed optionally
+by `--workload NAME`. The default is `basic`; unknown selectors and malformed
+option placement fail before creating run/store directories. Paths are resolved to
 absolute locations. The server and fixture must be executable regular files; the
 Nsight root must exist. The artifact and output roots must not overlap, because
 the report and standalone baseline are imported from outside the managed store.
@@ -74,6 +76,27 @@ build provenance. Captures use that baseline's retained shader directory, keepin
 the executable and shader identities separate and stable across all launches.
 No expected diagnosis or private oracle metadata is submitted to MCP.
 
+| Workload | Baseline and repeated reference | Variant |
+| --- | --- | --- |
+| `basic` | `reference` | `shader-error` |
+| `binding` | `reference` | `binding-error` |
+| `pipeline` | `reference` | `pipeline-error` |
+| `multipass` | `multipass-reference` | `pass-output-error` |
+| `bindless` | `bindless-reference` | `resource-selection-error` |
+| `indirect` | `indirect-reference` | `indirect-parameter-error` |
+| `combined-pass` | `combined-reference` | `combined-pass-error` |
+| `combined-resource` | `combined-reference` | `combined-resource-error` |
+| `combined-indirect` | `combined-reference` | `combined-indirect-error` |
+
+At **0.2.1**, all nine selectors pass on both matching Nsight releases, totaling
+54 captures. The standalone baseline always uses the selected reference scenario,
+and current bundles retain all seven shader source/SPIR-V pairs. The report
+records `workload`, `reference_scenario`, and `variant_scenario`. Batch evidence,
+producer differences, and the separate typed-query validation are recorded in
+[NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Fresh-context review found no
+actionable defect in selector mappings, validation order, isolation, or evidence
+classification.
+
 The server receives an explicit desktop-environment allowlist and a fixed system
 `PATH`. `XDG_DATA_DIRS` is intentionally absent to exercise the capture service's
 production default. The report retains that server environment; each capture's
@@ -85,8 +108,9 @@ standalone runner's layer policy remains distinct from Nsight injection.
 The standalone reference and all captures use seed **42** and **192 × 128**.
 The standalone baseline reads back application frame **2**. Each of the three
 captures requests Nsight capture frame **2**, one presented frame, with the
-application configured to finish at frame **20**. Captures run `reference`,
-`reference`, then `shader-error`, each through a fresh application launch.
+application configured to finish at frame **20**. Captures run the selected
+reference twice and then its variant, each through a fresh application launch.
+The default sequence remains `reference`, `reference`, then `shader-error`.
 The configured final application frame does not mean that application readback
 must finish before Nsight's exit-on-capture cleanup.
 
@@ -116,7 +140,7 @@ The harness checks:
   retained marker text and file hashes identify the evidence. These observations
   make no subsequent PID-liveness or ownership claim.
 - Valid PNG signatures and selected image dimensions, identical raw PNG hashes
-  for the repeated reference, and a different raw PNG hash for `shader-error`.
+  for the repeated reference, and a different raw PNG hash for the selected variant.
   This compares scenarios and does not establish diagnosis or source-fix
   verification.
 - Published, unquarantined pins for the standalone baseline and every submitted
@@ -153,8 +177,8 @@ successful required capture slice exits **0**; unavailable required evidence
 exits **3**; a failed check, setup, cleanup, or publication exits **1**. Pixel
 decoding, GPU replay execution, and source-edit/rebuild/recapture verification
 are explicitly skipped scope checks and cannot be inferred from a passing
-capture slice. This harness alone does not establish a second Nsight release,
-advanced renderer coverage, or the complete visual-debugging release.
+capture slice. Only the explicitly executed release/workload combinations are
+qualified; a passing run does not establish the complete visual-debugging release.
 
 Every submitted capture requests a persistent pin. The standalone baseline is
 imported with a pin even when it fails. After capture and restart sessions end,

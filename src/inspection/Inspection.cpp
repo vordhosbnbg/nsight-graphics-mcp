@@ -3,6 +3,7 @@
 #include "ngm/NsightEvidence.hpp"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <set>
 #include <utility>
@@ -14,6 +15,17 @@ using Error = InspectionErrorCode;
 constexpr std::size_t report_limit = 2U * 1024U * 1024U;
 constexpr std::string_view report_path = "raw/report.json";
 constexpr std::string_view metadata_path = "raw/exports/metadata.raw";
+
+struct ProducerProfile {
+    const char* cli_version;
+    const char* metadata_version;
+    const char* build;
+    const char* name;
+};
+
+constexpr std::array profiles{
+    ProducerProfile{"2026.3.1.0", "2026.3.1", "38722833", "nsight-2026.3.1-build-38722833-vulkan"},
+    ProducerProfile{"2026.2.0.0", "2026.2.0", "37991608", "nsight-2026.2.0-build-37991608-vulkan"}};
 
 [[noreturn]] void fail(Error code, const std::string& message) {
     throw InspectionError(code, message);
@@ -77,6 +89,7 @@ struct Capture {
     std::map<std::string, std::uint64_t> files;
     NsightMetadata metadata;
     Json producer;
+    const ProducerProfile* profile = nullptr;
 };
 
 void successful_process(const Json& operation) {
@@ -201,11 +214,16 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
         }
         require(member(observed, "version_valid") == true && member(observed, "help_valid") == true,
                 "Capture report has invalid tool observations");
-        if(producer.at("version") != "2026.3.1.0" || producer.at("build") != "38722833") {
+        const auto profile = std::find_if(profiles.begin(), profiles.end(), [&](const ProducerProfile& candidate) {
+            return producer.at("version") == candidate.cli_version && producer.at("build") == candidate.build;
+        });
+        if(profile == profiles.end() || (capture.profile && capture.profile != &*profile)) {
             fail(Error::UnsupportedProducer,
-                 "Inspection currently supports observed Nsight 2026.3.1.0 build 38722833 exports only; retain "
-                 "sample exports and validate a schema profile before using this producer");
+                 "Capture and replay must match one observed profile: Nsight 2026.3.1.0 build 38722833 or "
+                 "2026.2.0.0 build 37991608; retain sample exports and validate a new profile before using another "
+                 "producer");
         }
+        capture.profile = &*profile;
         capture.producer[std::string(name) + "_tool"] = std::move(producer);
     }
     const auto& operation = member(report, "capture");
@@ -218,11 +236,11 @@ Capture load_capture(ArtifactStore& store, const std::string& id) {
                 number(operation, "output_bytes") == capture_file->second,
             "Capture file is absent, empty, or disagrees with its reported size");
     capture.metadata = parse_export(store, capture, "metadata", std::string(metadata_path), parse_nsight_metadata);
-    if(capture.metadata.nsight_version != "2026.3.1" || capture.metadata.nsight_version_build_id != "38722833" ||
-       capture.metadata.primary_api != "Vulkan") {
+    if(capture.metadata.nsight_version != capture.profile->metadata_version ||
+       capture.metadata.nsight_version_build_id != capture.profile->build || capture.metadata.primary_api != "Vulkan") {
         fail(Error::UnsupportedProducer,
-             "Same-bundle metadata must identify the observed Vulkan profile: Nsight 2026.3.1 build 38722833; "
-             "inspect raw/exports/metadata.raw before validating a new producer/profile");
+             "Same-bundle metadata must identify the same observed Vulkan version/build profile as capture and "
+             "replay; inspect raw/exports/metadata.raw before validating a new producer/profile");
     }
     capture.producer["metadata_nsight_version"] = *capture.metadata.nsight_version;
     capture.producer["metadata_nsight_version_build_id"] = *capture.metadata.nsight_version_build_id;
@@ -265,7 +283,7 @@ Json base_result(const Capture& capture, const std::string& kind, const std::str
     return {{"capture_id", capture.info.summary.id},
             {"capture_uuid", optional(capture.metadata.uuid)},
             {"evidence_origin", "nsight_export"},
-            {"schema_profile", "nsight-2026.3.1-build-38722833-vulkan"},
+            {"schema_profile", capture.profile->name},
             {"metadata_version", capture.metadata.metadata_version},
             {"producer", capture.producer},
             {"source", {{"kind", kind}, {"path", path}, {"bytes", capture.files.at(path)}}},
@@ -368,7 +386,8 @@ Json InspectionService::events(const std::string& capture_id, std::size_t offset
                            return Json{{"event_index", event.event_index},
                                        {"function_name", event.function_name},
                                        {"thread_index", event.thread_index},
-                                       {"sequence_id", optional(event.sequence_id)}};
+                                       {"sequence_id", optional(event.sequence_id)},
+                                       {"indirect_index", optional(event.indirect_index)}};
                        });
 }
 

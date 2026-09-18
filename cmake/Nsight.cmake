@@ -15,5 +15,6 @@ function(ngm_add_nsight_checks)
         ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
     ngm_add_check(ngm_nsight_evidence_check SOURCES "${PROJECT_SOURCE_DIR}/tests/NsightEvidenceCheck.cpp"
         LIBRARIES ngm_nsight
-        ARGS "${PROJECT_SOURCE_DIR}/tests/fixtures/nsight-2026.3.1")
+        ARGS "${PROJECT_SOURCE_DIR}/tests/fixtures/nsight-2026.3.1"
+            "${PROJECT_SOURCE_DIR}/tests/fixtures/nsight-2026.2.0")
 endfunction()

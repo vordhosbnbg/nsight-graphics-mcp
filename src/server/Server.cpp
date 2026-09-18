@@ -72,7 +72,8 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
            {{"available", storage},
             {"status", storage ? "retained_exports_only" : "missing_prerequisites"},
             {"reason", "Implemented bounded metadata/event/object inventories for complete retained server captures "
-                       "from observed Nsight 2026.3.1.0 build 38722833 Vulkan exports. Requires --artifact-root; "
+                       "from observed Nsight 2026.3.1.0 build 38722833 or 2026.2.0.0 build 37991608 Vulkan exports. "
+                       "Requires --artifact-root; "
                        "each query validates its bundle and producer. Detailed pipeline/shader/resource state "
                        "and event associations remain unavailable from these exports."}}},
           {"profiling", unavailable("GPU profiling and metric extraction are pending.")},

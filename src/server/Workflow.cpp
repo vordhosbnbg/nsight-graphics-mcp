@@ -600,22 +600,25 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                                 {"offset", integer_schema(0, NsightEvidenceLimits::maximum_records)},
                                                 {"limit", integer_schema(1, InspectionService::maximum_page_records)}},
                                                {"capture_id"});
-    add_tool(tools, "capture_events", inventory_input,
-             inventory_schema("events", object_schema({{"event_index", integer_schema()},
-                                                       {"function_name",
-                                                        string_schema(NsightEvidenceLimits::maximum_string_bytes, 1)},
-                                                       {"thread_index", integer_schema()},
-                                                       {"sequence_id", nullable(integer_schema())}},
-                                                      {"event_index", "function_name", "thread_index", "sequence_id"})),
-             "Page the observed function inventory in retained export order, after validating metadata from the "
-             "same complete server capture. IDs belong only to capture_id; sequence_id is opaque. No API "
-             "arguments, event/object association, pipeline state, or pass hierarchy is inferred. Default limit "
-             "50, maximum 100; pages also stop at 256 KiB. Continue with next_offset until null; total is full count.",
-             true, false, [this](const Json& arguments) {
-                 const auto id = artifact_id(arguments, "capture_id");
-                 return InspectionService(service().artifacts())
-                     .events(id, arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
-             });
+    add_tool(
+        tools, "capture_events", inventory_input,
+        inventory_schema(
+            "events", object_schema({{"event_index", integer_schema()},
+                                     {"function_name", string_schema(NsightEvidenceLimits::maximum_string_bytes, 1)},
+                                     {"thread_index", integer_schema()},
+                                     {"sequence_id", nullable(integer_schema())},
+                                     {"indirect_index", nullable(integer_schema())}},
+                                    {"event_index", "function_name", "thread_index", "sequence_id", "indirect_index"})),
+        "Page the observed function inventory in retained export order, after validating metadata from the "
+        "same complete server capture. IDs belong only to capture_id; sequence_id and indirect_index are opaque. No "
+        "API "
+        "arguments, event/object association, pipeline state, or pass hierarchy is inferred. Default limit "
+        "50, maximum 100; pages also stop at 256 KiB. Continue with next_offset until null; total is full count.",
+        true, false, [this](const Json& arguments) {
+            const auto id = artifact_id(arguments, "capture_id");
+            return InspectionService(service().artifacts())
+                .events(id, arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
     add_tool(tools, "capture_objects", inventory_input,
              inventory_schema(
                  "objects", object_schema({{"uid", integer_schema()},

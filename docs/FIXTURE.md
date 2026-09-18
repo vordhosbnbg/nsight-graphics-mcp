@@ -71,10 +71,10 @@ for rejected candidate devices; successful runs also record the features enabled
 at device creation. A missing display is rejected before any device claims are
 made. Basic scenarios require no optional descriptor-indexing features.
 
-Advanced source implementation and harness coverage are present; local compilation,
-independent review, GPU validation, and Nsight capture compatibility must be
-recorded separately before R-010 is considered complete. The historical validation
-records below apply to the four basic scenarios only.
+R-010 is complete at **0.2.1** after local compilation, fresh-context review,
+application GPU validation, and basic/advanced Nsight capture compatibility with
+recorded inspection gaps. The validation records below distinguish the initial
+basic matrices from the later complete fixture and capture matrices.
 
 ## What a run retains
 
@@ -207,7 +207,19 @@ Its `raw/imported/relocation.json` maps original run paths to retained copies;
 Fresh-context source review found no actionable defect in feature enablement,
 resource/descriptor/indirect bounds, offscreen synchronization, or the analytic
 oracles. The new fixture-contract and experiment checks and full 20-check CPU
-aggregate pass. R-010 remains open for advanced capture compatibility/gap records.
+aggregate pass.
+
+At **0.2.1**, the capture harness passes all nine workload pairs on matching
+Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools: **54 fresh
+captures**, all five exports, repeated-reference PNG identity, variant difference,
+cleanup, and persistent pins. Typed metadata/event/object queries also pass on
+all 54 captures, including server restart. The capture batch and typed report
+are respectively pinned as `bundle-a4bce77c1a8d615412702da25e33fa75` and
+`bundle-a1af3b8bb46feebabcc66a3bd821ab80`. Exact inputs and version differences
+are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md); [INSPECTION.md](INSPECTION.md)
+records the missing pipeline, binding, shader, resource, and pass state. This
+completes R-010's renderer/capture-gap requirements. GPU replay, SDK control,
+and actual source repair remain separate unfinished work.
 
 The desktop dependencies are documented in [DEPENDENCIES.md](DEPENDENCIES.md).
 The [Khronos XCB surface reference](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_xcb_surface.html)

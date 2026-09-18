@@ -322,6 +322,9 @@ std::vector<NsightEvent> parse_nsight_functions(std::string_view text) {
         if(const auto found = record.find("sequence_id"); found != record.end()) {
             event.sequence_id = unsigned_integer(*found, path + ".sequence_id");
         }
+        if(const auto found = record.find("indirect_index"); found != record.end()) {
+            event.indirect_index = unsigned_integer(*found, path + ".indirect_index");
+        }
         result.push_back(std::move(event));
     }
     return result;

@@ -1,0 +1,43 @@
+{
+  "_metadata_collection_": {
+    "info": [
+      "Replay Information:",
+      "> Nsight Version................................ 2026.3.1",
+      "> Nsight Build Id............................... 38722833",
+      "> Operating System.............................. Linux (Arch Linux)",
+      "> GPU Name...................................... NVIDIA GeForce RTX 3080 Ti",
+      "> Driver Version................................ 615.71"
+    ],
+    "warnings": [
+      "\nWARNING: Capture version 2026.3.1 (build 38722833) is newer than replayer version 2026.3 (build 38722833). Replay may not work as expected.\nPlease upgrade to the latest replayer version. To continue using this version, either recapture or use --bundle-replayer."
+    ]
+  },
+  "captured_frame": "2",
+  "d3d12_core_version": "",
+  "driver_vendor": "NVIDIA",
+  "driver_version": "615.71",
+  "graphics_apis": {
+    "Vulkan": [
+      "general"
+    ]
+  },
+  "graphics_features": {
+    "general": [
+      "Vulkan"
+    ]
+  },
+  "has_unsupported_operation": false,
+  "metadata_version": 1,
+  "non_portable": "False",
+  "nsight_version": "2026.3.1",
+  "nsight_version_build_id": "38722833",
+  "os_information": "Linux (Arch Linux)",
+  "primary_api": "Vulkan",
+  "primary_gpu": "NVIDIA GeForce RTX 3080 Ti",
+  "process_command_line": "/fixture/ngm-vulkan-fixture --scenario indirect-reference --seed 42 --width 192 --height 128 --frame 20 --shader-dir /fixture/shaders --output /fixture/artifacts",
+  "process_environment": [],
+  "process_name": "ngm-vulkan-fixture",
+  "request_time": "2026_09_18_03_43_08",
+  "resolution": "192x128",
+  "uuid": "61073bde-b7ab-47e7-84dd-03b15308aa45"
+}

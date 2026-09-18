@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0. Twenty CPU checks pass, basic capture/export passes on two Nsight releases, and retained typed inventory queries pass on 2026.3.1.0. Advanced application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
+Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0; R-010 advanced fixture complete at 0.2.1. The recorded CPU aggregate passes 20 checks. Basic/advanced capture and retained typed queries pass across 54 captures on two Nsight releases, with current focused CPU checks passing. Application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
@@ -22,8 +22,9 @@ Keep the selected direction, remaining choices, and interview answers here.
 - The implemented backend uses documented Nsight CLI interfaces for capture and
   replay exports. Corrected production environment handling preserves explicit
   `XDG_DATA_DIRS` and supplies standard defaults when absent or empty. A C++ client
-  drove three successful basic capture/export runs per release through the real
-  MCP server without a data-directory environment override. The matching
+  drove 54 successful basic/advanced captures across nine workload pairs and two
+  releases through the real MCP server without a data-directory override. Typed
+  retained queries also pass on every capture. The matching
   2026.3.1.0 and 2026.2.0.0 results and limits are in
   [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Actual GPU replay stalled during
   initialization on both releases (I-007/I-011) and remains unqualified. Profiling
@@ -173,7 +174,7 @@ architecture.
 | MCP transport | Local stdio for the first release; persistent Streamable HTTP later. |
 | Display | System XCB desktop dependency, Vulkan XCB surface; actual KDE Wayland/Xwayland path exercised by the fixture. |
 | Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation, seven-shader provenance, and basic/advanced fixture rendering exercised. Nsight source correlation remains pending. |
-| Nsight integration | Documented capture/replay CLI adapter and shared CaptureService implemented; native ngm-capture and MCP workflow use it. CPU checks and three real basic capture/export runs per release pass on 2026.3.1.0 and 2026.2.0.0 with corrected environment defaults. Typed retained queries pass on the qualified 2026.3.1.0 producer. Actual GPU replay stalls during initialization on both releases. See NSIGHT_VALIDATION.md and INVESTIGATIONS.md. |
+| Nsight integration | Documented capture/replay CLI adapter and shared CaptureService implemented; native ngm-capture and MCP workflow use it. At 0.2.1, focused CPU checks and 54 real basic/advanced captures pass on matching 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools. Typed retained queries pass on all 54 captures using two explicit producer profiles. Actual GPU replay stalls during initialization on both releases. See NSIGHT_VALIDATION.md and INVESTIGATIONS.md. |
 | Jobs/processes | Linux process supervisor uses argv/environment arrays, deadlines, cancellation, and bounded descendant cleanup. JobCoordinator serializes state transitions and GPU reservations, validates completion identities, and retains ownership until cleanup is confirmed. See JOBS.md. |
 | Storage | ArtifactStore implements staged/atomic bundles, age/budget pruning, persistent pins, coordinated leases, and restart recovery using JSON manifests and directories. CPU checks pass; real attempts, captures, controls, and image comparisons are pinned, with capture pins verified after restart. See ARTIFACTS.md. |
 
@@ -366,9 +367,9 @@ documented Linux source-installation path; persistent Streamable HTTP follows
 later. Link vendored libraries statically and document the allowed system/runtime/
 GPU dependencies. C++20 and the initial source revisions are established by R-013;
 the process supervisor, job coordinator, and JSON-manifest artifact store are
-implemented. Basic capture/export through MCP is verified on the recorded
-2026.3.1.0 and 2026.2.0.0 setups; broader compatibility and representative
-advanced/performance retention measurements remain outstanding.
+implemented. Basic/advanced capture and typed inventory queries through MCP are
+verified on the recorded 2026.3.1.0 and 2026.2.0.0 setups; broader compatibility,
+source repair, and performance retention measurements remain outstanding.
 Run validation locally, including real GPU workflows on at least two Nsight
 releases. R-013 owns the build/toolchain choices, R-005 the fixture/windowing setup,
 R-011 process control, R-012 storage, and R-015 the exact compatibility matrix.

@@ -63,3 +63,32 @@ The checked-in fixtures are small parser inputs. They do not include proprietary
 capture data, screenshots, environment values, host/user paths, or application
 shader sources. They establish observed parsing behavior for this export shape;
 they do not establish GPU replay, a second Nsight release, or detailed inspection.
+
+## Advanced indirect inventory samples
+
+The following real exports are from the 0.2.1 workload matrix on 2026-09-18.
+Each source is complete and explicitly pinned. Workload inputs remain seed 42,
+192x128, and capture frame 2; the fixture now retains seven shader sources/SPIR-V.
+Metadata uses the same sanitization described above, additionally replacing any
+`--shader-dir` path with `/fixture/shaders`. Functions and objects are unchanged
+apart from JSON whitespace.
+
+| Prefix | Pinned source bundle |
+| --- | --- |
+| `indirect-reference-` | `bundle-865227a4400b16f08abf0287d6ab2150` |
+| `indirect-parameter-error-` | `bundle-39fec3a9565a6b250f140f4f5c482934` |
+
+| Fixture | Original raw SHA-256 |
+| --- | --- |
+| `indirect-reference-metadata.json` | `d93333451cb22cdd0095f658cfcfbe8a9036e931ea9a4cdd654463f0ea65cfd5` |
+| `indirect-reference-functions.json` | `aaf46fd9303a166305631235716345c1d452f0d3597904e398d8c89b299f9579` |
+| `indirect-reference-objects.json` | `47e27f5b239ca38570efb933c819e734a7b64b8b625d0f5a5b488d52b1117574` |
+| `indirect-parameter-error-metadata.json` | `15586dc61af386ff5badce58fd1b12ceb80131c84dabc6c634c097b577e36ba2` |
+| `indirect-parameter-error-functions.json` | `aaf46fd9303a166305631235716345c1d452f0d3597904e398d8c89b299f9579` |
+| `indirect-parameter-error-objects.json` | `47e27f5b239ca38570efb933c819e734a7b64b8b625d0f5a5b488d52b1117574` |
+
+Each functions array contains 23 records, including `vkCmdDrawIndirect` at
+event 14 and `vkCmdDraw` at event 15. The 2026.3.1 producer additionally emits
+`indirect_index: 0` on event 15; 2026.2.0 omits that member. Retain its presence
+and unsigned value without inferring parent/child links, arguments, buffer
+contents, or command expansion semantics. Both object arrays contain 34 entries.

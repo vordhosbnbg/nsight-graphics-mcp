@@ -134,6 +134,9 @@ or qualify GPU replay. A separate complete basic matrix also passes on matching
 **2026.2.0.0/build 37991608** tools, without that metadata warning. Actual GPU
 replay times out during initialization on both releases (I-007/I-011).
 [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md) records both matrices and pinned
-evidence. Typed metadata/event/object queries pass on the retained 2026.3.1.0
-pair; detailed event state, SDK capture, advanced captures, and a second typed
-producer profile remain separate validation work.
+evidence. At **0.2.1**, the capture matrix passes all nine basic/advanced workload
+pairs on both releases, totaling 54 fresh captures. Typed metadata/event/object
+queries pass on all 54 retained captures with two exact producer profiles;
+[INSPECTION.md](INSPECTION.md) records the observed version differences and gaps.
+Detailed event state, SDK capture, GPU replay, and source repair remain
+unfinished.

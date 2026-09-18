@@ -5,16 +5,19 @@ The source-build foundation, local stdio integration, and deterministic windowed
 Vulkan fixture completed the R-013/R-005/R-003 group at version 0.1.0, with CPU
 checks, a real Codex capability query, and local GPU fixture validation.
 
-The capture/evidence group completes at **0.2.0**: asynchronous jobs, managed
+The capture/evidence group completed at **0.2.0**: asynchronous jobs, managed
 artifact storage, a documented Nsight CLI adapter, and **15 MCP tools** including
-bounded metadata/event/object queries. The integrated CPU suite passes 20 checks.
-Real basic capture/export matrices pass on Nsight **2026.3.1.0** and
-**2026.2.0.0**, using matching tools and three fresh targets per release. The
-typed queries are exercised on retained 2026.3.1.0 captures; the current profile
-explicitly rejects other producers. The full application-readback fixture matrix
-passes 57 launches with synchronization validation. Advanced capture compatibility,
-detailed event state, and the diagnosis/source-repair/recapture workflow remain
-in progress. Actual GPU replay timed out on both releases. See
+bounded metadata/event/object queries. The recorded complete CPU suite passes
+20 checks; focused parser, inspection, MCP, and version checks pass at **0.2.1**.
+The current basic/advanced matrix passes **54 fresh captures** across nine
+workload pairs on matching Nsight **2026.3.1.0/build 38722833** and
+**2026.2.0.0/build 37991608** tools. Typed metadata/event/object queries pass on
+all 54 retained captures, including server restart. Other producer tuples are
+explicitly rejected until qualified. The application-readback fixture matrix
+passes 57 launches with synchronization validation. R-010's advanced fixture is
+complete; detailed event state, optional SDK control, and the
+diagnosis/source-repair/recapture workflow remain unfinished. Actual GPU replay
+timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
 [INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in
 [INVESTIGATIONS.md](docs/INVESTIGATIONS.md) for precise evidence and limits.
@@ -64,7 +67,8 @@ The build and ordinary checks need no display, GPU, Vulkan loader, or Nsight
 installation. The rendering fixture requires a Vulkan 1.3 device/driver, a system
 Vulkan loader, and an existing X11/Xwayland desktop through `DISPLAY`. The local
 GPU runs use KDE Wayland with Xwayland; this is a windowed application. Basic
-capture/export is verified on the recorded Nsight 2026.3.1.0 and 2026.2.0.0 setups; broader
+and advanced capture/export are verified on the recorded Nsight 2026.3.1.0 and
+2026.2.0.0 setups; broader
 compatibility remains under validation. The process runner requires Linux
 `/proc`, `close_range` (Linux 5.9+), and a platform with the `fork` system call;
 the currently validated architecture is x86-64.

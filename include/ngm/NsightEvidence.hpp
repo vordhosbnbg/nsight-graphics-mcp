@@ -53,6 +53,9 @@ struct NsightEvent {
     std::uint64_t thread_index = 0;
     // Opaque observed integer, not a globally unique or contiguous identity.
     std::optional<std::uint64_t> sequence_id;
+    // Observed on some indirect-workload records; no parent or argument
+    // relationship is inferred from its presence, value, or export position.
+    std::optional<std::uint64_t> indirect_index;
 };
 
 struct NsightObject {
@@ -96,7 +99,7 @@ struct NsightMetadata {
     std::optional<NsightMetadataCollection> collection;
 };
 
-// Pure parsers for observed Nsight 2026.3.1 JSON exports. These functions own no
+// Pure parsers for observed Nsight 2026.3.1/2026.2.0 JSON exports. These functions own no
 // files, artifact leases, processes, or capture identities. The caller associates
 // each result with its capture and retains the raw export/tool provenance.
 //

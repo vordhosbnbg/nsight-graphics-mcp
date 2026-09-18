@@ -736,6 +736,9 @@ void inspection_workflow_check(const std::string& server, const std::string& tar
     for(std::size_t index = 0; index < 80; ++index) {
         functions.push_back(
             {{"event_index", index * 3 + 1000}, {"function_name", std::string(8000, '"')}, {"thread_index", 0}});
+        if(index % 2 == 0) {
+            functions.back()["indirect_index"] = 0;
+        }
     }
     set_export("functions", functions.dump());
     const auto large = capture();
@@ -748,6 +751,8 @@ void inspection_workflow_check(const std::string& server, const std::string& tar
                 "MCP byte pagination stops before the row limit while preserving the total");
         for(const auto& event : page["events"]) {
             require(event["event_index"] == count * 3 + 1000, "MCP pages contain each observed event exactly once");
+            require(count % 2 == 0 ? event.at("indirect_index") == 0 : event.at("indirect_index").is_null(),
+                    "MCP preserves an observed indirect index or explicit absence without inference");
             ++count;
         }
         if(page["next_offset"].is_null()) {

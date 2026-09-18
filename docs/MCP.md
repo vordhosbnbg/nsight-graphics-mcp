@@ -3,7 +3,8 @@
 The local stdio server exposes capability discovery, asynchronous fresh-process
 capture, job status/cancellation, and bounded access to managed artifact bundles.
 Retained capture metadata and paginated event/object inventories are implemented
-for the observed Nsight 2026.3.1.0 build 38722833 Vulkan export profile. Detailed
+for the observed Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608
+Vulkan export profiles. Detailed
 pipeline/shader/resource state, event associations, profiling, and diagnosis/fix
 verification remain pending. A capture submission returns job and artifact IDs; it does not
 assert that capture or replay succeeded.
@@ -47,7 +48,7 @@ and the equivalent mechanism in
 | `artifact_prune` | Empty arguments; applies configured limits to unpinned, unused completed bundles. Returns at most 100 expired IDs/errors with total counts, `truncated`, and usage. |
 | `artifact_import` | Required absolute `source` directory outside the store; optional source-relative `required_outputs` (up to 128 paths) and `pin` (default true). Copies without following links, leaves the source unchanged, and labels provenance `caller_provided_import`. |
 | `capture_metadata` | Required `capture_id` (the capture's `artifact_id`); returns selected typed metadata, capture scope, exact producer observations, raw evidence references, and unavailable evidence categories. Missing optional metadata is null. Process environment and command line are omitted. |
-| `capture_events` | Required `capture_id`; optional `offset` (default 0, range 0–100000) and `limit` (default 50, range 1–100). Returns `events` in exported order with capture-scoped `event_index`, `function_name`, `thread_index`, and nullable opaque `sequence_id`, plus `offset`, full `total`, and `next_offset`. |
+| `capture_events` | Required `capture_id`; optional `offset` (default 0, range 0–100000) and `limit` (default 50, range 1–100). Returns `events` in exported order with capture-scoped `event_index`, `function_name`, `thread_index`, and nullable opaque `sequence_id` and `indirect_index`, plus `offset`, full `total`, and `next_offset`. |
 | `capture_objects` | Same inputs/pagination as `capture_events`; returns `objects` with capture-scoped `uid`, `api`, `object_name`, `type_name`, and opaque `access_flags`. No event associations, object definitions, or resource contents are inferred. |
 
 Strings reject NUL bytes; input byte limits are enforced in addition to the
@@ -70,10 +71,12 @@ All three inspection tools lease their bundle through loading and querying.
 They require a complete server capture with matching schema-1 manifest/report,
 successful capture and cleanup, inventoried outputs, and a successful relevant
 export. Events and objects additionally validate metadata from that same bundle
-before interpreting their unversioned arrays. The current explicit profile is
-Vulkan metadata version 1, CLI version `2026.3.1.0` / build `38722833`, and exported
-metadata version text `2026.3.1` / build `38722833`. These distinct strings are
-returned unchanged in `producer`. This preserves recorded observations; it does
+before interpreting their unversioned arrays. Both explicit profiles require
+Vulkan metadata version 1. Capture and replay must match the same complete tuple:
+CLI `2026.3.1.0` / build `38722833`, metadata `2026.3.1` / build `38722833`; or
+CLI `2026.2.0.0` / build `37991608`, metadata `2026.2.0` / build `37991608`.
+Mixed releases/builds are rejected. These distinct strings are returned unchanged
+in `producer`. This preserves recorded observations; it does
 not authenticate the producer or establish successful GPU replay execution.
 Imports cannot substitute for server captures. Unsupported producers, failed or
 missing exports, invalid schemas, and analysis limits produce explicit tool
@@ -372,9 +375,21 @@ pinned 2026.3.1.0 correct/faulty capture bundles. Each returns 22 events and
 server process opens the store without desktop variables or a usable tool PATH.
 The complete responses, source, and report are explicitly pinned in
 `bundle-e8bedf549310ff13da710678546d0a9f`. A retained 2026.2 capture returns the
-expected `unsupported_producer` error until its typed profile is qualified.
+expected `unsupported_producer` error in that historical 0.2.0 profile.
 This validates inspection of retained exports; it does not establish detailed
 event state, a rendered replay, source repair, or new Codex client coverage.
 
 Basic real capture/export passes independently on both selected Nsight releases;
 [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md) records the exact scope and evidence.
+
+At **0.2.1**, both exact producer profiles are implemented and reviewed. The
+focused MCP regression passes in **14.44 seconds**, including nullable/zero
+`indirect_index` values and byte-bounded pagination, and again in **14.10 seconds**
+after the final capability-description correction. A separate retained C++ MCP
+probe passes all three query tools on **54 basic/advanced captures**, checking
+every paginated event/object field against the corresponding raw export and
+identical metadata after restart. It uses no desktop variables and
+`PATH=/nonexistent`. Report, input expectations, probe/client sources, and complete
+transcripts are explicitly pinned as `bundle-a1af3b8bb46feebabcc66a3bd821ab80`.
+This broadens verified retained inventory coverage, without establishing detailed
+state, GPU replay execution, source repair, or a new Codex client run.
