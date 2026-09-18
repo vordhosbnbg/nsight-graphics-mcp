@@ -10,8 +10,10 @@ exact inventory profiles and selected workloads, not arbitrary Nsight releases.
 
 **R-006 completes its investigation/interface acceptance at 0.2.3. R-007 remains
 incomplete.** The demonstrated extraction paths and explicit gaps below guide
-diagnosis; source editing, rebuilding, recapturing, and fix verification still
-require implementation and validation. This document records the parser contract and observed
+diagnosis. At 0.2.4 the basic shader edit/build/recapture case passes on both
+releases; [SHADER_REPAIR.md](SHADER_REPAIR.md) records the retained evidence.
+Other defect repairs and deeper product queries still require implementation and
+validation. This document records the parser contract and observed
 exports; [MCP.md](MCP.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md) own the
 integrated tool surface and executed validation results.
 
@@ -473,11 +475,13 @@ not a claim that every detailed-state capability or R-007 is implemented.
 | Selected resource contents | Generated helper yields palette buffers, push constants, shader bytes, and indirect arguments with exact source references and temporal meaning. | Arbitrary after-event buffers/images remain unavailable from these exercised interfaces. Preserve that limit and revisit only with a documented export/helper path. |
 | Pass relationships | Generated render-pass/framebuffer/view/image links and barriers demonstrate offscreen scene → sampled postpass → presentation. | Initial attachment restoration is not post-draw output. R-007 can use final output and shader/control evidence; do not claim intermediate pixels. |
 | Bindless and indirect evidence | Combined source records descriptor-array features/layout, push ranges, indirect buffer/offset/count/stride; extracted indirect payload is (3,2,0,0). Standalone feature capture/source matrices pass too. | Bindless slot selection remains incomplete until descriptor interpretation is validated. Other defect variants need their own R-007 diagnosis/fix runs. |
-| Output comparison | Independently decoded Nsight screenshots distinguish correct/faulty output on both releases; basic references match application baselines. | Product image previews/comparison and source-fix verification remain R-007 work. File equality in the MCP capture harness is separately labelled. |
+| Output comparison | Independently decoded Nsight screenshots distinguish correct/faulty output on both releases; basic references match application baselines. | Bounded P6/BMP comparison and the basic shader fix pass at 0.2.4. Image previews and other source fixes remain R-007 work. File equality in the MCP capture harness is separately labelled. |
 | Standalone GPU replay | Bounded replay failures with confirmed cleanup are retained in I-007/I-009/I-010/I-011. Metadata export and C++ generation succeed independently. | Replay execution remains unqualified. The next repair workflow uses fresh captured outputs; revisit replay when a documented prerequisite or tool behavior changes. |
 
-**Selected next workflow:** R-007 starts with bounded image comparison and the
-basic shader-calculation defect, using the proven draw/module/SPIR-V/source link.
+**Current R-007 workflow:** Bounded image comparison and the basic
+shader-calculation repair pass at 0.2.4 using the proven draw/module/SPIR-V/source
+link; see [SHADER_REPAIR.md](SHADER_REPAIR.md). The following remains the method
+for additional defect cases.
 Use a source-isolated fixture, edit the implicated shader, rebuild, make fresh
 captures on both releases, and compare repaired output to an equivalent correct
 reference while retaining source diffs and executable/shader identities. Extend

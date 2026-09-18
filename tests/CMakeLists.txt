@@ -50,6 +50,15 @@ ngm_add_hardware_check(ngm_cpp_capture_integration SOURCES CppCaptureIntegration
         "reference" "shader-error")
 add_dependencies(ngm_cpp_capture_integration nsight-graphics-mcp ngm-vulkan-fixture)
 
+set(NGM_REPAIR_SHADER_ROOT "" CACHE PATH "Prebuilt edited shader bundle for opt-in repair validation")
+set(NGM_REPAIR_RECORD_ROOT "" CACHE PATH "Source patch and build record for opt-in repair validation")
+ngm_add_hardware_check(ngm_shader_repair_integration SOURCES ShaderRepairIntegration.cpp
+    LIBRARIES ngm_capture ngm_experiments
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>" "${NGM_FIXTURE_SHADER_OUTPUT_DIR}"
+        "${NGM_REPAIR_SHADER_ROOT}" "${NGM_REPAIR_RECORD_ROOT}" "${NGM_NSIGHT_ROOT}"
+        "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")
+add_dependencies(ngm_shader_repair_integration nsight-graphics-mcp ngm-vulkan-fixture)
+
 ngm_register_check(ngm_cli_check
     COMMAND "${CMAKE_COMMAND}"
         "-DSERVER=$<TARGET_FILE:nsight-graphics-mcp>"

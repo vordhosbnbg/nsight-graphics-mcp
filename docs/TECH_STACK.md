@@ -13,7 +13,10 @@ It uses the same pinned dependencies. [CPP_CAPTURE.md](CPP_CAPTURE.md) records
 its contract; fixed-capture generated-helper experiments remain separate from a
 generic resource-extraction API. R-006 investigation completes after 30 basic/advanced
 C++ captures and reviewed resource/shader examples on both releases. R-007 is
-the next active workflow; full visual repair remains unfinished.
+the active workflow; full visual repair remains unfinished. At 0.2.4, the seventeenth
+tool compares retained P6/BMP images. A source-isolated basic shader edit, rebuild,
+and fresh capture passes on both releases with exact reference equality;
+[SHADER_REPAIR.md](SHADER_REPAIR.md) records evidence and the remaining scope.
 
 ## Confirmed context
 
@@ -186,7 +189,7 @@ architecture.
 | MCP client | Codex CLI 0.154.0; a real 0.1.0 capability query negotiated MCP 2025-06-18. |
 | MCP transport | Local stdio for the first release; persistent Streamable HTTP later. |
 | Display | System XCB desktop dependency, Vulkan XCB surface; actual KDE Wayland/Xwayland path exercised by the fixture. |
-| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation, seven-shader provenance, and basic/advanced fixture rendering exercised. Fixed-capture generated-helper SPIR-V/GLSL correlation is demonstrated on both releases; generic product extraction and actual source repair remain unfinished. |
+| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation, seven-shader provenance, and basic/advanced fixture rendering exercised. Fixed-capture generated-helper SPIR-V/GLSL correlation is demonstrated on both releases; generic product extraction and remaining source-repair cases are unfinished; the basic shader repair passes at 0.2.4 (SHADER_REPAIR.md). |
 | Nsight integration | Documented capture/replay CLI adapter and shared CaptureService implemented; native ngm-capture and MCP workflow use it. At 0.2.1, focused CPU checks and 54 real basic/advanced captures pass on matching 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools. Typed retained queries pass on all 54 captures using two explicit producer profiles. Actual GPU replay stalls during initialization on both releases. See NSIGHT_VALIDATION.md and INVESTIGATIONS.md. |
 | Jobs/processes | Linux process supervisor uses argv/environment arrays, deadlines, cancellation, and bounded descendant cleanup. JobCoordinator serializes state transitions and GPU reservations, validates completion identities, and retains ownership until cleanup is confirmed. See JOBS.md. |
 | Storage | ArtifactStore implements staged/atomic bundles, age/budget pruning, persistent pins, coordinated leases, and restart recovery using JSON manifests and directories. CPU checks pass; real attempts, captures, controls, and image comparisons are pinned, with capture pins verified after restart. See ARTIFACTS.md. |
@@ -382,7 +385,7 @@ GPU dependencies. C++20 and the initial source revisions are established by R-01
 the process supervisor, job coordinator, and JSON-manifest artifact store are
 implemented. Basic/advanced capture and typed inventory queries through MCP are
 verified on the recorded 2026.3.1.0 and 2026.2.0.0 setups; broader compatibility,
-source repair, and performance retention measurements remain outstanding.
+remaining source-repair cases, and performance retention measurements remain outstanding.
 Run validation locally, including real GPU workflows on at least two Nsight
 releases. R-013 owns the build/toolchain choices, R-005 the fixture/windowing setup,
 R-011 process control, R-012 storage, and R-015 the exact compatibility matrix.

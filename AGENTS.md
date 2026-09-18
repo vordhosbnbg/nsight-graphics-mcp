@@ -108,9 +108,11 @@ producer restrictions, and limits; it is not a typed deep-state query or replay.
 R-006 completes its investigation/interface acceptance at 0.2.3 after 30 real
 basic/advanced C++ captures and independently reviewed selected resource/shader
 extraction on both releases. Its capability/gap/next-action matrix is in
-docs/INSPECTION.md. R-007 is the next active source-repair workflow; descriptor
-array mapping, generic deeper queries, and actual edit/build/recapture verification
-remain unfinished.
+docs/INSPECTION.md. R-007 remains active. At **0.2.4**, bounded artifact image comparison brings the
+surface to 17 tools. The basic shader source edit/build/recapture case passes on
+both releases, with exact repaired/reference RGB equality and retained pins; see
+docs/SHADER_REPAIR.md. Descriptor array mapping, generic deeper queries, previews,
+and all other visual defect repairs remain unfinished.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,

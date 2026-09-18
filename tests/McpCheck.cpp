@@ -79,12 +79,12 @@ Json query_capabilities(Client& client) {
     const auto report = result["structuredContent"];
     require(Json::parse(result["content"][0]["text"].get<std::string>()) == report, "text and structured result agree");
     require(report["server"]["version"] == ngm::project_version(), "capabilities use project version");
-    require(
-        report["implemented_tools"] ==
-            Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
-                         "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                         "artifact_prune", "artifact_import", "capture_metadata", "capture_events", "capture_objects"}),
-        "exactly the implemented tools advertised");
+    require(report["implemented_tools"] ==
+                Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
+                             "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
+                             "artifact_prune", "artifact_import", "artifact_compare_images", "capture_metadata",
+                             "capture_events", "capture_objects"}),
+            "exactly the implemented tools advertised");
     for(const auto* name : {"profiling", "fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
         require(operation["available"] == false && operation["status"] == "not_implemented",
@@ -106,7 +106,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 16, "discover exactly the implemented tools");
+    require(listing.size() == 17, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -322,12 +322,12 @@ void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
     const std::string id = "bundle-" + std::string(32, '0');
     for(const auto* name :
         {"capture", "job_status", "job_cancel", "artifact_info", "artifact_files", "artifact_read", "artifact_pin",
-         "artifact_import", "capture_metadata", "capture_events", "capture_objects"}) {
+         "artifact_import", "artifact_compare_images", "capture_metadata", "capture_events", "capture_objects"}) {
         expect_tool_error(call(client, name));
     }
     for(const auto* name : {"capture", "job_status", "job_cancel", "artifact_list", "artifact_info", "artifact_files",
                             "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune", "artifact_import",
-                            "capture_metadata", "capture_events", "capture_objects"}) {
+                            "artifact_compare_images", "capture_metadata", "capture_events", "capture_objects"}) {
         expect_tool_error(call(client, name, {{"unknown", true}}));
     }
     for(const auto& invalid : {Json(-1), Json(0), Json(101), Json(1.5), Json("10"), Json(true)}) {
@@ -670,6 +670,8 @@ void workflow_check(const std::string& server, const std::string& standin, const
 
     const auto source = scratch.path / "import-source";
     std::filesystem::create_directory(source);
+    std::ofstream(source / "reference.ppm", std::ios::binary) << "P6\n1 1\n255\n" << "abc";
+    std::ofstream(source / "candidate.ppm", std::ios::binary) << "P6\n1 1\n255\n" << "abd";
     std::ofstream(source / "note.txt") << "retained investigation evidence\n";
     std::ofstream(source / "large.txt") << std::string(65537, 'x');
     {
@@ -704,6 +706,26 @@ void workflow_check(const std::string& server, const std::string& standin, const
         call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/missing.txt"}}),
         "inventory");
 
+    const Json comparison_arguments{
+        {"reference", {{"artifact_id", imported_id}, {"path", "raw/imported/reference.ppm"}}},
+        {"candidate", {{"artifact_id", imported_id}, {"path", "raw/imported/candidate.ppm"}}}};
+    const auto comparison = successful_call(client, "artifact_compare_images", comparison_arguments);
+    require(comparison.at("matches_within_tolerance") == false && comparison.at("differing_pixels") == 1 &&
+                comparison.at("max_channel_difference") == 1 &&
+                comparison.at("reference").at("encoded_sha256") != comparison.at("candidate").at("encoded_sha256"),
+            "MCP comparison returns pixel differences and actual input identities");
+    auto tolerant = comparison_arguments;
+    tolerant["channel_tolerance"] = 1;
+    require(successful_call(client, "artifact_compare_images", tolerant).at("matches_within_tolerance") == true,
+            "MCP comparison tolerance is inclusive");
+    for(const auto& invalid : {Json(-1), Json(256), Json(1.5), Json(true)}) {
+        auto changed = comparison_arguments;
+        changed["channel_tolerance"] = invalid;
+        expect_tool_error(call(client, "artifact_compare_images", changed));
+    }
+    auto malformed = comparison_arguments;
+    malformed["candidate"]["path"] = "raw/imported/binary.bin";
+    expect_tool_error(call(client, "artifact_compare_images", malformed), "Unsupported image");
     const auto eof_record = scratch.path / "eof.pid";
     const auto eof = successful_call(client, "capture", capture_arguments(eof_record, true));
     await_record(eof_record);
@@ -717,6 +739,8 @@ void workflow_check(const std::string& server, const std::string& standin, const
         server, scratch.path,
         {"--artifact-root", root.string(), "--artifact-max-bytes", "1", "--artifact-max-age-seconds", "0"});
     initialize(restarted);
+    require(successful_call(restarted, "artifact_compare_images", comparison_arguments) == comparison,
+            "image comparison is identical after restart without Nsight or desktop");
     require(successful_call(restarted, "artifact_info", {{"artifact_id", imported_id}})["pinned"] == true,
             "import pin survives server restart");
     require(successful_call(restarted, "artifact_info", {{"artifact_id", first_id}})["pinned"] == true,
@@ -741,6 +765,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
             "quota pressure cannot delete a pinned baseline");
     expect_tool_error(
         call(restarted, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/note.txt"}}), "expired");
+    expect_tool_error(call(restarted, "artifact_compare_images", comparison_arguments), "expired");
     require(std::filesystem::is_regular_file(source / "note.txt"),
             "pruning imported evidence never changes its source");
     require(restarted.finish() == 0, "artifact-only restart shutdown");

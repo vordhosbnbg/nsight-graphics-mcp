@@ -109,7 +109,9 @@ are recorded separately in [INSPECTION.md](INSPECTION.md). Separate advanced qua
 bindless, indirect, and a combined pass-defect pair on both releases. The pinned
 matrix is `bundle-cb069965dca0cc90e2b672194195beb5`; exact scope and unrun variants
 are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). R-006's investigation is complete;
-R-007 still owns typed deeper queries, preview/comparison, and actual source repair.
+R-007 still owns typed deeper queries, previews, and the remaining source repairs.
+At 0.2.4, bounded image comparison and the basic shader repair pass on both
+releases; see [SHADER_REPAIR.md](SHADER_REPAIR.md).
 NVIDIA's [release notes](https://docs.nvidia.com/nsight-graphics/ReleaseNotes/index.html#deprecations)
 deprecate Vulkan C++ Capture and announce future removal; this backend is scoped
 to the exact tested producers, not a promise of future-release support.

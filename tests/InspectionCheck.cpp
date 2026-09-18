@@ -1,4 +1,5 @@
 #include "Check.hpp"
+#include "ngm/ImageEvidence.hpp"
 #include "ngm/Inspection.hpp"
 #include "ngm/NsightEvidence.hpp"
 
@@ -402,6 +403,57 @@ void profile_checks(const fs::path& first, const fs::path& second, const fs::pat
         }
     }
 }
+void image_checks(const fs::path& root) {
+    ngm::ArtifactOptions options;
+    options.root = root;
+    ngm::ArtifactStore store(options);
+    auto first = store.begin({{"evidence_origin", "synthetic_image"}}, {"raw/image.ppm"}, true);
+    write(first.raw_directory() / "image.ppm", std::string("P6\n1 1\n255\n") + "\1\2\3");
+    const ngm::ImageReference reference{first.id(), "raw/image.ppm"};
+    bool denied = false;
+    try {
+        (void)ngm::compare_artifact_images(store, reference, reference, 0);
+    } catch(const ngm::ArtifactError&) {
+        denied = true;
+    }
+    require(denied, "staging images cannot be compared as published evidence");
+    store.publish_success(first);
+    auto second = store.begin({{"evidence_origin", "synthetic_failed_attempt"}}, {}, true);
+    write(second.raw_directory() / "image.ppm", std::string("P6\n1 1\n255\n") + "\1\3\6");
+    write(second.raw_directory() / "invalid.bin", "not an image");
+    write(second.raw_directory() / "wide.ppm", std::string("P6\n2 1\n255\n") + "abcdef");
+    // Valid P6 dimensions, but encoded file exceeds the artifact comparison cap.
+    write(second.raw_directory() / "oversized.ppm", "P6\n2400 2400\n255\n" + std::string(2400U * 2400U * 3U, 'x'));
+    store.publish_failure(second, "synthetic capture failure");
+    const ngm::ImageReference candidate{second.id(), "raw/image.ppm"};
+    const auto report = ngm::compare_artifact_images(store, reference, candidate, 2);
+    require(report.at("differing_pixels") == 1 && report.at("max_channel_difference") == 3 &&
+                report.at("reference").at("artifact_status") == "complete" &&
+                report.at("candidate").at("artifact_status") == "failed" &&
+                report.at("evidence_origin") == "caller_selected_artifact_images",
+            "comparison reports pixels and failed-source status without implying a capture success");
+    require(report.at("reference").at("rgb_sha256") != report.at("candidate").at("rgb_sha256") &&
+                ngm::compare_artifact_images(store, reference, candidate, 3).at("matches_within_tolerance") == true,
+            "pixel identities and inclusive tolerance remain distinct");
+    const ngm::ImageReference oversized{second.id(), "raw/oversized.ppm"};
+    denied = false;
+    try {
+        (void)ngm::compare_artifact_images(store, oversized, oversized, 0);
+    } catch(const ngm::ArtifactError& error) {
+        denied = error.code() == ngm::ArtifactErrorCode::InvalidArgument &&
+                 std::string(error.what()).find("exceeds the read limit") != std::string::npos;
+    }
+    require(denied, "equal-sized valid images exceeding the encoded-byte cap fail at the artifact read limit");
+    for(const auto* path : {"raw/invalid.bin", "raw/wide.ppm", "raw/missing.ppm", "../image.ppm"}) {
+        denied = false;
+        try {
+            (void)ngm::compare_artifact_images(store, reference, {second.id(), path}, 0);
+        } catch(const std::exception&) {
+            denied = true;
+        }
+        require(denied, "invalid, mismatched, uninventoried or escaping images are rejected");
+    }
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -410,5 +462,6 @@ int main(int argc, char** argv) {
         const Scratch scratch;
         checks(argv[1], scratch.path / "store");
         profile_checks(argv[1], argv[2], scratch.path / "profiles");
+        image_checks(scratch.path / "images");
     });
 }

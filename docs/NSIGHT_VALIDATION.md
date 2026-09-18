@@ -291,6 +291,24 @@ on two releases. Basic binding-error/pipeline-error and combined-resource-error 
 combined-indirect-error variants remain **not run in this C++ matrix**; they were
 qualified separately by the earlier graphics capture/export matrix and still need
 R-007 diagnosis and repair coverage. This is representative evidence coverage for
-R-006, not completion of R-007 or R-015. No source repair or standalone GPU replay
-has been demonstrated. The fresh acceptance audit permits completing R-006 with
+R-006, not completion of R-007 or R-015. At that 0.2.3 checkpoint, source repair and standalone GPU replay
+had not been demonstrated. The fresh acceptance audit permits completing R-006 with
 its consolidated capability/gap/next-action matrix and explicit remaining limits.
+
+## Basic shader repair at 0.2.4
+
+The source-isolated basic shader repair passes on both matching releases: three
+fresh C++ captures per release, independent frame-2 application readbacks,
+7,337 faulty/reference differing pixels, and zero repaired/reference differing
+pixels at tolerance 0. The same `shader-error` scenario runs before and after
+the actual GLSL edit and glslang rebuild. Cleanup, retained source/build identities,
+pins, and comparison after restart pass. Exact commands, hashes, toolchain, and
+limits are in [SHADER_REPAIR.md](SHADER_REPAIR.md).
+
+The separately managed `artifacts/nsight-repair-evidence` store explicitly pins
+report `bundle-8c4bde6534439d155ebd27efd5d0764f` (2026.3.1.0/build 38722833) and
+`bundle-3f67d4137c5db7386090b01c934a1a0d` (2026.2.0.0/build 37991608), together
+with all six captures and six imported baselines. This advances R-007/R-015;
+other basic/advanced defect repairs, previews, deeper product queries, and
+standalone GPU replay remain unqualified. The harness verifies an externally
+prepared diagnosis/edit/build case, not a new autonomous Codex-client run.

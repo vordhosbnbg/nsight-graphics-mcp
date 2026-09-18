@@ -1,5 +1,6 @@
 #include "Workflow.hpp"
 
+#include "ngm/ImageEvidence.hpp"
 #include "ngm/Inspection.hpp"
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/Version.hpp"
@@ -326,7 +327,8 @@ void add_tool(fastmcpp::tools::ToolManager& tools, const char* name, Schema inpu
 Json implemented_tool_names() {
     return Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
                         "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                        "artifact_prune", "artifact_import", "capture_metadata", "capture_events", "capture_objects"});
+                        "artifact_prune", "artifact_import", "artifact_compare_images", "capture_metadata",
+                        "capture_events", "capture_objects"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -564,6 +566,53 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  result["text"] = text;
                  return result;
              });
+    const auto image_reference = object_schema(
+        {{"artifact_id", string_schema(39, 39)}, {"path", string_schema(512, 1)}}, {"artifact_id", "path"});
+    auto image_result = image_reference;
+    image_result["properties"]["artifact_status"] = {{"type", "string"}, {"enum", {"complete", "failed"}}};
+    image_result["properties"]["encoded_bytes"] = integer_schema(1, 16U * 1024U * 1024U);
+    image_result["properties"]["encoded_sha256"] = string_schema(64, 64);
+    image_result["properties"]["rgb_sha256"] = string_schema(64, 64);
+    for(const auto* field : {"artifact_status", "encoded_bytes", "encoded_sha256", "rgb_sha256"}) {
+        image_result["required"].push_back(field);
+    }
+    add_tool(
+        tools, "artifact_compare_images",
+        object_schema({{"reference", image_reference},
+                       {"candidate", image_reference},
+                       {"channel_tolerance", integer_schema(0, 255)}},
+                      {"reference", "candidate"}),
+        object_schema({{"evidence_origin", {{"type", "string"}, {"enum", {"caller_selected_artifact_images"}}}},
+                       {"reference", image_result},
+                       {"candidate", image_result},
+                       {"width", integer_schema(1, 4096)},
+                       {"height", integer_schema(1, 4096)},
+                       {"channel_tolerance", integer_schema(0, 255)},
+                       {"differing_pixels", integer_schema(0, 4096U * 4096U)},
+                       {"max_channel_difference", integer_schema(0, 255)},
+                       {"mean_absolute_channel_difference", {{"type", "number"}, {"minimum", 0}, {"maximum", 255}}},
+                       {"matches_within_tolerance", boolean_schema()},
+                       {"units", {{"type", "string"}, {"enum", {"RGB8_channel_steps"}}}},
+                       {"comparison_scope", string_schema(512)}},
+                      {"evidence_origin", "reference", "candidate", "width", "height", "channel_tolerance",
+                       "differing_pixels", "max_channel_difference", "mean_absolute_channel_difference",
+                       "matches_within_tolerance", "units", "comparison_scope"}),
+        "Compare two caller-selected artifact images under usage leases. P6 RGB8 or BMP 40-byte BI_RGB "
+        "24/32-bit without palette; at most 16 MiB per encoded file and 4096 pixels per dimension. "
+        "Top-down RGB8 without resizing/color conversion; BMP unused fourth byte ignored. Default inclusive "
+        "channel_tolerance 0; mismatched dimensions fail. Returns hashes and pixel/channel differences, "
+        "not proof of workload equivalence or a verified repair. Imports and readable failed bundles are allowed.",
+        true, false, [this](const Json& arguments) {
+            const auto reference_id = artifact_id(arguments.at("reference"));
+            const auto candidate_id = artifact_id(arguments.at("candidate"));
+            const auto reference_path = arguments.at("reference").at("path").get<std::string>();
+            const auto candidate_path = arguments.at("candidate").at("path").get<std::string>();
+            relative_path(reference_path);
+            relative_path(candidate_path);
+            return compare_artifact_images(service().artifacts(), {reference_id, reference_path},
+                                           {candidate_id, candidate_path},
+                                           arguments.value("channel_tolerance", std::uint8_t{0}));
+        });
     add_tool(tools, "artifact_pin",
              object_schema({{"artifact_id", string_schema(39, 39)}, {"pinned", boolean_schema()}},
                            {"artifact_id", "pinned"}),

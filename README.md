@@ -22,8 +22,12 @@ At **0.2.3**, `capture_cpp` adds generated API source and resource-file retentio
 as a separate mode, bringing the current surface to **16 tools**. Its contract
 and qualification are in [CPP_CAPTURE.md](docs/CPP_CAPTURE.md). Thirty basic and
 advanced C++ captures pass on both matching releases. R-006's inspection
-investigation is complete with explicit capability gaps. Typed deep state
-and the diagnosis/source-repair/recapture workflow remain unfinished. Actual GPU replay
+investigation is complete with explicit capability gaps. At **0.2.4**, bounded
+P6/BMP image comparison brings the surface to **17 tools**.
+The basic shader source edit/rebuild/recapture case passes on both releases with
+exact repaired/reference RGB equality; see [SHADER_REPAIR.md](docs/SHADER_REPAIR.md).
+Typed deep state and the remaining visual diagnosis/repair cases remain unfinished.
+Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
 [INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in
@@ -105,14 +109,14 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_dependency_check` | Source-built fastmcpp/JSON calls and uninitialized volk calls, with no GPU or loader initialization. |
 | `ngm_shader_check` | Valid SPIR-V 1.6 with embedded GLSL source and source-line instructions. |
 | `ngm_hash_check` | SHA-256 standard known answers for content identities. |
-| `ngm_image_check` | Bounded PPM parsing, channel comparisons, malformed images, and nonblocking FIFO rejection. |
+| `ngm_image_check` | Bounded PPM/BMP parsing, channel comparisons, malformed images, and nonblocking FIFO rejection. |
 | `ngm_process_check` | Actual executable boundary, timeout/cancellation, descendants, process ownership, and isolated logs/environment. |
 | `ngm_jobs_check` | Serialized state transitions, GPU reservations, completion identities, deadlines, cancellation, and cleanup ownership using CPU workers. |
 | `ngm_artifacts_check` | Atomic publication, persistent pins, leases, retention, quota exhaustion, imports, and restart recovery in temporary directories. |
 | `ngm_nsight_check` | CLI discovery, argument delivery, export validation, failures, and owned-process cleanup using executable Nsight stand-ins. |
 | `ngm_nsight_evidence_check` | Bounded parsing of sanitized observed metadata/event/object exports, invalid schemas, duplicate IDs/keys, and input limits. |
 | `ngm_capture_service_check` | Shared job/storage/backend workflow, retained success/failure evidence, timeout, and cancellation using executable stand-ins. |
-| `ngm_inspection_check` | Retained capture provenance, producer profiles, same-bundle metadata, pagination, and response bounds. |
+| `ngm_inspection_check` | Retained capture provenance, producer profiles, pagination, response bounds, and leased artifact image comparisons. |
 | `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |
 | `ngm_mcp_check` | Actual stdio protocol and capture/job/artifact tools through executable stand-ins, including input validation, output isolation, and shutdown. |
 | `ngm_fixture_contract_check` | Standalone option and shader-provenance validation without initializing Vulkan. |

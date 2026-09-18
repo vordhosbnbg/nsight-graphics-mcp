@@ -6,7 +6,9 @@ Retained capture metadata and paginated event/object inventories are implemented
 for the observed Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608
 Vulkan export profiles. The separate `capture_cpp` tool retains generated API
 source, metadata, and binary resource files through artifact access. Typed deep
-state/resource extraction, profiling, and diagnosis/fix verification remain pending. A capture submission returns job and artifact IDs; it does not
+state/resource extraction and profiling remain pending. At 0.2.4, the seventeenth tool,
+`artifact_compare_images`, supports the independently prepared basic shader repair
+qualified in [SHADER_REPAIR.md](SHADER_REPAIR.md); broader diagnosis/fix coverage remains pending. A capture submission returns job and artifact IDs; it does not
 assert that capture or replay succeeded.
 
 `capabilities` accepts `{}` or omitted `arguments`. It reports the product version,
@@ -19,7 +21,7 @@ reported as `prerequisites_observed` only when an artifact root, executable path
 and a desktop environment hint are present; the real connection and release
 compatibility still require validation.
 Inspection reports `retained_exports_only` when an artifact root is configured;
-each query separately validates the retained bundle and producer. Reading these
+each inventory query separately validates the retained bundle and producer. Reading these
 exports needs no current Nsight installation, desktop, or GPU execution.
 
 Every tool advertises closed input and structured output schemas. Unknown
@@ -44,6 +46,7 @@ and the equivalent mechanism in
 | `artifact_info` | Required `artifact_id`; returns retention state, bounded provenance, required outputs, file count, or an expiration explanation. |
 | `artifact_files` | Required `artifact_id`; optional `offset` (0–4096) and `limit` (default/max 100); returns inventoried relative paths/sizes with `next_offset`. |
 | `artifact_read` | Required `artifact_id` and `path`; optional `max_bytes` (default/max 65536, minimum 1). Returns a complete UTF-8 text file, or metadata and `local_path` for a larger file. NUL or malformed UTF-8 is a tool error. |
+| `artifact_compare_images` | Required `reference` and `candidate`, each containing `artifact_id` and inventoried `path`; optional integer `channel_tolerance` (0–255, default 0). Compares bounded P6/BMP RGB8 images, returning hashes, source statuses, and pixel/channel errors. Imports and readable failed artifacts are allowed; workload equivalence and repair are not inferred. See IMAGE_COMPARISON.md. |
 | `artifact_pin` | Required `artifact_id` and boolean `pinned`; persists protection across server restarts. Quarantined evidence cannot be unpinned before cleanup is confirmed. |
 | `artifact_usage` | Empty arguments; reports managed bytes, protected subsets, configured size limit, and quota exhaustion. |
 | `artifact_prune` | Empty arguments; applies configured limits to unpinned, unused completed bundles. Returns at most 100 expired IDs/errors with total counts, `truncated`, and usage. |

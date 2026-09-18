@@ -495,3 +495,42 @@ repair nor R-015 is complete. These follow-up changes are documentation/evidence
 only: no additional product code or version increment, and no CPU-suite rerun.
 Content/diff review supplements the already recorded 0.2.3 aggregate and focused
 correction checks. All hardware commands and outcomes are retained separately.
+
+## Image comparison and basic repair at 0.2.4
+
+GCC Debug adds bounded P6/BMP artifact image comparison and the opt-in
+`ngm_shader_repair_integration` harness. The full **20-check CPU aggregate**
+passes in **179.44 seconds** (`build/capture-acceptance/check-0.2.4-image-aggregate.log`).
+After hardware-target registration, the harness builds and `ngm_check_isolation_run`
+passes separately. The aggregate predates that registration and the final
+review corrections; it is not a claim that every subsequent edit reran the suite.
+
+Fresh-context review prompts a stronger encoded-byte-limit regression: an
+oversized valid image is compared against itself and must report the artifact
+read-limit error, so a dimension mismatch cannot cause a false pass. The corrected
+`ngm_inspection_check_run` passes in **23.75 seconds**, log
+`build/capture-acceptance/check-0.2.4-inspection-review.log`. Decoder checks also
+cover multi-column padded BMP rows, orientation, channel order, unused fourth
+bytes, malformed headers, truncation, and signed-height extremes.
+
+The repair harness review strengthens compiler/source/output identity checks
+and rejects a copied prebuilt reference SPIR-V. An initial GCC comparison error
+between `std::string` and JSON is corrected with explicit string extraction;
+`check-0.2.4-repair-harness-corrected-2.log` records the successful rebuild.
+This is a compiler/test correction, not a failed Nsight integration. The final
+capability wording scopes producer validation to inventory queries, since image
+comparison intentionally accepts imports and failed bundles. The rebuilt
+`ngm_mcp_check_run` passes in **16.41 seconds**, log
+`build/capture-acceptance/check-0.2.4-capability-review.log`. A further fresh-context
+implementation review finds no blocking defect.
+
+The hardware harness records six successful fresh captures across both selected
+releases, three standalone synchronization-validated application baselines per
+release, exact repaired/reference RGB equality, and successful cleanup/pin/restart
+checks. The source edit and shader compilation are separate normal development
+actions recorded alongside the harness evidence. Independent evidence review
+reproduces comparisons and checks source/SPIR-V/provenance links;
+[SHADER_REPAIR.md](SHADER_REPAIR.md) records exact commands, identities, limits,
+and explicitly pinned reports/audit in `artifacts/nsight-repair-evidence`.
+The hardware runs used the frozen server preceding the final description-only
+correction. R-007 and R-015 remain in progress for the remaining visual workflows.
