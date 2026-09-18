@@ -144,6 +144,11 @@ All nine visual defect scenarios now have verified source repairs. Generic bound
 product resource access remains unfinished; fixed-input helper experiments are
 not that API. See `docs/ADVANCED_REPAIR.md`. R-007/R-015 remain in progress.
 
+At 0.2.11, optional workers compile exact generated reader helper profiles and
+confine database parsing with Landlock/seccomp and process limits. Retained-input
+byte checks are separate from unfinished source-reference, snapshot, parent
+validation and MCP resource-query integration; see `docs/RESOURCE_WORKER.md`.
+
 Local baseline, inspected on 2026-09-17:
 
 - Nsight Graphics **2026.3.1.0**, installed under
@@ -232,6 +237,15 @@ Recheck its availability when evaluating new documented integration options.
   incompatible captures.
 
 ## Build and dependency policy
+
+- Optional generated-resource workers may compile the exact fingerprint-qualified
+  five-file ReadOnlyDatabase/DataScope helper closure supplied by a separately
+  installed Nsight C++ export. Keep these proprietary generated sources outside
+  version control, copy/hash them into an isolated build directory, and compile
+  no generated replay scripts or application code. This scoped toolchain-source
+  exception follows the optional NGFX header policy; it does not permit network
+  acquisition or replacement of pinned submodule dependencies. See
+  [docs/RESOURCE_WORKER.md](docs/RESOURCE_WORKER.md).
 
 - Track project dependency sources under `external/` as exact-commit git
   submodules, including required transitive sources. Initialize them explicitly

@@ -28,6 +28,14 @@ limits are recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
 
 ## Confirmed context
 
+- R-007's 0.2.11 resource-reader boundary selects prebuilt optional workers,
+  compiled from exact qualified five-file Nsight generated helper closures.
+  Project-owned Linux Landlock/seccomp and resource limits apply before database
+  parsing; no runtime compiler or private database decoder is introduced.
+  These optional toolchain outputs are outside the vendored submodule graph and
+  are never checked in. [RESOURCE_WORKER.md](RESOURCE_WORKER.md) records the
+  build/runtime prerequisites and incomplete service/MCP integration.
+
 - The first target is Vulkan graphics and compute on Linux with NVIDIA Nsight
   Graphics.
 - R-013 provides the build/check foundation. R-003/R-005 completed the 0.1.0 stdio

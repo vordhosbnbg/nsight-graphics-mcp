@@ -1015,3 +1015,34 @@ only if a different generated helper changes its resource-access contract.
   data limitation.
   The corrected seven workers and independent reruns passed with empty
   sanitizer diagnostics, extracting 33 source-referenced resources.
+
+### I-025 — Truncated copied databases crash the generated reader inside confinement
+
+- **Context:** Development product 0.2.11, GCC 16.2.1, exact unchanged reader
+  closures from Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608.
+  This is a deliberate corruption test of retained copies, not a failed capture
+  of an application or evidence that either release cannot read valid data.
+- **Reproduction:** `build/resource-worker-validation/validate.py` copies a
+  qualified generated database and record file, replaces only `data.bin` with
+  one byte, and requests a source-declared shader resource through the compiled
+  worker. Each `negative-*-truncated-data/attempt.argv.json` records exact inputs;
+  the C++ `RunWorker.cpp` driver uses `run_process`, empty environment, regular
+  output logs and a ten-second wall deadline.
+- **Expected/observed:** The corrupt data must not escape the worker or produce
+  accepted evidence. Both generated readers terminate with SIGSEGV (11), with
+  confirmed cleanup, no timeout, and bounded output. The wrapper cannot convert
+  every malformed database into a normal library error. CPU/file/address-space
+  limits, Landlock and seccomp were installed before reader construction/Init.
+- **Evidence/retention:** The qualification records preserve the copied malformed
+  inputs, worker identities, argv, stdout/stderr and process results. Final pinned
+  snapshot `bundle-78b10c057ee352241bb5eb276b22ff11` is pinned in
+  `artifacts/nsight-resource-worker-evidence`; BUILD_VALIDATION.md records the
+  complete qualification scope.
+  The same matrix records expected refusals for wrong sizes/offsets/handles,
+  empty/short/corrupt record files, missing/symlink data and excessive record size.
+- **Correction/revisit:** Keep all abnormal terminations as explicit extraction
+  failures. The pending service must validate the bounded response only after
+  successful exit and confirmed cleanup, and must retain failure diagnostics.
+  Do not modify or reverse-engineer the vendor format to mask this result. Revisit
+  on a changed helper profile or if a malformed-input run defeats the process
+  boundary or returns evidence that the parent incorrectly accepts.

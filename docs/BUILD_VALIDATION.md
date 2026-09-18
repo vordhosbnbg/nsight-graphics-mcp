@@ -866,3 +866,51 @@ negative preflights. The complete 2,165-file qualification snapshot is pinned as
 Post-publication payload/implementation hash and reference/pin verification passes.
 R-007/R-015 remain in progress; this does not qualify generic resource access or
 standalone GPU replay.
+
+## Resource worker boundary at 0.2.11
+
+Both optional resource workers build from the exact five-file helper closures of
+Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, using GCC 16.2.1
+Debug. Build inputs are selected from retained generated captures, copied and
+hashed in isolation; vendor helper code links statically. No new capture, GPU
+replay, system setting change or runtime compilation is involved. See
+[RESOURCE_WORKER.md](RESOURCE_WORKER.md) for the internal contract and prerequisites.
+
+The retained-input matrix covers 42 capture cases: 35 generated projects with
+94 shader resources matched against their separately retained application SPIR-V,
+plus seven prior diagnosis cases with 33 independently reviewed shader/push/indirect
+resources. Each resource passes whole-output, two-part reconstruction and end-offset
+checks. Twenty negative runs cover wrong declarations, invalid offsets/handles,
+malformed or absent data, symlink rejection and input-size bounds on both profiles.
+The C++ process driver verifies cleanup and a ten-second wall deadline for each
+invocation. I-025 records the two deliberately truncated inputs that terminate the
+vendor reader with SIGSEGV inside confinement; these are rejected extraction
+results, not successful data reads.
+
+The first complete GCC Debug CPU aggregate passes 23/23 in 187.20 seconds. The
+confinement check exercises actual enforcement on this host. Independent extended
+CPU probes additionally verify denied file-descriptor duplication, executable
+mprotect, io_uring, memfd, sendfile, directory contents and /proc contents. A
+simulated pre-Landlock header build verifies that the default confinement stub
+compiles and fails closed while explicitly requested optional workers fail
+configuration with an actionable prerequisite error. The final aggregate passes
+23/23 with no skips in 186.80 seconds after that compatibility correction. The
+rebuilt matrix passes 636 invocations, including two additional 98,304-byte
+resources checked by alternate bounded ranges and over-limit request refusals.
+Those two cases establish range consistency, not an independent image oracle.
+A fresh-context acceptance reviewer also independently passes 18 final-binary
+argument/range checks across both profiles and audits the static runtime linkage.
+
+The MCP surface remains 20 tools. This establishes the internal worker boundary;
+source-reference enumeration, protected input snapshots, strict parent response
+validation and general MCP resource access remain R-007 work.
+
+Fresh-context acceptance audits all 636 final invocations: 614 successes and
+22 expected failures, including two contained SIGSEGVs. The 602 oracle responses
+cover 127 resources from 42 distinct captures; 12 responses separately establish
+large-resource range consistency. No blocking finding remains. Qualification
+bundle `bundle-78b10c057ee352241bb5eb276b22ff11` is pinned in
+`artifacts/nsight-resource-worker-evidence`, with 2,837 payload files and 42 pinned
+source-capture references. Every inventoried payload hash, implementation hash,
+source manifest and pin verifies after publication. Runtime enforcement was
+tested on Linux 7.2.6-zen2-1-zen x86-64; no host configuration was changed.

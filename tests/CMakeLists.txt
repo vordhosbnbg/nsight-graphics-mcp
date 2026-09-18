@@ -8,6 +8,12 @@ add_executable(ngm_process_standin ProcessStandin.cpp)
 ngm_first_party(ngm_process_standin)
 ngm_add_check(ngm_process_check SOURCES ProcessCheck.cpp LIBRARIES ngm_core
     ARGS "$<TARGET_FILE:ngm_process_standin>" DEPENDS ngm_process_standin)
+add_executable(ngm_worker_confinement_probe WorkerConfinementProbe.cpp)
+target_link_libraries(ngm_worker_confinement_probe PRIVATE ngm_worker_confinement)
+ngm_first_party(ngm_worker_confinement_probe)
+ngm_add_check(ngm_worker_confinement_check SOURCES WorkerConfinementCheck.cpp LIBRARIES ngm_core
+    ARGS "$<TARGET_FILE:ngm_worker_confinement_probe>" DEPENDS ngm_worker_confinement_probe)
+set_tests_properties(ngm_worker_confinement_check PROPERTIES SKIP_RETURN_CODE 77)
 ngm_add_jobs_checks()
 ngm_add_nsight_checks()
 ngm_add_artifact_checks()

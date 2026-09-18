@@ -61,6 +61,11 @@ timed out on both releases. See
 [INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in
 [INVESTIGATIONS.md](docs/INVESTIGATIONS.md) for precise evidence and limits.
 
+At **0.2.11**, optional confined resource workers provide the underlying byte-reader
+boundary for both qualified generated-helper profiles. They remain internal
+components; general resource queries are not yet exposed through MCP. See
+[RESOURCE_WORKER.md](docs/RESOURCE_WORKER.md) for builds, limits and remaining work.
+
 ## Build on Linux
 
 Host prerequisites:
@@ -139,6 +144,7 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_hash_check` | SHA-256 standard known answers for content identities. |
 | `ngm_image_check` | Bounded PPM/BMP/PNG decoding, PNG encoding, crop/downsampling, channel comparisons, malformed images, and FIFO rejection. |
 | `ngm_process_check` | Actual executable boundary, timeout/cancellation, descendants, process ownership, and isolated logs/environment. |
+| `ngm_worker_confinement_check` | Worker-only filesystem/syscall restrictions and memory, CPU and output limits; unavailable Landlock enforcement is explicitly skipped after checking refusal. |
 | `ngm_jobs_check` | Serialized state transitions, GPU reservations, completion identities, deadlines, cancellation, and cleanup ownership using CPU workers. |
 | `ngm_artifacts_check` | Atomic publication, persistent pins, leases, retention, quota exhaustion, imports, and restart recovery in temporary directories. |
 | `ngm_nsight_check` | CLI discovery, argument delivery, export validation, failures, and owned-process cleanup using executable Nsight stand-ins. |

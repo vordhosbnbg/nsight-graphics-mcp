@@ -4,7 +4,8 @@ Initial R-013 source pins were selected and built on 2026-09-17; R-007 adds
 LodePNG at 0.2.5 on 2026-09-18. Gitlinks are authoritative;
 tags below describe the selected revisions, not moving update policies.
 All vendored sources are unmodified submodules under `external/`. The optional
-NGFX SDK is separately installed toolchain source, described below.
+NGFX SDK and generated resource-reader helpers are separately supplied toolchain
+sources, described below.
 
 | Path | Upstream/version | Exact commit | Purpose and linkage |
 | --- | --- | --- | --- |
@@ -136,3 +137,23 @@ Reproduction from the repository root:
 ```sh
 strace -f -e trace=openat -o build/linux-gcc-debug/fixture-runtime.log build/linux-gcc-debug/ngm-experiment --fixture build/linux-gcc-debug/ngm-vulkan-fixture --output-root artifacts/runtime-validation --scenario reference --seed 42 --width 192 --height 128 --frame 2
 ```
+
+## Optional generated resource-reader helpers
+
+At 0.2.11, `NGM_RESOURCE_HELPERS_2026_3` and `NGM_RESOURCE_HELPERS_2026_2` may select
+local C++ capture directories produced by the two qualified Nsight releases.
+`cmake/ResourceWorker.cmake` pins each of the five helper files by SHA-256 and
+copies only that verified closure into the build tree. Two helper translation
+units build as static libraries; no proprietary binary, generated CMake script,
+replay application, network acquisition or runtime compiler is used. The worker's
+`--profile` output retains exact compiled source hashes and producer identity.
+These generated toolchain outputs remain outside version control and outside the
+vendored submodule graph, under the scoped exception in AGENTS.md.
+
+Optional worker builds require Linux x86-64 and UAPI headers with Landlock ABI 3
+(Linux 6.2+). Default builds with older headers compile an unavailable stub;
+explicit optional-worker configuration refuses those headers. Runtime confinement
+requires Landlock ABI 3 and seccomp, with no unconfined fallback. Workers retain
+normal libc/libstdc++/libgcc/libm and loader dependencies; the generated reader
+has no Vulkan or GPU dependency. [RESOURCE_WORKER.md](RESOURCE_WORKER.md) records
+commands, limits, validation and the still-unfinished MCP integration.
