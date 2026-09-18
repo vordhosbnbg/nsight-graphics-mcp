@@ -1,10 +1,62 @@
 #include "Server.hpp"
 #include "ngm/Version.hpp"
 
+#include <charconv>
 #include <filesystem>
 #include <iostream>
-#include <optional>
+#include <limits>
+#include <set>
+#include <string>
 #include <string_view>
+
+namespace {
+std::uint64_t unsigned_option(std::string_view name, std::string_view value, std::uint64_t maximum) {
+    std::uint64_t result = 0;
+    const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+    if(parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || result > maximum) {
+        throw std::invalid_argument(std::string(name) + " requires a nonnegative integer within range");
+    }
+    return result;
+}
+
+ngm::ServerOptions parse_options(int argc, char** argv) {
+    ngm::ServerOptions options;
+    std::set<std::string_view> seen;
+    for(int index = 1; index < argc; index += 2) {
+        const std::string_view name = argv[index];
+        if(index + 1 == argc || !seen.insert(name).second) {
+            throw std::invalid_argument("Every option requires one value and may be supplied only once; use --help");
+        }
+        const std::string_view value = argv[index + 1];
+        if(name == "--nsight-root") {
+            const std::filesystem::path path(value);
+            std::error_code error;
+            if(!path.is_absolute() || !std::filesystem::is_directory(path, error) || error) {
+                throw std::invalid_argument("--nsight-root requires an existing absolute directory");
+            }
+            options.nsight_root = std::filesystem::canonical(path);
+        } else if(name == "--artifact-root") {
+            const std::filesystem::path path(value);
+            if(!path.is_absolute() || value.size() > 4096 || path.lexically_normal() == path.root_path()) {
+                throw std::invalid_argument("--artifact-root requires an absolute directory below the filesystem root");
+            }
+            options.artifacts.root = path.lexically_normal();
+        } else if(name == "--artifact-max-bytes") {
+            options.artifacts.max_bytes = unsigned_option(name, value, std::numeric_limits<std::uint64_t>::max());
+        } else if(name == "--artifact-max-age-seconds") {
+            options.artifacts.max_age = std::chrono::seconds(unsigned_option(
+                name, value, static_cast<std::uint64_t>(std::numeric_limits<std::chrono::seconds::rep>::max())));
+        } else {
+            throw std::invalid_argument("Unsupported option " + std::string(name) + "; use --help");
+        }
+    }
+    if(options.artifacts.root.empty() &&
+       (seen.contains("--artifact-max-bytes") || seen.contains("--artifact-max-age-seconds"))) {
+        throw std::invalid_argument("Artifact retention options require --artifact-root ABS_PATH");
+    }
+    return options;
+}
+} // namespace
 
 int main(int argc, char** argv) {
     if(argc == 2 && std::string_view(argv[1]) == "--version") {
@@ -12,31 +64,25 @@ int main(int argc, char** argv) {
         return 0;
     }
     if(argc == 2 && std::string_view(argv[1]) == "--help") {
-        std::cout << "Usage: nsight-graphics-mcp [--nsight-root PATH] | --version | --help\n"
+        std::cout << "Usage: nsight-graphics-mcp [OPTIONS] | --version | --help\n"
                      "Serve MCP on stdin/stdout until EOF. Diagnostics use stderr.\n"
-                     "--nsight-root selects an absolute Nsight installation directory for discovery.\n"
-                     "The capabilities tool reports prerequisites; capture and inspection are not implemented.\n";
+                     "  --nsight-root ABS_PATH           Select an existing Nsight installation.\n"
+                     "  --artifact-root ABS_PATH         Enable capture/job/artifact workflow tools.\n"
+                     "  --artifact-max-bytes N           Retention limit; default 2147483648, 0 disables.\n"
+                     "  --artifact-max-age-seconds N     Completed age limit; default 2592000, 0 disables.\n"
+                     "Artifact storage is opened lazily on a workflow call. Discovery runs no Nsight commands.\n"
+                     "Capture launches a fresh application; EOF cancels and cleans up owned jobs.\n";
         return 0;
     }
-    std::optional<std::filesystem::path> nsight_root;
-    if(argc == 3 && std::string_view(argv[1]) == "--nsight-root") {
-        std::filesystem::path path(argv[2]);
-        std::error_code error;
-        if(!path.is_absolute() || !std::filesystem::is_directory(path, error) || error) {
-            std::cerr << "nsight-graphics-mcp: --nsight-root requires an existing absolute directory.\n";
-            return 2;
-        }
-        nsight_root = std::filesystem::canonical(path, error);
-        if(error) {
-            std::cerr << "nsight-graphics-mcp: cannot resolve --nsight-root: " << error.message() << '\n';
-            return 2;
-        }
-    } else if(argc != 1) {
-        std::cerr << "nsight-graphics-mcp: unsupported arguments; use --help.\n";
+    ngm::ServerOptions options;
+    try {
+        options = parse_options(argc, argv);
+    } catch(const std::exception& error) {
+        std::cerr << "nsight-graphics-mcp: unsupported arguments: " << error.what() << '\n';
         return 2;
     }
     try {
-        return ngm::serve_stdio(nsight_root);
+        return ngm::serve_stdio(options);
     } catch(const std::exception& error) {
         std::cerr << "nsight-graphics-mcp: " << error.what() << '\n';
         return 1;

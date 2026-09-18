@@ -150,3 +150,169 @@ repair workflow is claimed by this milestone. Fixture records are application
 readback and remain local experiment directories until R-012 imports and pins
 the required baselines. Temporary review probes and CTest logs are ordinary
 development evidence, not managed capture bundles.
+
+## Capture/evidence implementation progress
+
+Date: 2026-09-18. The historical progress below used product **0.1.1**. The
+final capture/evidence acceptance record follows this history and completes
+R-012/R-011/R-001 at **0.2.0**.
+
+Subsequent focused checks pass for the new bounded export parsers
+(`ngm_nsight_evidence_check`, 0.69 seconds), hardware result classification
+(`ngm_capture_validation_check`), and optional export availability
+(`ngm_nsight_check`, 1.57 seconds). The parser and harness corrections each
+received an independent review; isolated ASan/UBSan parser probes also passed.
+These additions are separate from the historical 17-check aggregate below;
+they do not claim an aggregate run over ongoing inspection/advanced-fixture work.
+
+The checked-in opt-in `ngm_capture_integration_run` now passes its complete
+basic hardware matrix on product 0.1.1 and the same recorded 2026.3.1.0 setup:
+three fresh captures, all five export outcomes, bounded MCP evidence access,
+repeat/different PNG checks, persistent pins after restart, and clean EOF.
+Its report and transcript are pinned as
+`bundle-9e029958d57c655a53e191cef3bb580c`. See
+[CAPTURE_VALIDATION.md](CAPTURE_VALIDATION.md) for the verified command and exact
+retained baseline/captures, and investigation I-008 for the initial harness
+failure and reviewed correction. Actual GPU replay, decoded cross-origin image
+comparison, and source repair are explicitly outside that harness's checks.
+
+After the production environment correction and independent review, the shared
+GCC 16.2.1 Debug `ngm_check` run passed all **17 CPU checks** in **82.67 seconds**.
+The complete transcript is retained in ignored
+`build/capture-acceptance/check-0.1.1-xdg.log`. Focused capture-service, backend,
+and MCP checks also passed. Four checks extend the 0.1.0 suite:
+`ngm_artifacts_check`, `ngm_jobs_check`, `ngm_nsight_check`, and
+`ngm_capture_service_check`. The expanded `ngm_mcp_check` exercises the 12-tool
+stdio surface through executable Nsight stand-ins and a CPU target. The CLI and
+linkage checks also cover the native `ngm-capture` executable. These checks
+exercise real process boundaries, coordinator state/cleanup, artifact
+publication/retention, and synthetic export failures; they establish no real
+Nsight file or GPU compatibility. Component scope and focused validation records
+are in [ARTIFACTS.md](ARTIFACTS.md), [JOBS.md](JOBS.md),
+[NSIGHT_BACKEND.md](NSIGHT_BACKEND.md), and [MCP.md](MCP.md).
+
+An earlier aggregate run passed all 17 checks in 83.30 seconds. CTest's local
+cost data retained that successful run history, but a subsequent `ctest -N`
+replaced `LastTest.log`; its full transcript was not retained. The later
+82.67-second run has the separate transcript identified above. This implementation
+is qualified on the shared GCC Debug configuration only. The earlier foundation's
+Clang/Release/clean-build results and the 0.1.0 real Codex capability query remain
+separate historical evidence; no new real Codex workflow validation is claimed.
+
+The first real `ngm-capture` attempt used matching Nsight Graphics **2026.3.1.0,
+build 38722833** on RTX 3080 Ti / driver 615.71.09 / KDE Wayland through Xwayland.
+The uninstrumented fixture's standalone application-readback preflight passed.
+Under capture injection, the target reported missing `VK_KHR_surface` and exited
+3; `ngfx-capture` exited 255. No capture file or replay export was produced.
+Owned-process cleanup was confirmed and the failed attempt was published and
+pinned. Its report was subsequently retrieved through the MCP artifact tools.
+
+The pinned preflight and failed capture are respectively
+`bundle-1d1bd01e1378fc5f759d0e108b5e1aec` and
+`bundle-2681d459696671f55ed0ab2a15a7d71f` under `artifacts/nsight-evidence`.
+[I-001](INVESTIGATIONS.md#i-001--window-system-extension-unavailable-under-initial-capture-injection)
+records exact inputs, identities, reproduction, and retention. Related I-002/I-003
+controls retain the passthrough failure and successful target rendering with
+process injection disabled, despite the latter wrapper's nonzero exit. These
+application results do not establish capture support or identify the failure's
+cause. Investigation records track subsequent controls and their pinned evidence.
+
+A subsequent diagnostic `CaptureService` run with the same retained fixture
+executable and an explicit per-process
+`XDG_DATA_DIRS=/usr/local/share:/usr/share` succeeded. Pinned complete bundle
+`bundle-0863b91c8d1a178482d1cd3abebff32c` retains a 100,968-byte capture and
+successful metadata, functions, objects, logs, and screenshot exports, with
+`readable_capture: true` and confirmed cleanup. The ignored diagnostic runner
+supplied the environment override. The production service now preserves explicit
+`XDG_DATA_DIRS` and materializes `/usr/local/share:/usr/share` when unset or empty;
+the MCP configuration forwards caller-provided values. Metadata warned that
+capture version `2026.3.1` was newer than replayer `2026.3` despite matching tool
+version/build observations. Export success
+does not establish actual GPU replay or detailed inspection of the exported data.
+
+A subsequent retained C++ MCP probe, without an `XDG_DATA_DIRS` override,
+completed three captures through the production stdio server on the same
+Nsight/GPU/driver/desktop setup. Every capture produced all five exports, confirmed
+owned-process cleanup, and retained a pin across server restart:
+
+| Workload | Fresh target PID | Pinned capture bundle |
+| --- | ---: | --- |
+| Reference | 90251 | `bundle-019e2411c941dafdbfba953018451416` |
+| Reference repeat | 90471 | `bundle-55689147d2b220f4b7b72aff355e0800` |
+| Shader-error | 90601 | `bundle-3f5db7a4c55c1a3e1b6a53636b091066` |
+
+The probe sources and MCP transcript are pinned as
+`bundle-5ff26740ed6e0aa24ca466c348da8799` under `artifacts/nsight-evidence`.
+This uses a C++ MCP client, not a new Codex invocation. Decoded reference
+screenshots repeat exactly and match a standalone fixture readback at application
+frame 2; the shader-error screenshot differs on 7,337 pixels. The comparison and
+script are pinned as `bundle-01f092932bf93bbeb91abd8eb9ee45fe`.
+[I-005](INVESTIGATIONS.md#i-005--capture-frame-numbering-needs-an-observed-application-correspondence)
+records the failed frame-1 comparison, frame-2 correspondence, and exact workload
+identities. The screenshots are embedded final-present capture images. These
+measurements establish neither replay-rendered output nor a source diagnosis or
+repair.
+
+The separate documented Generate C++ Capture activity failed while connecting
+to the fixture and produced no generated source. Its logs and report are pinned
+as `bundle-cb453ee75e7a466f98fcaf75621bf3b8`; see
+[I-006](INVESTIGATIONS.md#i-006--generate-c-capture-times-out-while-connecting-to-the-fixture).
+That failed source-export probe does not invalidate the working Graphics Capture
+and metadata-export path or establish a universal capability limit.
+
+Those early probes established no actual GPU replay, detailed event state, SDK
+control, profiling, source repair/recapture, or two-release compatibility.
+
+## R-012/R-011/R-001 capture/evidence group completion
+
+The group completes on **2026-09-18** at product **0.2.0**, following independent
+component reviews, correction cycles, and a fresh acceptance audit. R-006,
+R-010, and R-015 remain in progress; this milestone is not the first complete
+visual-debugging release.
+
+Before the version-only minor increment, GCC 16.2.1 Debug **0.1.1** passed all
+**20 CPU checks** in **136.40 seconds**. Transcript:
+`build/capture-acceptance/check-0.1.1-inspection-advanced-2.log`. This includes
+the three new parser, retained-inspection, and capture-harness classification
+checks, as well as the expanded 15-tool MCP and advanced fixture contracts.
+The preceding aggregate build found two invalid string/JSON comparisons in
+the new inspection implementation. Both now use validated string extraction;
+the final aggregate and the independent reviewer's separate warnings-as-errors
+inspection check pass. The failed build is retained as
+`check-0.1.1-inspection-advanced-1.log` in the same directory.
+
+After setting the authoritative version to **0.2.0**, the focused
+`ngm_cli_check_run` passes in **0.05 seconds** and `ngm_mcp_check_run` in
+**14.39 seconds**, verifying rebuilt standalone versions and MCP identity and
+workflow behavior. `ngm-experiment` was relinked too. Transcripts:
+`build/capture-acceptance/check-0.2.0-version.log` and
+`build/capture-acceptance/check-0.2.0-mcp.log`. The earlier complete aggregate
+and hardware evidence retain their actual 0.1.1 identity; a version increment
+does not relabel existing evidence.
+
+The current implementation has these independently scoped real results:
+
+- **Basic capture/export:** three fresh MCP captures per release pass on
+  2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, with all five exports,
+  process cleanup, raw evidence access, and pins after restart. Exact baseline,
+  capture, and report bundles are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md).
+- **Retained typed queries:** `capture_metadata`, `capture_events`, and
+  `capture_objects` pass on the real 2026.3.1.0 correct/faulty pair, with 22 events
+  and 32 objects each, five-record pages, exact capture scope, bounded protocol
+  output, and stable metadata after server restart. The C++ client supplied no
+  desktop variables and set `PATH=/nonexistent`. The current profile rejects the
+  retained 2026.2 capture explicitly as `unsupported_producer`. Report, full MCP
+  transcripts, and exact probe/client sources are pinned as
+  `bundle-e8bedf549310ff13da710678546d0a9f`. This is not a new Codex invocation.
+- **Advanced application rendering:** all **57** fresh launches pass with active,
+  clean synchronization validation, deterministic repeats, and the independent
+  analytic oracle. Complete retained matrix and runs are pinned as
+  `bundle-a5e2bf5a70cfdff49bb8705afff9aba5`; see [FIXTURE.md](FIXTURE.md).
+
+The acceptance reviewer checked lifecycle/storage source and regression cases,
+the completed CPU transcript, and the real capture bundles and their inventories,
+hashes, and persistent pins. No blocking defect remained for R-012/R-011/R-001.
+Those checks do not qualify advanced captures, detailed pipeline/resource/shader
+state, SDK control, source repair, profiling, or the full two-release workflow.
+GPU replay attempts on both releases timed out during initialization, with
+confirmed cleanup and pinned evidence in I-007/I-009/I-010/I-011.

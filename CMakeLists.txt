@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(NsightGraphicsMCP VERSION 0.1.0 LANGUAGES C CXX)
+project(NsightGraphicsMCP VERSION 0.2.0 LANGUAGES C CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Only Linux builds are currently supported.")
@@ -31,6 +31,16 @@ add_library(ngm_core STATIC src/core/Version.cpp src/core/Bootstrap.cpp src/core
 target_include_directories(ngm_core PUBLIC include PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(ngm_core PUBLIC Threads::Threads)
 ngm_first_party(ngm_core)
+include(cmake/Jobs.cmake)
+ngm_add_jobs()
+include(cmake/Nsight.cmake)
+ngm_add_nsight()
+include(cmake/Artifacts.cmake)
+ngm_add_artifacts()
+include(cmake/Capture.cmake)
+ngm_add_capture()
+include(cmake/Inspection.cmake)
+ngm_add_inspection()
 
 add_executable(nsight-graphics-mcp src/server/Main.cpp)
 target_link_libraries(nsight-graphics-mcp PRIVATE ngm_core fastmcpp_core)

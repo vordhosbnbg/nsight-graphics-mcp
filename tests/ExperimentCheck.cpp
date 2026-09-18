@@ -33,10 +33,41 @@ int main(int argc, char** argv) {
                     std::filesystem::exists(first.directory / "logs/stderr.log"),
                 "separate logs retained");
         for(const auto* scenario :
-            {"malformed-result", "wrong-inputs", "missing-image", "failure", "unsupported", "inconsistent-metadata",
-             "missing-provenance", "fifo-image", "empty-metadata", "missing-driver", "tampered-shader",
-             "wrong-executable", "missing-shader-build", "malformed-shader-build", "missing-shader-manifest",
-             "contradictory-shader-manifest", "fifo-shader-manifest", "floating-shader-schema"}) {
+            {"multipass-reference", "pass-output-error", "bindless-reference", "resource-selection-error",
+             "indirect-reference", "indirect-parameter-error", "combined-reference", "combined-pass-error",
+             "combined-resource-error", "combined-indirect-error"}) {
+            options.scenario = scenario;
+            const auto result = ngm::run_experiment(options);
+            require(result.report.at("status") == "pass", "valid advanced input and feature metadata accepted");
+            require(result.report.at("result").at("provenance").at("shaders").size() == 7,
+                    "complete advanced shader bundle retained");
+        }
+        for(const auto* scenario : {"malformed-result",
+                                    "wrong-inputs",
+                                    "missing-image",
+                                    "failure",
+                                    "unsupported",
+                                    "inconsistent-metadata",
+                                    "missing-provenance",
+                                    "fifo-image",
+                                    "empty-metadata",
+                                    "missing-driver",
+                                    "tampered-shader",
+                                    "wrong-executable",
+                                    "missing-shader-build",
+                                    "malformed-shader-build",
+                                    "missing-shader-manifest",
+                                    "contradictory-shader-manifest",
+                                    "fifo-shader-manifest",
+                                    "floating-shader-schema",
+                                    "missing-workload",
+                                    "contradictory-workload",
+                                    "floating-workload-count",
+                                    "missing-device-support",
+                                    "contradictory-feature-enablement",
+                                    "combined-unsupported-feature",
+                                    "combined-unsupported-format",
+                                    "combined-unsupported-limit"}) {
             options.scenario = scenario;
             const auto result = ngm::run_experiment(options);
             const auto status = options.scenario == "unsupported" ? "unsupported" : "fail";

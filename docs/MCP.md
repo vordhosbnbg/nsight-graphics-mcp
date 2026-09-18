@@ -1,26 +1,118 @@
 # Local stdio MCP server
 
-The server exposes one read-only tool, `capabilities`, through a local stdio
-connection. It reports the project version, negotiated MCP revision, implemented
-operations, and prerequisite observations. Capture, export inspection, profiling,
-and launching the separate Vulkan fixture through MCP are not implemented.
+The local stdio server exposes capability discovery, asynchronous fresh-process
+capture, job status/cancellation, and bounded access to managed artifact bundles.
+Retained capture metadata and paginated event/object inventories are implemented
+for the observed Nsight 2026.3.1.0 build 38722833 Vulkan export profile. Detailed
+pipeline/shader/resource state, event associations, profiling, and diagnosis/fix
+verification remain pending. A capture submission returns job and artifact IDs; it does not
+assert that capture or replay succeeded.
 
-`capabilities` accepts `{}` or omitted `arguments`. Unknown object properties are
-tool input errors: the call returns a tool result with `isError: true` and text
-explaining how to correct it. Malformed call parameters, including non-object
+`capabilities` accepts `{}` or omitted `arguments`. It reports the product version,
+negotiated MCP revision, implemented tools, configured artifact limits, and
+prerequisite observations. It never creates artifact directories, opens the
+artifact store, runs Nsight, or probes the GPU. Executable paths and desktop
+variables are observations only: compatibility remains `not_verified`, the GPU
+remains `not_probed`, and unobserved versions/identities remain null. Capture is
+reported as `prerequisites_observed` only when an artifact root, executable paths,
+and a desktop environment hint are present; the real connection and release
+compatibility still require validation.
+Inspection reports `retained_exports_only` when an artifact root is configured;
+each query separately validates the retained bundle and producer. Reading these
+exports needs no current Nsight installation, desktop, or GPU execution.
+
+Every tool advertises closed input and structured output schemas. Unknown
+properties, incorrect field types, out-of-range values, unsafe paths, missing
+configuration, and operational failures return tool results with `isError: true`
+and actionable text. Malformed protocol parameters, including non-object
 `arguments`, produce JSON-RPC error `-32602`. Successful results contain both
-`structuredContent` and an equivalent JSON text block, with an advertised output
-schema. This distinction follows the MCP
-[2025-11-25 tool error contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#error-handling)
-and uses the invalid-input tool error mechanism also present in
+`structuredContent` and an equivalent JSON text block. This distinction follows
+the MCP [2025-11-25 tool error contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#error-handling)
+and the equivalent mechanism in
 [2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#error-handling).
 
-Executable discovery observes regular executable files; it does not run Nsight,
-read a tool version, probe a GPU, or validate a display connection. The report
-keeps those states `not_verified` or `not_probed` and leaves unobserved versions
-and GPU identities null. A visible `DISPLAY` or `WAYLAND_DISPLAY` environment
-variable is only a hint. The fixture's application readback is separate from
-Nsight evidence and is not exposed by this tool.
+## Workflow tools
+
+| Tool | Inputs and behavior |
+| --- | --- |
+| `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one presented frame; the fresh target must present. Returns `identity` and `artifact_id`. |
+| `job_status` | Required `job_id`; returns state, stop reason, cleanup/reservation flags, elapsed milliseconds, a bounded diagnostic error, and evidence IDs. IDs belong to this server session. |
+| `job_cancel` | Required `job_id`; requests cancellation and reports whether it was already requested or terminal. Poll status for cleanup completion. |
+| `artifact_list` | Optional `after_id` and `limit` (default 50, range 1–100); includes staging, complete, failed, and expired summaries with `next_after`. |
+| `artifact_info` | Required `artifact_id`; returns retention state, bounded provenance, required outputs, file count, or an expiration explanation. |
+| `artifact_files` | Required `artifact_id`; optional `offset` (0–4096) and `limit` (default/max 100); returns inventoried relative paths/sizes with `next_offset`. |
+| `artifact_read` | Required `artifact_id` and `path`; optional `max_bytes` (default/max 65536, minimum 1). Returns a complete UTF-8 text file, or metadata and `local_path` for a larger file. NUL or malformed UTF-8 is a tool error. |
+| `artifact_pin` | Required `artifact_id` and boolean `pinned`; persists protection across server restarts. Quarantined evidence cannot be unpinned before cleanup is confirmed. |
+| `artifact_usage` | Empty arguments; reports managed bytes, protected subsets, configured size limit, and quota exhaustion. |
+| `artifact_prune` | Empty arguments; applies configured limits to unpinned, unused completed bundles. Returns at most 100 expired IDs/errors with total counts, `truncated`, and usage. |
+| `artifact_import` | Required absolute `source` directory outside the store; optional source-relative `required_outputs` (up to 128 paths) and `pin` (default true). Copies without following links, leaves the source unchanged, and labels provenance `caller_provided_import`. |
+| `capture_metadata` | Required `capture_id` (the capture's `artifact_id`); returns selected typed metadata, capture scope, exact producer observations, raw evidence references, and unavailable evidence categories. Missing optional metadata is null. Process environment and command line are omitted. |
+| `capture_events` | Required `capture_id`; optional `offset` (default 0, range 0–100000) and `limit` (default 50, range 1–100). Returns `events` in exported order with capture-scoped `event_index`, `function_name`, `thread_index`, and nullable opaque `sequence_id`, plus `offset`, full `total`, and `next_offset`. |
+| `capture_objects` | Same inputs/pagination as `capture_events`; returns `objects` with capture-scoped `uid`, `api`, `object_name`, `type_name`, and opaque `access_flags`. No event associations, object definitions, or resource contents are inferred. |
+
+Strings reject NUL bytes; input byte limits are enforced in addition to the
+advertised schemas. Absolute application/import paths are limited to 4096 bytes;
+inventoried file paths to 512 bytes. File paths must remain below `raw/` or
+`derived/`, without absolute paths or traversal. Tools do not accept arbitrary
+caller-provenance or expected-diagnosis fields. All requests remain subject to
+the protocol line/nesting limits below. Structured results are bounded to 1 MiB;
+text evidence reads are capped at 64 KiB and do not truncate or repair evidence.
+Inventory pages also stop before their encoded structured JSON exceeds 256 KiB;
+`next_offset` advances only by the records returned, and becomes null at the end.
+Follow that offset even when fewer than `limit` records were returned. An offset
+beyond the end returns an empty terminal page with the unchanged total.
+Inspection checks the serialized structured result and escaped text fallback,
+reserving protocol overhead within 1 MiB. If one record or a metadata summary
+cannot fit, the query returns an actionable `inspection_limit` error and points
+to the retained raw export; fields are never silently truncated.
+
+All three inspection tools lease their bundle through loading and querying.
+They require a complete server capture with matching schema-1 manifest/report,
+successful capture and cleanup, inventoried outputs, and a successful relevant
+export. Events and objects additionally validate metadata from that same bundle
+before interpreting their unversioned arrays. The current explicit profile is
+Vulkan metadata version 1, CLI version `2026.3.1.0` / build `38722833`, and exported
+metadata version text `2026.3.1` / build `38722833`. These distinct strings are
+returned unchanged in `producer`. This preserves recorded observations; it does
+not authenticate the producer or establish successful GPU replay execution.
+Imports cannot substitute for server captures. Unsupported producers, failed or
+missing exports, invalid schemas, and analysis limits produce explicit tool
+errors. Raw evidence remains available separately through the artifact tools.
+See [INSPECTION.md](INSPECTION.md) for the core contract and evidence limits.
+
+Each capture uses a fresh application launch and retains stdout/stderr under its
+artifact bundle. The documented CLI backend checks matching tool versions/help,
+saves a capture, and attempts replay metadata plus optional export views. The
+retained report distinguishes each export outcome; readable capture metadata
+does not establish full event state, descriptor contents, shader inspection, or
+resource extraction. `application_output_option` appends that option and a fresh
+bundle-local output directory to the application argv. This optional convention
+labels its files as application-provided evidence, separate from Nsight exports.
+The service selects the documented present delimiter and one frame. A workload
+without presentation needs a separate documented boundary/control path, which
+this service does not implement. A timeout alone does not identify missing
+presentation as its cause; inspect the retained process logs and report.
+
+Poll until the state is terminal **and** `worker_running` and
+`finalization_pending` are both false before reading finalized evidence. Check
+`cleanup_confirmed`; a terminal result alone cannot certify process cleanup.
+Queued cancellation never launches the target. Running cancellation retains the
+GPU reservation until cleanup is confirmed. EOF requests job shutdown and waits
+for owned work to finish; the server reports failed cleanup on stderr and exits
+nonzero. Completed artifact references survive restarts; job snapshots do not.
+
+Pin investigation evidence and retained verification baselines explicitly: a
+reference alone does not protect data. Default retention is 30 days and 2 GiB;
+zero disables the corresponding limit. Protected bundles can leave the quota
+exceeded. Failed/interrupted attempts remain identifiable rather than appearing
+as complete captures. Imported investigation/baseline directories provide a way
+to bring existing evidence under the same retention policy. Import checks both
+lexical and resolved source/store containment before opening storage, so rejecting
+an overlapping source does not create a store inside that source. The artifact
+core repeats its containment and no-follow checks at import time. Job diagnostics
+are bounded to their advertised schema; inspect retained report/log files for the
+full evidence. Raw captures/images
+remain disk files; MCP image previews are not implemented in this slice.
 
 ## Build and run
 
@@ -33,9 +125,10 @@ cmake --build --preset linux-gcc-debug --target nsight-graphics-mcp ngm_mcp_chec
 ./build/linux-gcc-debug/nsight-graphics-mcp --version
 ```
 
-Without arguments, `nsight-graphics-mcp` reads line-delimited JSON-RPC from stdin
-until EOF. Stdout contains only protocol replies. Negotiation/shutdown diagnostics
-use stderr; `--version` and `--help` are separate standalone commands, never
+Without arguments, `nsight-graphics-mcp` permits discovery and reads line-delimited
+JSON-RPC from stdin until EOF. Workflow tools require an explicit artifact root;
+there is no implicit HOME-backed store. Stdout contains only protocol replies.
+Negotiation/shutdown diagnostics use stderr; `--version` and `--help` are separate standalone commands, never
 startup banners.
 
 Default discovery searches `PATH` for `ngfx`, resolves symlinks, then searches for
@@ -45,13 +138,33 @@ belong to different releases and do not establish compatibility. Select a single
 installation explicitly with an existing absolute directory:
 
 ```sh
-/absolute/path/to/nsight-graphics-mcp --nsight-root /absolute/path/to/Nsight-installation
+/absolute/path/to/nsight-graphics-mcp \
+  --nsight-root /absolute/path/to/Nsight-installation \
+  --artifact-root /absolute/path/to/managed-evidence \
+  --artifact-max-bytes 2147483648 \
+  --artifact-max-age-seconds 2592000
 ```
 
 An explicit root searches `host/linux-desktop-nomad-x64` and the root itself,
 without falling back to other `PATH` installations. A directory with missing
 executables still permits discovery and reports them as absent. An invalid root
-exits with code 2 and an actionable stderr message.
+exits with code 2 and an actionable stderr message. Artifact-root creation and
+validation are deferred to the first valid workflow call; configuring it alone
+has no storage side effects. Its path must be absolute and below the filesystem
+root. Retention values are nonnegative integers, may appear once each, and require
+`--artifact-root`. The managed store claims an exclusive lock and rejects a
+nonempty unrelated directory.
+
+A minimal capture tool call is:
+
+```json
+{"executable":"/absolute/path/to/application","arguments":["--scenario","reference"],"working_directory":"/absolute/path/to/work","capture_frame":2,"timeout_ms":120000,"pin":true}
+```
+
+Arguments must be representable by the installed documented Nsight CLI; rejected
+argument combinations are retained as a failed attempt with their reason. No
+shell command string is accepted by MCP. The backend's argument conversion and
+version-specific interface checks are documented in [NSIGHT_BACKEND.md](NSIGHT_BACKEND.md).
 
 ## Codex configuration
 
@@ -66,14 +179,21 @@ file after substituting your checkout path:
 ```toml
 [mcp_servers.nsight_graphics]
 command = "/absolute/path/to/nsight-graphics-mcp/build/linux-gcc-debug/nsight-graphics-mcp"
-env_vars = ["DISPLAY", "WAYLAND_DISPLAY"]
+args = ["--artifact-root", "/absolute/path/to/managed-evidence"]
+env_vars = ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "DBUS_SESSION_BUS_ADDRESS", "XDG_DATA_DIRS"]
 required = true
 ```
 
-If needed, select an installation with
-`args = ["--nsight-root", "/absolute/path/to/Nsight-installation"]`. Forwarding
-desktop environment variables makes their presence observable; this still does
-not verify a desktop connection. Server names, arguments, and timeouts use the
+If needed, add `"--nsight-root", "/absolute/path/to/Nsight-installation"` to
+`args`. Forwarding desktop session variables permits the capture worker to use
+the existing desktop; it still does not verify a desktop connection. Each attempt
+gets isolated HOME/XDG configuration/cache/data/state and temporary directories
+inside its managed bundle. `XDG_DATA_DIRS` preserves the caller's system data
+search path; unset/empty values use `/usr/local/share:/usr/share` before Nsight
+adds its layer location. This keeps normal Vulkan driver discovery available.
+No authentication-file contents are copied into the MCP protocol. The core
+forwards only its documented desktop session and data-search environment.
+Server names, arguments, and timeouts use the
 [official configuration fields](https://learn.chatgpt.com/docs/config-file/config-reference).
 
 The interoperability run uses CLI `-c` overrides instead of changing any
@@ -104,9 +224,11 @@ The pinned fastmcpp revision is
 construction, invocation, and result construction. Source-inspected gaps are
 handled by a small first-party adapter without modifying the vendored source:
 
-- The library's opt-in input validator ignores `additionalProperties`; the
-  `capabilities` handler explicitly requires an empty object and returns tool
-  input errors as `isError: true`, rather than the library's JSON-RPC mapping.
+- The library's opt-in input validator ignores `additionalProperties` and maps
+  its failures to protocol errors. First-party workflow validation enforces exact
+  fields, required values, types, ranges, path constraints, and byte limits before
+  performing an operation. `capabilities` separately requires an empty object.
+  Tool input failures return `isError: true`.
 - The library's `StdioServerWrapper` maps malformed JSON to an internal error
   and has no input-size limit. First-party framing returns parse error `-32700`,
   validates request envelopes and IDs, and limits each line to 65,536 bytes.
@@ -128,8 +250,9 @@ Notifications receive no response. An oversized line is drained before the next
 request; oversized or overdeep requests receive `-32600`. The server recovers
 after rejected input. A complete final JSON
 request without a newline is processed on EOF; incomplete JSON receives a parse
-error, then the server exits normally. There is no HTTP listener or background
-job lifecycle in this slice.
+error, then the server shuts down owned jobs and exits. There is no HTTP listener.
+Capture work runs through the shared job coordinator; MCP handlers submit, poll,
+cancel, and query retained evidence without running capture inline.
 
 `ngm_mcp_check` is a C++ client that starts the actual executable through
 `posix_spawn`, with isolated environment and fake installation files. It checks
@@ -140,9 +263,30 @@ valid initialize prefix (which must not change lifecycle state), 16,384 nested
 arrays, deep objects, the exact nesting boundary, and healthy requests following
 rejection. It also checks negotiation for both supported revisions and fallback
 from `2024-11-05`, `2025-03-26`, and an unknown revision. Fake files
-exercise path discovery only and are never executed. These checks do not validate
-future asynchronous jobs, cancellation, image/resource responses, or real Nsight
-capture compatibility.
+exercise path discovery only and are never executed.
+
+The same check also copies the C++ Nsight stand-in as matching discovery/capture/
+replay executables and launches a test-owned CPU application through the actual
+server/process boundary. It exercises asynchronous submission, fresh PIDs,
+serialization, queued/running cancellation, timeout and EOF cleanup, evidence
+publication, pagination, bounded text reads, binary/UTF-8 rejection, import,
+persistent pins, unpin/prune, quota exhaustion, unknown session jobs, and argument/
+CLI rejection. Discovery-only and invalid-input sessions must leave the configured
+artifact root absent. These synthetic checks do not establish real Nsight or GPU
+compatibility. New real Codex/capture validation must be recorded separately from
+the historical 0.1.0 result below.
+
+The inspection cases use synthetic observed-shape exports from the C++ stand-in
+through real MCP calls. They exercise metadata selection and omitted process
+context, event/object identities and pagination, encoded-byte page limits and
+complete traversal, metadata validation before inventories, malformed/failed
+exports, staging/failed/import rejection, and retained inspection after restart
+without tool paths. They also check that complete inspection protocol replies
+remain below 1 MiB and the raw MCP read cap remains 64 KiB. The independent
+inspection-core regression adds report/manifest provenance and producer checks,
+the same-bundle schema gate, parser/read bounds, raw-file references, and
+over-limit metadata/individual-record errors. Executed validation results belong
+in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 
 ## Initial interoperability, 2026-09-18
 
@@ -198,3 +342,39 @@ explicitly `not_implemented`. Logs are retained as
 `build/mcp-acceptance/codex-query-0.1.0.jsonl` and
 `build/mcp-acceptance/codex-query-0.1.0.stderr`. No persistent client configuration
 was changed, and this query executed no Nsight or GPU workload.
+
+## Capture/workflow CPU validation, 2026-09-18
+
+The shared GCC Debug build, using **GCC 16.2.1** and product version **0.1.1**,
+passed the expanded `ngm_mcp_check` in **6.57 seconds**. The configured focused
+entry point is `ngm_mcp_check_run`. This run used the actual stdio server,
+copied C++ Nsight stand-ins, and a test-owned CPU target in temporary directories.
+It covered the protocol regressions and capture/job/artifact workflow cases
+described above, including confirmed process cleanup and persistent pins.
+
+The check used no real Nsight installation, GPU workload, network, or Codex
+invocation. It establishes the adapter/process contracts under synthetic tool
+behavior; it does not establish release compatibility or the real visual
+capture/diagnosis workflow.
+
+## Retained inspection and capture/evidence milestone
+
+The R-012/R-011/R-001 group completes at **0.2.0**. The current surface has
+**15 tools**. The full GCC Debug aggregate passes 20 CPU checks at the
+pre-milestone 0.1.1 version; after the minor increment, the rebuilt
+`ngm_mcp_check_run` passes in 14.39 seconds at 0.2.0. It covers the retained
+inspection handlers alongside the existing capture/job/artifact tools. See
+[BUILD_VALIDATION.md](BUILD_VALIDATION.md) for exact logs and review boundaries.
+
+A separate C++ MCP client exercised all three typed queries against real,
+pinned 2026.3.1.0 correct/faulty capture bundles. Each returns 22 events and
+32 objects through five-record pages. Metadata remains identical after a fresh
+server process opens the store without desktop variables or a usable tool PATH.
+The complete responses, source, and report are explicitly pinned in
+`bundle-e8bedf549310ff13da710678546d0a9f`. A retained 2026.2 capture returns the
+expected `unsupported_producer` error until its typed profile is qualified.
+This validates inspection of retained exports; it does not establish detailed
+event state, a rendered replay, source repair, or new Codex client coverage.
+
+Basic real capture/export passes independently on both selected Nsight releases;
+[NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md) records the exact scope and evidence.

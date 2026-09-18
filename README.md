@@ -1,11 +1,23 @@
 # nsight-graphics-mcp
 
 A C++ MCP server under development for NVIDIA Nsight Graphics on Linux.
-The source-build foundation, a local stdio capability tool, and a deterministic
-windowed Vulkan fixture are implemented. Capture and Nsight evidence inspection
-remain subsequent [roadmap items](docs/ROADMAP.md). R-003/R-005 passed independent
-review/correction cycles, CPU checks, real Codex interoperability, and local GPU
-fixture validation; the R-013/R-005/R-003 group is complete at version 0.1.0.
+The source-build foundation, local stdio integration, and deterministic windowed
+Vulkan fixture completed the R-013/R-005/R-003 group at version 0.1.0, with CPU
+checks, a real Codex capability query, and local GPU fixture validation.
+
+The capture/evidence group completes at **0.2.0**: asynchronous jobs, managed
+artifact storage, a documented Nsight CLI adapter, and **15 MCP tools** including
+bounded metadata/event/object queries. The integrated CPU suite passes 20 checks.
+Real basic capture/export matrices pass on Nsight **2026.3.1.0** and
+**2026.2.0.0**, using matching tools and three fresh targets per release. The
+typed queries are exercised on retained 2026.3.1.0 captures; the current profile
+explicitly rejects other producers. The full application-readback fixture matrix
+passes 57 launches with synchronization validation. Advanced capture compatibility,
+detailed event state, and the diagnosis/source-repair/recapture workflow remain
+in progress. Actual GPU replay timed out on both releases. See
+[NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
+[INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in
+[INVESTIGATIONS.md](docs/INVESTIGATIONS.md) for precise evidence and limits.
 
 ## Build on Linux
 
@@ -31,6 +43,7 @@ cmake --build --preset linux-gcc-debug
 ctest --preset linux-gcc-debug
 build/linux-gcc-debug/nsight-graphics-mcp --version
 build/linux-gcc-debug/ngm-vulkan-fixture --version
+build/linux-gcc-debug/ngm-capture --version
 ```
 
 All dependency acquisition happens in the explicit submodule step. Configure and
@@ -50,14 +63,20 @@ measurement configuration.
 The build and ordinary checks need no display, GPU, Vulkan loader, or Nsight
 installation. The rendering fixture requires a Vulkan 1.3 device/driver, a system
 Vulkan loader, and an existing X11/Xwayland desktop through `DISPLAY`. The local
-GPU runs use KDE Wayland with Xwayland; this is a windowed application. Nsight
-capture compatibility remains unverified. The process runner requires Linux
+GPU runs use KDE Wayland with Xwayland; this is a windowed application. Basic
+capture/export is verified on the recorded Nsight 2026.3.1.0 and 2026.2.0.0 setups; broader
+compatibility remains under validation. The process runner requires Linux
 `/proc`, `close_range` (Linux 5.9+), and a platform with the `fork` system call;
 the currently validated architecture is x86-64.
 
-The server runs on stdin/stdout with one implemented `capabilities` tool. See
-[MCP.md](docs/MCP.md) for the verified Codex integration, protocol boundaries,
-and explicit distinction between discovered tools and tested capture support.
+The server runs on stdin/stdout with `capabilities`, capture submission, job
+status/cancellation, and managed-artifact tools. Workflow tools require an
+explicit `--artifact-root`. The native `ngm-capture` command uses the same
+`CaptureService` to run one attempt and report its job and retained artifact.
+See [MCP.md](docs/MCP.md) for configuration, tool contracts, and the distinction
+between the historical Codex capability query and current synthetic workflow
+checks and real C++ MCP capture validation. [NSIGHT_BACKEND.md](docs/NSIGHT_BACKEND.md)
+records adapter limits.
 
 ## Focused checks
 
@@ -77,7 +96,14 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_hash_check` | SHA-256 standard known answers for content identities. |
 | `ngm_image_check` | Bounded PPM parsing, channel comparisons, malformed images, and nonblocking FIFO rejection. |
 | `ngm_process_check` | Actual executable boundary, timeout/cancellation, descendants, process ownership, and isolated logs/environment. |
-| `ngm_mcp_check` | Real stdio protocol, initialization, capability query, invalid requests, discovery, and shutdown. |
+| `ngm_jobs_check` | Serialized state transitions, GPU reservations, completion identities, deadlines, cancellation, and cleanup ownership using CPU workers. |
+| `ngm_artifacts_check` | Atomic publication, persistent pins, leases, retention, quota exhaustion, imports, and restart recovery in temporary directories. |
+| `ngm_nsight_check` | CLI discovery, argument delivery, export validation, failures, and owned-process cleanup using executable Nsight stand-ins. |
+| `ngm_nsight_evidence_check` | Bounded parsing of sanitized observed metadata/event/object exports, invalid schemas, duplicate IDs/keys, and input limits. |
+| `ngm_capture_service_check` | Shared job/storage/backend workflow, retained success/failure evidence, timeout, and cancellation using executable stand-ins. |
+| `ngm_inspection_check` | Retained capture provenance, producer profiles, same-bundle metadata, pagination, and response bounds. |
+| `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |
+| `ngm_mcp_check` | Actual stdio protocol and capture/job/artifact tools through executable stand-ins, including input validation, output isolation, and shutdown. |
 | `ngm_fixture_contract_check` | Standalone option and shader-provenance validation without initializing Vulkan. |
 | `ngm_experiment_check` | Isolated repeated runs and retained failed/malformed results using a CPU executable stand-in. |
 | `ngm_cli_check` | Versions match CMake; standalone options and clean server EOF keep diagnostics separate. |
@@ -96,16 +122,21 @@ configurations. It is excluded from ordinary CTest and default check targets.
 ## Build boundaries
 
 `ngm_core` owns shared versioning, process execution, discovery, content hashes,
-and image parsing. `ngm_experiments` owns the isolated fixture runner. The server
-and fixture have separate entry points; later job coordination, artifact storage,
-and Nsight backend adapters build on these boundaries. Vendored warnings and flags
-stay separate from first-party C++20 targets.
+and image parsing. `ngm_experiments` owns the isolated fixture runner.
+`ngm_jobs`, `ngm_artifacts`, and `ngm_nsight` own the coordinator, managed storage,
+CLI adapter, and export parsers. `ngm_capture` composes the capture workflow as
+`CaptureService`, shared by the MCP server and `ngm-capture`. `ngm_inspection`
+queries retained capture bundles independently of the transport. The fixture
+remains a separate application. Vendored
+warnings and flags stay separate from first-party C++20 targets. Storage and job
+contracts are in [ARTIFACTS.md](docs/ARTIFACTS.md) and [JOBS.md](docs/JOBS.md).
 
 The authoritative product version is `project(... VERSION ...)` in
 [CMakeLists.txt](CMakeLists.txt), exposed through `ngm::project_version()`.
 MCP protocol, artifact schema, Nsight, and dependency versions are separate
 identifiers. Fixture results retain shader artifacts and build identities;
-Nsight capture provenance arrives with the capture backend.
+capture-attempt reports retain executable hashes, tool observations, and launch
+settings, with caller-provided application metadata labelled separately.
 
 Planning and integration limits are in [AGENTS.md](AGENTS.md),
 [TECH_STACK.md](docs/TECH_STACK.md), and [INVESTIGATIONS.md](docs/INVESTIGATIONS.md).

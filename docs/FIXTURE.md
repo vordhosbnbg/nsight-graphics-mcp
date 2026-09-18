@@ -17,9 +17,9 @@ build/linux-gcc-debug/ngm-experiment \
 
 All workload inputs are explicit. Frame selection is zero-based and the fixture
 presents frames zero through the selected frame. Dimensions are 32..4096; frames
-are 0..600; the seed is an unsigned 32-bit integer. Scenarios are `reference`,
-`shader-error`, `binding-error`, and `pipeline-error`. The runner defaults to a
-30-second process deadline; `--timeout-ms` accepts 1..600000. An optional
+are 0..600; the seed is an unsigned 32-bit integer. Basic scenarios are `reference`,
+`shader-error`, `binding-error`, and `pipeline-error`. Advanced selections are listed
+below. The runner defaults to a 30-second process deadline; `--timeout-ms` accepts 1..600000. An optional
 `--shader-dir` selects a complete, hash-verified diagnostic shader bundle.
 
 The standalone fixture accepts the same workload options, with `--output` naming
@@ -27,6 +27,54 @@ a new directory instead of the runner's `--output-root`. It can run independentl
 of both the MCP server and experiment runner. Missing display/device prerequisites
 fail explicitly. Requested API features and readback-capable UNORM swapchain
 formats are checked; the fixture does not silently render a different workload.
+
+## Advanced workloads
+
+| Workload | Correct selection | Controlled variant selections |
+| --- | --- | --- |
+| Two passes, offscreen color attachment, and post-processing | `multipass-reference` | `pass-output-error` |
+| Bindless storage-buffer resources | `bindless-reference` | `resource-selection-error` |
+| Indirect instanced draws | `indirect-reference` | `indirect-parameter-error` |
+| All three paths together | `combined-reference` | `combined-pass-error`, `combined-resource-error`, `combined-indirect-error` |
+
+The multipass path renders the scene into an `R8G8B8A8_UNORM` offscreen image,
+transitions it from color attachment to sampled-image access, and uses a second
+fullscreen pass to fetch each texel and apply a color transform. The image is
+transitioned back before the next frame. The combined path draws the bindless
+scene indirectly into that same offscreen pass before post-processing.
+
+The bindless shader declares an unsized runtime array of storage-buffer
+descriptors. Two descriptors are fully populated before submission; the fragment
+shader chooses between them using a nonuniform, bounded index. Device selection
+queries `VkPhysicalDeviceVulkan12Features`, requires and explicitly enables
+`runtimeDescriptorArray` and `shaderStorageBufferArrayNonUniformIndexing`, and
+checks the descriptor/push-constant limits. This path does not require partially
+bound, update-after-bind, or variable-descriptor-count bindings.
+
+The indirect path reads one `VkDrawIndirectCommand` from a buffer with
+`VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT`. It keeps `drawCount = 1` and
+`firstInstance = 0`, so `multiDrawIndirect` and `drawIndirectFirstInstance` are
+unnecessary. The vertex shader places each instance separately. Valid instance
+counts select the controlled variation; there is no out-of-bounds vertex or
+resource indexing. Offscreen image format features, extent, usage combination,
+and sample count are queried before creating the image. No advanced request
+falls back to the basic workload when prerequisites are unavailable.
+
+These choices follow the Khronos references for
+[descriptor-indexing features](https://docs.vulkan.org/refpages/latest/refpages/source/VkPhysicalDeviceVulkan12Features.html),
+[descriptor-array layout counts](https://docs.vulkan.org/refpages/latest/refpages/source/VkDescriptorSetLayoutBinding.html),
+and [indirect draw requirements](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdDrawIndirect.html).
+
+Each result records `workload` with the selected paths and required API features.
+`device_support` retains queried features, relevant limits, and explicit reasons
+for rejected candidate devices; successful runs also record the features enabled
+at device creation. A missing display is rejected before any device claims are
+made. Basic scenarios require no optional descriptor-indexing features.
+
+Advanced source implementation and harness coverage are present; local compilation,
+independent review, GPU validation, and Nsight capture compatibility must be
+recorded separately before R-010 is considered complete. The historical validation
+records below apply to the four basic scenarios only.
 
 ## What a run retains
 
@@ -38,6 +86,10 @@ Each runner invocation creates a unique `run-*` directory containing:
 - `logs/stdout.log` and `logs/stderr.log`, separated from the runner's output.
 - `output/image.ppm`, the selected pre-presentation RGB8 readback, and `result.json`.
 - `output/shaders/`, with retained GLSL source, SPIR-V, and shader-bundle provenance.
+  The complete inventory is `scene.vert`, `scene.frag`, `shader-error.frag`,
+  `indirect.vert`, `bindless.frag`, `post.vert`, and `post.frag`, each with its SPIR-V.
+  Overrides must include and hash all seven sources/binaries, even for a basic run;
+  an older three-shader bundle is explicitly rejected.
 - `report.json`, with explicit outcome, inputs, environment, executable/shader
   identities, GPU/driver/UUID, desktop backend, timing, and owned-process cleanup.
 
@@ -64,13 +116,26 @@ and explicitly pinned by that store.
 cmake --build --preset linux-gcc-debug --target ngm_fixture_integration_run
 ```
 
-This target runs each scenario twice at 192x128/seed 42/frame 2 and
-257x193/seed 2271560481/frame 5. Repeats must be byte-identical. A separate CPU
-mathematical oracle compares triangle interpolation, palette selection, and
-write-mask behavior with a tolerance of one RGB8 channel step. Pixels within
-the declared narrow triangle-edge band are excluded from the analytic check;
-the complete images still participate in exact repeat comparisons. Every faulty
-scenario must visibly differ from its corresponding correct reference.
+This existing target keeps its basic-suite behavior: four scenarios twice at
+192x128/seed 42/frame 2 and 257x193/seed 2271560481/frame 5, plus the shader-bundle
+override check. The same hardware harness accepts `--suite basic|advanced|all`;
+`basic` is the default. `advanced` selects ten advanced scenarios at the same two
+input tuples with two fresh launches each (40 launches), and `all` covers all
+fourteen plus the override (57 launches). `--validation` remains independent of
+the suite selection. The full `--validation --suite all` invocation is now
+validated separately from the historical basic matrix below.
+
+Repeats must be byte-identical across the complete image. A separate CPU
+mathematical oracle compares triangle interpolation, resource selection,
+instance placement, write-mask behavior, intermediate UNORM quantization, and the
+post-process transform. It allows one RGB8 channel step for a single pass and two
+steps for multipass output, accounting for both UNORM conversions. Pixels within
+a barycentric distance of `2 / min(width, height)` of a rendered triangle edge are
+excluded from the analytic check; all pixels still participate in exact repeat
+comparisons. Each faulty scenario must differ from its own equivalent correct
+reference on more than one tenth of all pixels using a one-step difference
+threshold. Unsupported advanced requirements are reported as `unsupported` and
+cannot make the matrix pass.
 
 The private expectations are documented in [tests/SCENARIOS.md](../tests/SCENARIOS.md)
 and implemented only in `tests/FixtureIntegration.cpp`. They are never returned
@@ -119,6 +184,30 @@ requires the retained shader manifest to agree with inline metadata after the
 The final `ngm_check` run passes all 13 CPU checks, including the additional
 integer-schema regression added after this GPU matrix. Those checks validate
 failure handling without claiming Nsight compatibility.
+
+Advanced validation at product **0.1.1**, on the same recorded configuration,
+passes all 28 scenario/input pairs twice plus the shader override: **57 fresh
+launches**, with synchronization validation active and clean. Repeated images
+are identical; the independent oracle passes within one RGB8 step for a single
+pass and two for multipass; controlled faults exceed the declared 10% threshold.
+The exact invocation was:
+
+```sh
+build/linux-gcc-debug/tests/ngm_fixture_integration \
+  "$PWD/build/linux-gcc-debug/ngm-vulkan-fixture" \
+  "$PWD/artifacts/fixture-validation" --validation --suite all
+```
+
+Summary: `artifacts/fixture-validation/summaries/matrix-1789691021831101042.json`.
+The complete matrix, all 57 run directories, and harness log are explicitly
+pinned in managed bundle `bundle-a5e2bf5a70cfdff49bb8705afff9aba5`.
+Its `raw/imported/relocation.json` maps original run paths to retained copies;
+`raw/imported/matrix.json` preserves the original report. The snapshot is
+**application-readback** evidence. It does not establish Nsight compatibility.
+Fresh-context source review found no actionable defect in feature enablement,
+resource/descriptor/indirect bounds, offscreen synchronization, or the analytic
+oracles. The new fixture-contract and experiment checks and full 20-check CPU
+aggregate pass. R-010 remains open for advanced capture compatibility/gap records.
 
 The desktop dependencies are documented in [DEPENDENCIES.md](DEPENDENCIES.md).
 The [Khronos XCB surface reference](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_xcb_surface.html)

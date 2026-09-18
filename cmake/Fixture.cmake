@@ -38,7 +38,7 @@ function(ngm_configure_fixture target)
     add_dependencies(${target} ngm_fixture_identity)
 
     set(outputs)
-    foreach(name IN ITEMS scene.vert scene.frag shader-error.frag)
+    foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag)
         set(source "${PROJECT_SOURCE_DIR}/shaders/fixture/${name}")
         set(spirv "${shader_dir}/${name}.spv")
         ngm_compile_shader("${source}" "${spirv}")

@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Workflow.hpp"
 
 #include "ngm/Capabilities.hpp"
 #include "ngm/Version.hpp"
@@ -6,6 +7,7 @@
 #include <fastmcpp/mcp/handler.hpp>
 #include <fastmcpp/tools/manager.hpp>
 
+#include <algorithm>
 #include <csignal>
 #include <functional>
 #include <iostream>
@@ -27,8 +29,8 @@ bool limit_json_nesting(int depth, Json::parse_event_t event, Json&) {
     return true;
 }
 
-Json capability_report(const std::optional<std::filesystem::path>& root, const std::string& protocol_version) {
-    const auto observations = discover_prerequisites(root);
+Json capability_report(const ServerOptions& options, const std::string& protocol_version) {
+    const auto observations = discover_prerequisites(options.nsight_root);
     Json executables = Json::array();
     for(const auto& executable : observations.executables) {
         executables.push_back({{"name", executable.name},
@@ -38,27 +40,58 @@ Json capability_report(const std::optional<std::filesystem::path>& root, const s
     const auto unavailable = [](const char* reason) {
         return Json{{"available", false}, {"status", "not_implemented"}, {"reason", reason}};
     };
+    const bool storage = !options.artifacts.root.empty();
+    const bool tool_paths = std::all_of(observations.executables.begin(), observations.executables.end(),
+                                        [](const auto& item) { return item.path.has_value(); });
+    const bool desktop = observations.display_present || observations.wayland_display_present;
+    const bool capture_ready = storage && tool_paths && desktop;
+    const Json capture{{"available", capture_ready},
+                       {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
+                       {"reason",
+                        "Implemented asynchronous fresh-process capture. Requires --artifact-root, matching "
+                        "Nsight tools, a working desktop, and a compatible GPU/driver. Paths/environment "
+                        "only establish observable prerequisites; each job checks tools and retains results. "
+                        "Captures one presented frame and requires presentation; other boundary paths are pending."}};
+    const Json store{{"available", storage},
+                     {"status", storage ? "configured" : "missing_prerequisites"},
+                     {"reason", storage ? "Implemented; storage is opened lazily by a workflow call. "
+                                          "The configured path has not been validated by this query."
+                                        : "Launch with --artifact-root ABS_PATH to enable workflow tools."}};
     return {
         {"server",
          {{"name", "nsight-graphics-mcp"},
           {"version", project_version()},
           {"transport", "stdio"},
           {"protocol_version", protocol_version}}},
-        {"implemented_tools", {"capabilities"}},
+        {"implemented_tools", implemented_tool_names()},
         {"operations",
-         {{"capture", unavailable("Capture jobs, owned application launches, and artifact storage are pending.")},
-          {"inspection", unavailable("No Nsight capture exports or event/resource queries are integrated.")},
+         {{"capture", capture},
+          {"jobs", store},
+          {"artifacts", store},
+          {"inspection",
+           {{"available", storage},
+            {"status", storage ? "retained_exports_only" : "missing_prerequisites"},
+            {"reason", "Implemented bounded metadata/event/object inventories for complete retained server captures "
+                       "from observed Nsight 2026.3.1.0 build 38722833 Vulkan exports. Requires --artifact-root; "
+                       "each query validates its bundle and producer. Detailed pipeline/shader/resource state "
+                       "and event associations remain unavailable from these exports."}}},
           {"profiling", unavailable("GPU profiling and metric extraction are pending.")},
-          {"fixture_via_mcp", unavailable("Run and validate the separate Vulkan fixture with development tools.")}}},
+          {"fixture_via_mcp",
+           unavailable("No fixture-specific tool; the generic capture tool accepts its absolute executable path.")}}},
         {"prerequisites",
          {{"platform", "linux"},
+          {"artifact_store",
+           {{"configured", storage},
+            {"root", storage ? Json(options.artifacts.root.string()) : Json(nullptr)},
+            {"max_bytes", options.artifacts.max_bytes},
+            {"max_age_seconds", options.artifacts.max_age.count()}}},
           {"nsight",
            {{"discovery_source", observations.discovery_source},
             {"root_override", observations.nsight_root ? Json(observations.nsight_root->string()) : Json(nullptr)},
             {"executables", executables},
             {"version", nullptr},
             {"compatibility", "not_verified"},
-            {"note", "Paths are executable-file observations only; no Nsight command or capture was run. "
+            {"note", "Paths are executable-file observations only; this query runs no Nsight command or capture. "
                      "PATH entries may belong to different releases; select --nsight-root for one installation."}}},
           {"desktop",
            {{"display_environment_present", observations.display_present},
@@ -66,12 +99,13 @@ Json capability_report(const std::optional<std::filesystem::path>& root, const s
             {"connection", "not_verified"}}},
           {"gpu", {{"status", "not_probed"}, {"name", nullptr}, {"driver", nullptr}}}}},
         {"next_step", "Use --nsight-root with an existing absolute installation directory if tool paths are "
-                      "missing. Validate the windowed fixture separately. MCP capture and inspection require "
-                      "their pending implementation and real GPU/Nsight validation."}};
+                      "missing. Configure --artifact-root, submit capture with absolute application paths, then poll "
+                      "job_status and inspect retained artifact files. Detailed state queries, diagnosis, and real "
+                      "release compatibility require separately recorded validation."}};
 }
 
 Json output_schema() {
-    return Json::parse(R"json({
+    auto schema = Json::parse(R"json({
         "type": "object",
         "additionalProperties": false,
         "required": ["server", "implemented_tools", "operations", "prerequisites", "next_step"],
@@ -153,6 +187,21 @@ Json output_schema() {
             }
         }}
     })json");
+    for(const auto* operation : {"jobs", "artifacts"}) {
+        schema["properties"]["operations"]["required"].push_back(operation);
+        schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
+    }
+    schema["properties"]["prerequisites"]["required"].push_back("artifact_store");
+    schema["properties"]["prerequisites"]["properties"]["artifact_store"] = {
+        {"type", "object"},
+        {"additionalProperties", false},
+        {"required", {"configured", "root", "max_bytes", "max_age_seconds"}},
+        {"properties",
+         {{"configured", {{"type", "boolean"}}},
+          {"root", {{"type", {"string", "null"}}}},
+          {"max_bytes", {{"type", "integer"}, {"minimum", 0}}},
+          {"max_age_seconds", {{"type", "integer"}, {"minimum", 0}}}}}};
+    return schema;
 }
 
 Json rpc_error(const Json& request, int code, const char* message) {
@@ -302,12 +351,13 @@ int run_stdio(const std::function<Json(const Json&)>& handler, std::string& prot
 }
 } // namespace
 
-int serve_stdio(const std::optional<std::filesystem::path>& nsight_root) {
+int serve_stdio(const ServerOptions& options) {
     std::string protocol_version;
+    WorkflowTools workflow(options);
     fastmcpp::tools::ToolManager tools;
     fastmcpp::tools::Tool capabilities(
         "capabilities", {{"type", "object"}, {"properties", Json::object()}, {"additionalProperties", false}},
-        output_schema(), [nsight_root, &protocol_version](const Json& arguments) {
+        output_schema(), [&options, &protocol_version](const Json& arguments) {
             // The pinned validator checks types/required fields, but ignores
             // additionalProperties. Enforce the exact public contract ourselves.
             if(!arguments.is_object() || !arguments.empty()) {
@@ -318,18 +368,27 @@ int serve_stdio(const std::optional<std::filesystem::path>& nsight_root) {
                                                       {"text", "capabilities accepts only an empty object (no "
                                                                "arguments). Remove all argument properties."}}})}};
             }
-            return capability_report(nsight_root, protocol_version);
+            return capability_report(options, protocol_version);
         });
     capabilities.set_description("Report implemented MCP operations and local prerequisite observations. "
                                  "Does not launch applications or verify Nsight/GPU compatibility.");
     capabilities.set_validate_args(true);
     capabilities.set_annotations({{"readOnlyHint", true}, {"destructiveHint", false}, {"openWorldHint", false}});
     tools.register_tool(capabilities);
+    workflow.register_tools(tools);
     const auto handler = fastmcpp::mcp::make_mcp_handler(
         "nsight-graphics-mcp", std::string(project_version()), tools, {}, {},
         "Call capabilities to discover implemented operations and prerequisite observations. "
-        "Capture, inspection, profiling, and launching the fixture through MCP are not implemented. "
-        "Found executable paths are not evidence of Nsight or GPU compatibility.");
-    return run_stdio(handler, protocol_version);
+        "Capture requires --artifact-root and starts a fresh application for each asynchronous job. Poll job_status "
+        "and use artifact tools to inspect bounded retained evidence; explicitly pin important baselines. "
+        "Use capture_metadata/capture_events/capture_objects for supported retained export inventories. "
+        "Found executable paths are not evidence of Nsight or GPU compatibility. Detailed pipeline/shader/resource "
+        "state and event associations are unavailable from these exports; profiling is not implemented.");
+    const auto result = run_stdio(handler, protocol_version);
+    if(!workflow.shutdown()) {
+        std::cerr << "nsight-graphics-mcp: job shutdown did not confirm all owned-process cleanup\n";
+        return 1;
+    }
+    return result;
 }
 } // namespace ngm

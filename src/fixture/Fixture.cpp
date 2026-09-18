@@ -30,7 +30,68 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 4> scenarios{"reference", "shader-error", "binding-error", "pipeline-error"};
+constexpr std::array<std::string_view, 14> scenarios{"reference",
+                                                     "shader-error",
+                                                     "binding-error",
+                                                     "pipeline-error",
+                                                     "multipass-reference",
+                                                     "pass-output-error",
+                                                     "bindless-reference",
+                                                     "resource-selection-error",
+                                                     "indirect-reference",
+                                                     "indirect-parameter-error",
+                                                     "combined-reference",
+                                                     "combined-pass-error",
+                                                     "combined-resource-error",
+                                                     "combined-indirect-error"};
+constexpr std::array<std::string_view, 7> shader_sources{
+    "scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag"};
+
+struct Workload {
+    bool multipass = false;
+    bool bindless = false;
+    bool indirect = false;
+    std::uint32_t channel_order = 0;
+    std::uint32_t resource_xor = 0;
+    std::uint32_t instance_count = 1;
+};
+
+Workload workload(std::string_view scenario) {
+    const bool combined = scenario.starts_with("combined-");
+    Workload result;
+    result.multipass = combined || scenario == "multipass-reference" || scenario == "pass-output-error";
+    result.bindless = combined || scenario == "bindless-reference" || scenario == "resource-selection-error";
+    result.indirect = combined || scenario == "indirect-reference" || scenario == "indirect-parameter-error";
+    result.channel_order = scenario == "pass-output-error" || scenario == "combined-pass-error" ? 1u : 0u;
+    result.resource_xor = scenario == "resource-selection-error" || scenario == "combined-resource-error" ? 1u : 0u;
+    result.instance_count =
+        result.indirect && scenario != "indirect-parameter-error" && scenario != "combined-indirect-error" ? 2u : 1u;
+    return result;
+}
+
+Json workload_metadata(std::string_view scenario) {
+    const auto selected = workload(scenario);
+    Json required = Json::array();
+    if(selected.bindless) {
+        required.push_back("runtimeDescriptorArray");
+        required.push_back("shaderStorageBufferArrayNonUniformIndexing");
+    }
+    return {
+        {"offscreen_render_target", selected.multipass},
+        {"post_processing", selected.multipass},
+        {"bindless_storage_buffers", selected.bindless},
+        {"indirect_draw", selected.indirect},
+        {"render_pass_count", selected.multipass ? 2 : 1},
+        {"minimum_api_version", "1.3.0"},
+        {"required_device_extensions", {"VK_KHR_swapchain"}},
+        {"required_api_features", required},
+        {"offscreen_format", selected.multipass ? Json("R8G8B8A8_UNORM") : Json(nullptr)},
+        {"offscreen_format_features", selected.multipass ? Json({"COLOR_ATTACHMENT", "SAMPLED_IMAGE"}) : Json::array()},
+        {"descriptor_array_count", selected.bindless ? 2 : 0},
+        {"indirect_command", selected.indirect ? Json("vkCmdDrawIndirect") : Json(nullptr)},
+        {"indirect_draw_count", selected.indirect ? 1 : 0},
+        {"indirect_first_instance", 0}};
+}
 
 template <typename T>
 T vk_struct(VkStructureType type) {
@@ -171,8 +232,9 @@ Json retain_shaders(const Options& options) {
         const auto stage = shader.at("stage").get<std::string>();
         const auto source = checked_filename(shader, "source");
         const auto spirv = checked_filename(shader, "spirv");
-        const bool vertex = source == "scene.vert";
-        const bool fragment = source == "scene.frag" || source == "shader-error.frag";
+        const bool recognized = std::find(shader_sources.begin(), shader_sources.end(), source) != shader_sources.end();
+        const bool vertex = recognized && std::string_view(source).ends_with(".vert");
+        const bool fragment = recognized && std::string_view(source).ends_with(".frag");
         if((!vertex && !fragment) || spirv != source + ".spv" || stage != (vertex ? "vertex" : "fragment")) {
             throw std::runtime_error(
                 "unexpected shader filename, stage, or source/SPIR-V pairing in fixture provenance");
@@ -196,10 +258,11 @@ Json retain_shaders(const Options& options) {
             }
         }
     }
-    for(const auto* required : {"scene.vert", "scene.vert.spv", "scene.frag", "scene.frag.spv", "shader-error.frag",
-                                "shader-error.frag.spv"}) {
-        if(!filenames.contains(required)) {
-            throw std::runtime_error(std::string("shader provenance is missing required artifact ") + required);
+    for(const auto source : shader_sources) {
+        for(const auto& required : {std::string(source), std::string(source) + ".spv"}) {
+            if(!filenames.contains(required)) {
+                throw std::runtime_error("shader provenance is missing required artifact " + required);
+            }
         }
     }
     write_json(retained / "provenance.json", manifest);
@@ -216,7 +279,7 @@ struct Buffer {
 
 class Renderer {
 public:
-    explicit Renderer(const Options& options) : options_(options) {}
+    explicit Renderer(const Options& options) : options_(options), workload_(workload(options.scenario)) {}
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
     ~Renderer() {
@@ -230,6 +293,9 @@ public:
         create_device();
         create_swapchain();
         create_render_pass();
+        if(workload_.multipass) {
+            create_offscreen();
+        }
         create_buffers_and_descriptors();
         create_pipeline();
         create_commands();
@@ -249,6 +315,10 @@ public:
                 {"driver_uuid", uuid_string(ids_.driverUUID)}};
     }
 
+    const Json& device_support() const {
+        return device_support_;
+    }
+
     Json rendering_metadata() const {
         Json metadata{
             {"requested_api_version", "1.3.0"},
@@ -261,11 +331,19 @@ public:
             {"present_queue_family", present_family_},
             {"rendered_frames", options_.frame + 1},
             {"shader_configuration", "diagnostic"},
-            {"selected_shader_artifacts",
-             {"shaders/scene.vert.spv",
-              options_.scenario == "shader-error" ? "shaders/shader-error.frag.spv" : "shaders/scene.frag.spv"}},
             {"readback_before_presentation", true},
             {"presentation_completion", maintenance_extension_.empty() ? "device_wait_idle" : maintenance_extension_}};
+        metadata["selected_shader_artifacts"] = {
+            workload_.indirect ? "shaders/indirect.vert.spv" : "shaders/scene.vert.spv",
+            workload_.bindless
+                ? "shaders/bindless.frag.spv"
+                : (options_.scenario == "shader-error" ? "shaders/shader-error.frag.spv" : "shaders/scene.frag.spv")};
+        if(workload_.multipass) {
+            metadata["selected_shader_artifacts"].push_back("shaders/post.vert.spv");
+            metadata["selected_shader_artifacts"].push_back("shaders/post.frag.spv");
+        }
+        metadata["enabled_api_features"] = {{"runtimeDescriptorArray", workload_.bindless},
+                                            {"shaderStorageBufferArrayNonUniformIndexing", workload_.bindless}};
         if(maintenance_extension_.empty()) {
             metadata["presentation_teardown_limit"] = "Without swapchain_maintenance1, device idle does not formally "
                                                       "prove completion of presentation-engine access";
@@ -486,7 +564,67 @@ private:
         for(const auto candidate : devices) {
             VkPhysicalDeviceProperties properties{};
             vkGetPhysicalDeviceProperties(candidate, &properties);
+            Json evaluation{{"name", properties.deviceName},
+                            {"api_version", api_version(properties.apiVersion)},
+                            {"status", "rejected"},
+                            {"missing_requirements", Json::array()}};
             if(properties.apiVersion < VK_API_VERSION_1_3) {
+                evaluation["missing_requirements"].push_back("Vulkan 1.3");
+                device_support_.push_back(evaluation);
+                continue;
+            }
+            auto indexing =
+                vk_struct<VkPhysicalDeviceVulkan12Features>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES);
+            auto features = vk_struct<VkPhysicalDeviceFeatures2>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2);
+            features.pNext = &indexing;
+            vkGetPhysicalDeviceFeatures2(candidate, &features);
+            evaluation["queried_api_features"] = {
+                {"runtimeDescriptorArray", indexing.runtimeDescriptorArray == VK_TRUE},
+                {"shaderStorageBufferArrayNonUniformIndexing",
+                 indexing.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE}};
+            evaluation["limits"] = {
+                {"maxPerStageDescriptorStorageBuffers", properties.limits.maxPerStageDescriptorStorageBuffers},
+                {"maxDescriptorSetStorageBuffers", properties.limits.maxDescriptorSetStorageBuffers},
+                {"maxDrawIndirectCount", properties.limits.maxDrawIndirectCount},
+                {"maxPushConstantsSize", properties.limits.maxPushConstantsSize}};
+            if(workload_.bindless) {
+                if(!indexing.runtimeDescriptorArray) {
+                    evaluation["missing_requirements"].push_back("runtimeDescriptorArray");
+                }
+                if(!indexing.shaderStorageBufferArrayNonUniformIndexing) {
+                    evaluation["missing_requirements"].push_back("shaderStorageBufferArrayNonUniformIndexing");
+                }
+                if(properties.limits.maxPerStageDescriptorStorageBuffers < 2 ||
+                   properties.limits.maxDescriptorSetStorageBuffers < 2 || properties.limits.maxPushConstantsSize < 8) {
+                    evaluation["missing_requirements"].push_back(
+                        "two storage-buffer descriptors and eight push-constant bytes");
+                }
+            }
+            if(workload_.indirect && properties.limits.maxDrawIndirectCount < 1) {
+                evaluation["missing_requirements"].push_back("one indirect draw command");
+            }
+            if(workload_.multipass) {
+                VkFormatProperties format_properties{};
+                vkGetPhysicalDeviceFormatProperties(candidate, VK_FORMAT_R8G8B8A8_UNORM, &format_properties);
+                constexpr auto required_format =
+                    VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+                VkImageFormatProperties image_properties{};
+                const auto image_support = vkGetPhysicalDeviceImageFormatProperties(
+                    candidate, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 0, &image_properties);
+                const bool supported = image_support == VK_SUCCESS &&
+                                       (format_properties.optimalTilingFeatures & required_format) == required_format &&
+                                       image_properties.maxExtent.width >= options_.width &&
+                                       image_properties.maxExtent.height >= options_.height &&
+                                       (image_properties.sampleCounts & VK_SAMPLE_COUNT_1_BIT) != 0;
+                evaluation["offscreen_rgba8_color_attachment_and_sampled_image"] = supported;
+                if(!supported) {
+                    evaluation["missing_requirements"].push_back(
+                        "RGBA8_UNORM optimal color attachment and sampled image at requested dimensions");
+                }
+            }
+            if(!evaluation.at("missing_requirements").empty()) {
+                device_support_.push_back(evaluation);
                 continue;
             }
             std::uint32_t extension_count = 0;
@@ -498,6 +636,8 @@ private:
             if(std::none_of(extensions.begin(), extensions.end(), [](const auto& value) {
                    return std::strcmp(value.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
                })) {
+                evaluation["missing_requirements"].push_back("VK_KHR_swapchain");
+                device_support_.push_back(evaluation);
                 continue;
             }
             std::uint32_t family_count = 0;
@@ -524,6 +664,8 @@ private:
                 }
             }
             if(graphics && present) {
+                evaluation["status"] = "selected";
+                device_support_.push_back(evaluation);
                 physical_ = candidate;
                 graphics_family_ = *graphics;
                 present_family_ = *present;
@@ -549,9 +691,15 @@ private:
                 }
                 break;
             }
+            evaluation["missing_requirements"].push_back(
+                "graphics and presentation to the selected X11/Xwayland desktop");
+            device_support_.push_back(evaluation);
         }
         if(physical_ == VK_NULL_HANDLE) {
-            throw Unsupported("no Vulkan 1.3 GPU supports graphics and presentation to this X11/Xwayland desktop");
+            throw Unsupported(
+                "no GPU satisfies the requested scenario's Vulkan 1.3, presentation, feature, and format requirements; "
+                "see device_support in result.json: " +
+                device_support_.dump());
         }
         ids_ = vk_struct<VkPhysicalDeviceIDProperties>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES);
         driver_ = vk_struct<VkPhysicalDeviceDriverProperties>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES);
@@ -585,7 +733,12 @@ private:
         create.pQueueCreateInfos = queues.data();
         create.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
         create.ppEnabledExtensionNames = extensions.data();
-        create.pNext = maintenance_extension_.empty() ? nullptr : &maintenance;
+        auto enabled =
+            vk_struct<VkPhysicalDeviceVulkan12Features>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES);
+        enabled.runtimeDescriptorArray = workload_.bindless ? VK_TRUE : VK_FALSE;
+        enabled.shaderStorageBufferArrayNonUniformIndexing = workload_.bindless ? VK_TRUE : VK_FALSE;
+        enabled.pNext = maintenance_extension_.empty() ? nullptr : &maintenance;
+        create.pNext = &enabled;
         check(vkCreateDevice(physical_, &create, nullptr, &device_), "creating the graphics device");
         volkLoadDevice(device_);
         vkGetDeviceQueue(device_, graphics_family_, 0, &graphics_queue_);
@@ -701,15 +854,16 @@ private:
         }
     }
 
-    void create_render_pass() {
+    VkRenderPass make_render_pass(VkFormat format, const std::string& label,
+                                  VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) {
         VkAttachmentDescription color{};
-        color.format = format_;
+        color.format = format;
         color.samples = VK_SAMPLE_COUNT_1_BIT;
         color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        color.initialLayout = initial_layout;
         color.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         const VkAttachmentReference reference{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
         VkSubpassDescription subpass{};
@@ -729,8 +883,14 @@ private:
         create.pSubpasses = &subpass;
         create.dependencyCount = 1;
         create.pDependencies = &dependency;
-        check(vkCreateRenderPass(device_, &create, nullptr, &render_pass_), "creating the raster render pass");
-        name(VK_OBJECT_TYPE_RENDER_PASS, render_pass_, "fixture.scene.raster");
+        VkRenderPass result = VK_NULL_HANDLE;
+        check(vkCreateRenderPass(device_, &create, nullptr, &result), "creating " + label);
+        name(VK_OBJECT_TYPE_RENDER_PASS, result, label);
+        return result;
+    }
+
+    void create_render_pass() {
+        render_pass_ = make_render_pass(format_, workload_.multipass ? "fixture.post.present" : "fixture.scene.raster");
         framebuffers_.resize(image_views_.size(), VK_NULL_HANDLE);
         for(std::size_t i = 0; i < framebuffers_.size(); ++i) {
             auto framebuffer = vk_struct<VkFramebufferCreateInfo>(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
@@ -742,6 +902,70 @@ private:
             framebuffer.layers = 1;
             check(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[i]), "creating a frame buffer");
         }
+    }
+
+    void create_offscreen() {
+        offscreen_pass_ = make_render_pass(VK_FORMAT_R8G8B8A8_UNORM, "fixture.scene.offscreen",
+                                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        auto create = vk_struct<VkImageCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);
+        create.imageType = VK_IMAGE_TYPE_2D;
+        create.format = VK_FORMAT_R8G8B8A8_UNORM;
+        create.extent = {extent_.width, extent_.height, 1};
+        create.mipLevels = 1;
+        create.arrayLayers = 1;
+        create.samples = VK_SAMPLE_COUNT_1_BIT;
+        create.tiling = VK_IMAGE_TILING_OPTIMAL;
+        create.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        create.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        check(vkCreateImage(device_, &create, nullptr, &offscreen_image_), "creating the offscreen scene image");
+        VkMemoryRequirements requirements{};
+        vkGetImageMemoryRequirements(device_, offscreen_image_, &requirements);
+        std::optional<std::uint32_t> memory_type;
+        for(std::uint32_t i = 0; i < memory_properties_.memoryTypeCount; ++i) {
+            if(requirements.memoryTypeBits & (1u << i)) {
+                memory_type = i;
+                if(memory_properties_.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+                    break;
+                }
+            }
+        }
+        if(!memory_type) {
+            throw Unsupported("no memory type can back the required offscreen scene image");
+        }
+        auto allocate = vk_struct<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
+        allocate.allocationSize = requirements.size;
+        allocate.memoryTypeIndex = *memory_type;
+        check(vkAllocateMemory(device_, &allocate, nullptr, &offscreen_memory_), "allocating offscreen image memory");
+        check(vkBindImageMemory(device_, offscreen_image_, offscreen_memory_, 0), "binding offscreen image memory");
+        auto view = vk_struct<VkImageViewCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+        view.image = offscreen_image_;
+        view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view.format = create.format;
+        view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        check(vkCreateImageView(device_, &view, nullptr, &offscreen_view_), "creating the offscreen image view");
+        auto framebuffer = vk_struct<VkFramebufferCreateInfo>(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
+        framebuffer.renderPass = offscreen_pass_;
+        framebuffer.attachmentCount = 1;
+        framebuffer.pAttachments = &offscreen_view_;
+        framebuffer.width = extent_.width;
+        framebuffer.height = extent_.height;
+        framebuffer.layers = 1;
+        check(vkCreateFramebuffer(device_, &framebuffer, nullptr, &offscreen_framebuffer_),
+              "creating the offscreen framebuffer");
+        auto sampler = vk_struct<VkSamplerCreateInfo>(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
+        sampler.magFilter = VK_FILTER_NEAREST;
+        sampler.minFilter = VK_FILTER_NEAREST;
+        sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler.maxLod = 0;
+        check(vkCreateSampler(device_, &sampler, nullptr, &post_sampler_), "creating the post-processing sampler");
+        name(VK_OBJECT_TYPE_IMAGE, offscreen_image_, "fixture.scene.color");
+        name(VK_OBJECT_TYPE_IMAGE_VIEW, offscreen_view_, "fixture.scene.color_view");
+        name(VK_OBJECT_TYPE_FRAMEBUFFER, offscreen_framebuffer_, "fixture.scene.offscreen_framebuffer");
+        name(VK_OBJECT_TYPE_SAMPLER, post_sampler_, "fixture.post.nearest_sampler");
     }
 
     void create_buffer(Buffer& buffer, VkDeviceSize size, VkBufferUsageFlags usage, const std::string& label) {
@@ -777,44 +1001,90 @@ private:
         name(VK_OBJECT_TYPE_BUFFER, buffer.handle, label);
     }
 
+    void flush_buffer(const Buffer& buffer, std::string_view label) {
+        if(!buffer.coherent) {
+            auto range = vk_struct<VkMappedMemoryRange>(VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE);
+            range.memory = buffer.memory;
+            range.size = VK_WHOLE_SIZE;
+            check(vkFlushMappedMemoryRanges(device_, 1, &range), label);
+        }
+    }
+
     void create_buffers_and_descriptors() {
         create_buffer(readback_, static_cast<VkDeviceSize>(extent_.width) * extent_.height * 4,
                       VK_BUFFER_USAGE_TRANSFER_DST_BIT, "fixture.application_readback");
-        create_buffer(palettes_[0], sizeof(float) * 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, "fixture.palette.primary");
-        create_buffer(palettes_[1], sizeof(float) * 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, "fixture.palette.secondary");
+        const auto palette_usage =
+            workload_.bindless ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        create_buffer(palettes_[0], sizeof(float) * 4, palette_usage, "fixture.palette.primary");
+        create_buffer(palettes_[1], sizeof(float) * 4, palette_usage, "fixture.palette.secondary");
+        const auto descriptor_type =
+            workload_.bindless ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         VkDescriptorSetLayoutBinding binding{};
         binding.binding = 0;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        binding.descriptorCount = 1;
+        binding.descriptorType = descriptor_type;
+        binding.descriptorCount = workload_.bindless ? 2u : 1u;
         binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         auto layout = vk_struct<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
         layout.bindingCount = 1;
         layout.pBindings = &binding;
         check(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
               "creating the palette layout");
-        const VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2};
+        if(workload_.multipass) {
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            binding.descriptorCount = 1;
+            check(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &post_descriptor_layout_),
+                  "creating the post-processing layout");
+        }
+        std::vector<VkDescriptorPoolSize> sizes{{descriptor_type, 2}};
+        if(workload_.multipass) {
+            sizes.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1});
+        }
         auto pool = vk_struct<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
-        pool.maxSets = 2;
-        pool.poolSizeCount = 1;
-        pool.pPoolSizes = &size;
+        pool.maxSets = 3;
+        pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
+        pool.pPoolSizes = sizes.data();
         check(vkCreateDescriptorPool(device_, &pool, nullptr, &descriptor_pool_),
-              "creating the palette descriptor pool");
+              "creating the fixture descriptor pool");
         const std::array layouts{descriptor_layout_, descriptor_layout_};
         auto allocation = vk_struct<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
         allocation.descriptorPool = descriptor_pool_;
-        allocation.descriptorSetCount = static_cast<std::uint32_t>(layouts.size());
+        allocation.descriptorSetCount = workload_.bindless ? 1u : 2u;
         allocation.pSetLayouts = layouts.data();
         check(vkAllocateDescriptorSets(device_, &allocation, descriptors_.data()), "allocating palette descriptors");
-        for(std::size_t i = 0; i < descriptors_.size(); ++i) {
-            const VkDescriptorBufferInfo buffer{palettes_[i].handle, 0, sizeof(float) * 4};
+        std::array<VkDescriptorBufferInfo, 2> buffers{};
+        for(std::size_t i = 0; i < buffers.size(); ++i) {
+            buffers[i] = {palettes_[i].handle, 0, sizeof(float) * 4};
+        }
+        for(std::uint32_t i = 0; i < allocation.descriptorSetCount; ++i) {
             auto write = vk_struct<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
             write.dstSet = descriptors_[i];
             write.dstBinding = 0;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            write.pBufferInfo = &buffer;
+            write.descriptorCount = workload_.bindless ? 2u : 1u;
+            write.descriptorType = descriptor_type;
+            write.pBufferInfo = &buffers[i];
             vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
             name(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptors_[i], "fixture.palette_set." + std::to_string(i));
+        }
+        if(workload_.multipass) {
+            allocation.descriptorSetCount = 1;
+            allocation.pSetLayouts = &post_descriptor_layout_;
+            check(vkAllocateDescriptorSets(device_, &allocation, &post_descriptor_), "allocating the post descriptor");
+            const VkDescriptorImageInfo image{post_sampler_, offscreen_view_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+            auto write = vk_struct<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+            write.dstSet = post_descriptor_;
+            write.dstBinding = 0;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo = &image;
+            vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+            name(VK_OBJECT_TYPE_DESCRIPTOR_SET, post_descriptor_, "fixture.post.scene_color_set");
+        }
+        if(workload_.indirect) {
+            create_buffer(indirect_, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                          "fixture.scene.indirect_parameters");
+            const VkDrawIndirectCommand draw{3, workload_.instance_count, 0, 0};
+            std::memcpy(indirect_.mapped, &draw, sizeof(draw));
+            flush_buffer(indirect_, "flushing indirect draw memory");
         }
     }
 
@@ -841,22 +1111,27 @@ private:
         return shader;
     }
 
-    void create_pipeline() {
+    void make_pipeline(const std::string& vertex_file, const std::string& fragment_file,
+                       VkDescriptorSetLayout descriptor_layout, std::uint32_t push_size, VkRenderPass render_pass,
+                       VkPipelineLayout& pipeline_layout, VkPipeline& pipeline, const std::string& label) {
         std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
         stages[0] = vk_struct<VkPipelineShaderStageCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        stages[0].module = load_shader("scene.vert.spv");
+        stages[0].module = load_shader(vertex_file);
         stages[0].pName = "main";
         stages[1] = vk_struct<VkPipelineShaderStageCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stages[1].module =
-            load_shader(options_.scenario == "shader-error" ? "shader-error.frag.spv" : "scene.frag.spv");
+        stages[1].module = load_shader(fragment_file);
         stages[1].pName = "main";
         auto layout = vk_struct<VkPipelineLayoutCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
         layout.setLayoutCount = 1;
-        layout.pSetLayouts = &descriptor_layout_;
-        check(vkCreatePipelineLayout(device_, &layout, nullptr, &pipeline_layout_),
-              "creating the scene pipeline layout");
+        layout.pSetLayouts = &descriptor_layout;
+        const VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, push_size};
+        if(push_size != 0) {
+            layout.pushConstantRangeCount = 1;
+            layout.pPushConstantRanges = &push;
+        }
+        check(vkCreatePipelineLayout(device_, &layout, nullptr, &pipeline_layout), "creating " + label + " layout");
         const auto vertex =
             vk_struct<VkPipelineVertexInputStateCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
         auto assembly = vk_struct<VkPipelineInputAssemblyStateCreateInfo>(
@@ -898,11 +1173,23 @@ private:
         create.pRasterizationState = &raster;
         create.pMultisampleState = &multisample;
         create.pColorBlendState = &blend;
-        create.layout = pipeline_layout_;
-        create.renderPass = render_pass_;
-        check(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline_),
-              "creating the scene graphics pipeline");
-        name(VK_OBJECT_TYPE_PIPELINE, pipeline_, "fixture.scene.graphics");
+        create.layout = pipeline_layout;
+        create.renderPass = render_pass;
+        check(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline), "creating " + label);
+        name(VK_OBJECT_TYPE_PIPELINE, pipeline, label);
+    }
+
+    void create_pipeline() {
+        make_pipeline(
+            workload_.indirect ? "indirect.vert.spv" : "scene.vert.spv",
+            workload_.bindless ? "bindless.frag.spv"
+                               : (options_.scenario == "shader-error" ? "shader-error.frag.spv" : "scene.frag.spv"),
+            descriptor_layout_, workload_.bindless ? 8u : 0u, workload_.multipass ? offscreen_pass_ : render_pass_,
+            pipeline_layout_, pipeline_, "fixture.scene.graphics");
+        if(workload_.multipass) {
+            make_pipeline("post.vert.spv", "post.frag.spv", post_descriptor_layout_, 4, render_pass_,
+                          post_pipeline_layout_, post_pipeline_, "fixture.post.graphics");
+        }
     }
 
     void create_commands() {
@@ -940,12 +1227,7 @@ private:
         const std::array values{primary, secondary};
         for(std::size_t i = 0; i < palettes_.size(); ++i) {
             std::memcpy(palettes_[i].mapped, values[i].data(), sizeof(values[i]));
-            if(!palettes_[i].coherent) {
-                auto range = vk_struct<VkMappedMemoryRange>(VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE);
-                range.memory = palettes_[i].memory;
-                range.size = VK_WHOLE_SIZE;
-                check(vkFlushMappedMemoryRanges(device_, 1, &range), "flushing palette memory");
-            }
+            flush_buffer(palettes_[i], "flushing palette memory");
         }
     }
 
@@ -972,15 +1254,29 @@ private:
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         check(vkBeginCommandBuffer(command_, &begin), "beginning frame commands");
         begin_label("frame." + std::to_string(frame));
-        begin_label("scene.raster");
+        if(workload_.multipass) {
+            auto image = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
+            image.srcAccessMask = frame == 0 ? VkAccessFlags{0} : VkAccessFlags{VK_ACCESS_SHADER_READ_BIT};
+            image.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            image.oldLayout = frame == 0 ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            image.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            image.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            image.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            image.image = offscreen_image_;
+            image.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(command_,
+                                 frame == 0 ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &image);
+        }
+        begin_label(workload_.multipass ? "scene.offscreen" : "scene.raster");
         VkClearValue clear{};
         clear.color.float32[0] = 0.03125f;
         clear.color.float32[1] = 0.0625f;
         clear.color.float32[2] = 0.09375f;
         clear.color.float32[3] = 1;
         auto pass = vk_struct<VkRenderPassBeginInfo>(VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
-        pass.renderPass = render_pass_;
-        pass.framebuffer = framebuffers_[image_index];
+        pass.renderPass = workload_.multipass ? offscreen_pass_ : render_pass_;
+        pass.framebuffer = workload_.multipass ? offscreen_framebuffer_ : framebuffers_[image_index];
         pass.renderArea = {{0, 0}, extent_};
         pass.clearValueCount = 1;
         pass.pClearValues = &clear;
@@ -989,9 +1285,43 @@ private:
         const auto descriptor = descriptors_[options_.scenario == "binding-error" ? 1 : 0];
         vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor, 0,
                                 nullptr);
-        vkCmdDraw(command_, 3, 1, 0, 0);
+        if(workload_.bindless) {
+            const std::array<std::uint32_t, 2> selection{workload_.resource_xor, (options_.seed ^ frame) & 1u};
+            vkCmdPushConstants(command_, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               static_cast<std::uint32_t>(sizeof(selection)), selection.data());
+        }
+        if(workload_.indirect) {
+            vkCmdDrawIndirect(command_, indirect_.handle, 0, 1, sizeof(VkDrawIndirectCommand));
+        } else {
+            vkCmdDraw(command_, 3, 1, 0, 0);
+        }
         vkCmdEndRenderPass(command_);
         end_label();
+        if(workload_.multipass) {
+            auto sample = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
+            sample.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            sample.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            sample.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            sample.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            sample.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sample.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sample.image = offscreen_image_;
+            sample.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &sample);
+            begin_label("post.present");
+            pass.renderPass = render_pass_;
+            pass.framebuffer = framebuffers_[image_index];
+            vkCmdBeginRenderPass(command_, &pass, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pipeline_);
+            vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pipeline_layout_, 0, 1,
+                                    &post_descriptor_, 0, nullptr);
+            vkCmdPushConstants(command_, post_pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(workload_.channel_order), &workload_.channel_order);
+            vkCmdDraw(command_, 3, 1, 0, 0);
+            vkCmdEndRenderPass(command_);
+            end_label();
+        }
         auto barrier = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
         barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1103,11 +1433,17 @@ private:
             if(pipeline_) {
                 vkDestroyPipeline(device_, pipeline_, nullptr);
             }
+            if(post_pipeline_) {
+                vkDestroyPipeline(device_, post_pipeline_, nullptr);
+            }
             for(const auto shader : shaders_) {
                 vkDestroyShaderModule(device_, shader, nullptr);
             }
             if(pipeline_layout_) {
                 vkDestroyPipelineLayout(device_, pipeline_layout_, nullptr);
+            }
+            if(post_pipeline_layout_) {
+                vkDestroyPipelineLayout(device_, post_pipeline_layout_, nullptr);
             }
             if(descriptor_pool_) {
                 vkDestroyDescriptorPool(device_, descriptor_pool_, nullptr);
@@ -1115,10 +1451,32 @@ private:
             if(descriptor_layout_) {
                 vkDestroyDescriptorSetLayout(device_, descriptor_layout_, nullptr);
             }
+            if(post_descriptor_layout_) {
+                vkDestroyDescriptorSetLayout(device_, post_descriptor_layout_, nullptr);
+            }
+            if(post_sampler_) {
+                vkDestroySampler(device_, post_sampler_, nullptr);
+            }
             for(auto& palette : palettes_) {
                 destroy_buffer(palette);
             }
             destroy_buffer(readback_);
+            destroy_buffer(indirect_);
+            if(offscreen_framebuffer_) {
+                vkDestroyFramebuffer(device_, offscreen_framebuffer_, nullptr);
+            }
+            if(offscreen_pass_) {
+                vkDestroyRenderPass(device_, offscreen_pass_, nullptr);
+            }
+            if(offscreen_view_) {
+                vkDestroyImageView(device_, offscreen_view_, nullptr);
+            }
+            if(offscreen_image_) {
+                vkDestroyImage(device_, offscreen_image_, nullptr);
+            }
+            if(offscreen_memory_) {
+                vkFreeMemory(device_, offscreen_memory_, nullptr);
+            }
             for(const auto framebuffer : framebuffers_) {
                 if(framebuffer) {
                     vkDestroyFramebuffer(device_, framebuffer, nullptr);
@@ -1152,6 +1510,8 @@ private:
     }
 
     const Options& options_;
+    const Workload workload_;
+    Json device_support_ = Json::array();
     xcb_connection_t* connection_ = nullptr;
     xcb_window_t window_ = XCB_WINDOW_NONE;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -1178,6 +1538,17 @@ private:
     std::vector<VkSemaphore> present_ready_;
     VkRenderPass render_pass_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers_;
+    VkImage offscreen_image_ = VK_NULL_HANDLE;
+    VkDeviceMemory offscreen_memory_ = VK_NULL_HANDLE;
+    VkImageView offscreen_view_ = VK_NULL_HANDLE;
+    VkRenderPass offscreen_pass_ = VK_NULL_HANDLE;
+    VkFramebuffer offscreen_framebuffer_ = VK_NULL_HANDLE;
+    VkSampler post_sampler_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout post_descriptor_layout_ = VK_NULL_HANDLE;
+    VkDescriptorSet post_descriptor_ = VK_NULL_HANDLE;
+    VkPipelineLayout post_pipeline_layout_ = VK_NULL_HANDLE;
+    VkPipeline post_pipeline_ = VK_NULL_HANDLE;
+    Buffer indirect_;
     Buffer readback_;
     std::array<Buffer, 2> palettes_{};
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
@@ -1257,6 +1628,7 @@ void run(const Options& options) {
                 {"status", "failed"},
                 {"project_version", ngm::project_version()},
                 {"evidence_origin", "application_readback"},
+                {"workload", workload_metadata(options.scenario)},
                 {"inputs",
                  {{"scenario", options.scenario},
                   {"seed", options.seed},
@@ -1268,13 +1640,14 @@ void run(const Options& options) {
                   {"display", environment("DISPLAY")},
                   {"session_type", environment("XDG_SESSION_TYPE")},
                   {"wayland_display", environment("WAYLAND_DISPLAY")}}}};
+    Renderer renderer(options);
     try {
         result["application"] = {{"executable_sha256", ngm::sha256_file("/proc/self/exe")},
                                  {"build", Json::parse(build_identity_json)}};
         result["provenance"] = retain_shaders(options);
         result["provenance"]["kind"] = "shader_bundle";
-        Renderer renderer(options);
         renderer.initialize();
+        result["device_support"] = renderer.device_support();
         result["gpu"] = renderer.gpu_metadata();
         result["rendering"] = renderer.rendering_metadata();
         renderer.render();
@@ -1286,6 +1659,7 @@ void run(const Options& options) {
         result["status"] = "pass";
         write_json(options.output / "result.json", result);
     } catch(const std::exception& error) {
+        result["device_support"] = renderer.device_support();
         result["status"] = dynamic_cast<const Unsupported*>(&error) ? "unsupported" : "failed";
         result["error"] = error.what();
         try {

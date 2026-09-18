@@ -1,11 +1,16 @@
 #include "ngm/Hash.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
+#include <cerrno>
 #include <cstdint>
+#include <fcntl.h>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace ngm {
 namespace {
@@ -126,6 +131,55 @@ std::string sha256_file(const std::filesystem::path& path) {
     }
     if(!input.eof()) {
         throw std::runtime_error("Error reading file for SHA-256: " + path.string());
+    }
+    return hash.finish();
+}
+
+std::string sha256_regular_file(const std::filesystem::path& path, std::chrono::steady_clock::time_point deadline,
+                                std::stop_token stop) {
+    const auto check_stop = [&] {
+        if(stop.stop_requested() || std::chrono::steady_clock::now() >= deadline) {
+            throw std::runtime_error("File hashing cancelled or deadline expired: " + path.string());
+        }
+    };
+    check_stop();
+    if(path.string().find('\0') != std::string::npos) {
+        throw std::invalid_argument("Hash input path must not contain NUL bytes");
+    }
+    struct File {
+        int descriptor;
+        ~File() {
+            if(descriptor >= 0) {
+                close(descriptor);
+            }
+        }
+    } file{open(path.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)};
+    struct stat before{};
+    if(file.descriptor < 0 || fstat(file.descriptor, &before) != 0 || !S_ISREG(before.st_mode) || before.st_size < 0) {
+        throw std::runtime_error("Expected a readable regular file for SHA-256: " + path.string());
+    }
+    Sha256 hash;
+    std::array<std::byte, 65536> buffer{};
+    auto remaining_bytes = static_cast<std::uint64_t>(before.st_size);
+    while(remaining_bytes) {
+        check_stop();
+        const auto requested = static_cast<std::size_t>(std::min<std::uint64_t>(remaining_bytes, buffer.size()));
+        const auto count = read(file.descriptor, buffer.data(), requested);
+        if(count < 0 && errno == EINTR) {
+            continue;
+        }
+        if(count <= 0) {
+            throw std::runtime_error("File changed or failed while hashing: " + path.string());
+        }
+        hash.update(std::span(buffer.data(), static_cast<std::size_t>(count)));
+        remaining_bytes -= static_cast<std::uint64_t>(count);
+    }
+    check_stop();
+    struct stat after{};
+    if(fstat(file.descriptor, &after) != 0 || before.st_size != after.st_size ||
+       before.st_mtim.tv_sec != after.st_mtim.tv_sec || before.st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
+       before.st_ctim.tv_sec != after.st_ctim.tv_sec || before.st_ctim.tv_nsec != after.st_ctim.tv_nsec) {
+        throw std::runtime_error("File changed while hashing: " + path.string());
     }
     return hash.finish();
 }

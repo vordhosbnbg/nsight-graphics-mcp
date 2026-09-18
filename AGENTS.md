@@ -80,9 +80,26 @@ R-003/R-005 complete the first build/basic-fixture group at version 0.1.0 with a
 real Codex capability query, a windowed Vulkan fixture, and an isolated C++
 experiment runner. Fresh-context reviews, CPU checks, and local GPU validation
 are recorded in docs/BUILD_VALIDATION.md, docs/MCP.md, and docs/FIXTURE.md.
-Nsight capture, the job coordinator, and managed artifact storage are the next
-implementation group; no real Nsight capture is validated yet. Update these
-instructions as the project develops.
+The R-012/R-011/R-001 capture/evidence group completes at **0.2.0** after
+independent acceptance review. It provides the job coordinator, managed artifact
+storage, documented Nsight CLI adapter, and shared `CaptureService`, used by the
+native `ngm-capture` command and stdio tools. The current surface has **15 MCP
+tools**, including bounded retained metadata/event/object queries. The integrated
+GCC Debug CPU suite passes **20 checks**. Real basic MCP capture/export matrices
+pass on matching Nsight **2026.3.1.0/build 38722833** and
+**2026.2.0.0/build 37991608** tools, with three fresh targets per release and
+persistent pins. The service preserves explicit `XDG_DATA_DIRS` and supplies
+standard defaults when unset or empty. Typed queries pass on the pinned
+2026.3.1.0 correct/faulty pair; another producer is explicitly rejected until
+qualified. The full fixture passes 57 fresh application-readback launches with
+synchronization validation, including advanced workloads. Advanced capture
+compatibility, detailed state, optional SDK control, and source repair remain
+unfinished. Actual GPU replay times out on both releases. These results are
+separate from the historical 0.1.0 Codex capability query. Exact versions,
+evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,
+docs/FIXTURE.md, docs/INSPECTION.md, and docs/INVESTIGATIONS.md. Component contracts
+are in docs/ARTIFACTS.md, docs/JOBS.md, docs/NSIGHT_BACKEND.md, and docs/MCP.md.
+Update these instructions as the project develops.
 
 Local baseline, inspected on 2026-09-17:
 
@@ -142,8 +159,10 @@ Recheck its availability when evaluating new documented integration options.
 
 - Follow the C++/fastmcpp direction in `docs/TECH_STACK.md` and resolve the remaining
   supporting choices there. Codex over local stdio is the selected first-release
-  integration. CMake/Ninja and first-party C++20 are implemented by R-013; a
-  SQLite artifact index remains a proposal.
+  integration. CMake/Ninja and first-party C++20 are implemented by R-013. The
+  artifact store now uses JSON manifests and directories, with provisional
+  2 GiB/30-day limits; no SQLite dependency is selected. Revisit retention
+  defaults after measuring representative real captures.
   Keep MCP handlers separate from job management, artifact storage, parsers, and
   backend adapters so the later HTTP service can share the same core.
 - Expose a compact, typed tool surface organized around agent tasks: capability

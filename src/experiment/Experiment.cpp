@@ -144,7 +144,80 @@ void text_fields(const Json& object, std::initializer_list<const char*> fields, 
     }
 }
 
+void validate_workload(const Json& result) {
+    const auto scenario = result.at("inputs").at("scenario").get<std::string>();
+    const bool combined = scenario.starts_with("combined-");
+    const bool multipass = combined || scenario == "multipass-reference" || scenario == "pass-output-error";
+    const bool bindless = combined || scenario == "bindless-reference" || scenario == "resource-selection-error";
+    const bool indirect = combined || scenario == "indirect-reference" || scenario == "indirect-parameter-error";
+    const auto& workload = result.at("workload");
+    for(const auto& [key, expected] :
+        std::array<std::pair<const char*, bool>, 4>{{{"offscreen_render_target", multipass},
+                                                     {"post_processing", multipass},
+                                                     {"bindless_storage_buffers", bindless},
+                                                     {"indirect_draw", indirect}}}) {
+        require(workload.at(key).is_boolean() && workload.at(key) == expected, std::string("workload.") + key);
+    }
+    for(const auto& [key, expected] :
+        std::array<std::pair<const char*, int>, 4>{{{"render_pass_count", multipass ? 2 : 1},
+                                                    {"descriptor_array_count", bindless ? 2 : 0},
+                                                    {"indirect_draw_count", indirect ? 1 : 0},
+                                                    {"indirect_first_instance", 0}}}) {
+        require(workload.at(key).is_number_integer() && workload.at(key) == expected, std::string("workload.") + key);
+    }
+    const auto features =
+        bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"}) : Json::array();
+    require(workload.at("required_api_features") == features, "workload.required_api_features");
+    require(workload.at("minimum_api_version") == "1.3.0" &&
+                workload.at("required_device_extensions") == Json({"VK_KHR_swapchain"}),
+            "workload.required_api");
+    require(workload.at("offscreen_format") == (multipass ? Json("R8G8B8A8_UNORM") : Json(nullptr)) &&
+                workload.at("offscreen_format_features") ==
+                    (multipass ? Json({"COLOR_ATTACHMENT", "SAMPLED_IMAGE"}) : Json::array()),
+            "workload.offscreen_format");
+    require(workload.at("indirect_command") == (indirect ? Json("vkCmdDrawIndirect") : Json(nullptr)),
+            "workload.indirect_command");
+    const auto& support = result.at("device_support");
+    require(support.is_array() && !support.empty(), "device_support");
+    const Json* selected = nullptr;
+    for(const auto& candidate : support) {
+        require(candidate.at("status") == "selected" || candidate.at("status") == "rejected", "device_support.status");
+        require(candidate.at("missing_requirements").is_array(), "device_support.missing_requirements");
+        if(candidate.at("status") == "selected") {
+            require(selected == nullptr && candidate.at("missing_requirements").empty(), "device_support.selected");
+            selected = &candidate;
+        }
+    }
+    require(selected != nullptr, "device_support.selected");
+    require(selected->at("name") == result.at("gpu").at("name") &&
+                selected->at("api_version") == result.at("gpu").at("api_version"),
+            "device_support.identity");
+    for(const auto* key : {"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"}) {
+        const auto& enabled = result.at("rendering").at("enabled_api_features").at(key);
+        const auto& available = selected->at("queried_api_features").at(key);
+        require(enabled.is_boolean() && enabled == bindless && available.is_boolean() &&
+                    (!bindless || available == true),
+                std::string("rendering.enabled_api_features.") + key);
+    }
+    if(multipass) {
+        require(selected->at("offscreen_rgba8_color_attachment_and_sampled_image") == true,
+                "device_support.offscreen_rgba8_color_attachment_and_sampled_image");
+    }
+    if(bindless || indirect) {
+        const auto& limits = selected->at("limits");
+        for(const auto& [key, minimum] :
+            std::array<std::pair<const char*, int>, 4>{{{"maxPerStageDescriptorStorageBuffers", bindless ? 2 : 0},
+                                                        {"maxDescriptorSetStorageBuffers", bindless ? 2 : 0},
+                                                        {"maxPushConstantsSize", bindless ? 8 : 0},
+                                                        {"maxDrawIndirectCount", indirect ? 1 : 0}}}) {
+            require(limits.at(key).is_number_integer() && limits.at(key) >= minimum,
+                    std::string("device_support.limits.") + key);
+        }
+    }
+}
+
 void validate_metadata(const Json& result, const fs::path& directory) {
+    validate_workload(result);
     const auto& gpu = result.at("gpu");
     text_fields(gpu, {"name", "api_version", "driver_name", "device_uuid", "driver_uuid"}, "gpu.");
     require(gpu.at("driver_info").is_string(), "gpu.driver_info");
@@ -199,9 +272,11 @@ void validate_metadata(const Json& result, const fs::path& directory) {
     for(const auto& argument : compiler.at("arguments")) {
         require(argument.is_string(), "provenance.shader_compiler.arguments");
     }
-    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 3, "provenance.shaders");
-    std::map<std::string, std::string> expected{
-        {"scene.vert", "vertex"}, {"scene.frag", "fragment"}, {"shader-error.frag", "fragment"}};
+    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 7, "provenance.shaders");
+    std::map<std::string, std::string> expected{{"scene.vert", "vertex"},          {"scene.frag", "fragment"},
+                                                {"shader-error.frag", "fragment"}, {"indirect.vert", "vertex"},
+                                                {"bindless.frag", "fragment"},     {"post.vert", "vertex"},
+                                                {"post.frag", "fragment"}};
     for(const auto& shader : provenance.at("shaders")) {
         const auto source = shader.at("source").get<std::string>();
         require(expected.contains(source) && shader.at("stage") == expected.at(source) &&

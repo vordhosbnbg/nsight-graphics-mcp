@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **C++20 foundation, real Codex capability query, and basic windowed Vulkan rendering validated at 0.1.0. Artifact/job/capture implementation is next; real Nsight workflows remain unverified.**
+Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0. Twenty CPU checks pass, basic capture/export passes on two Nsight releases, and retained typed inventory queries pass on 2026.3.1.0. Advanced application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
@@ -11,14 +11,23 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 - The first target is Vulkan graphics and compute on Linux with NVIDIA Nsight
   Graphics.
-- R-013 provides the build/check foundation. R-003/R-005 add an implemented stdio
-  capability tool, windowed Vulkan fixture, and isolated C++ experiment runner.
+- R-013 provides the build/check foundation. R-003/R-005 completed the 0.1.0 stdio
+  capability query, windowed Vulkan fixture, and isolated C++ experiment runner.
+  The 0.2.0 capture/evidence milestone adds managed storage, asynchronous jobs,
+  `CaptureService`, a native `ngm-capture` command, and 15 MCP tools, including
+  bounded retained metadata/event/object queries.
   [MCP.md](MCP.md) and [FIXTURE.md](FIXTURE.md) distinguish current evidence from
   the still-pending Nsight workflows. Exact source pins and build evidence are in
   [DEPENDENCIES.md](DEPENDENCIES.md) and [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
-- The initial architecture proposal uses documented Nsight CLI interfaces for
-  capture, replay metadata, and profiling, with an optional application-side SDK
-  bridge for precise capture control.
+- The implemented backend uses documented Nsight CLI interfaces for capture and
+  replay exports. Corrected production environment handling preserves explicit
+  `XDG_DATA_DIRS` and supplies standard defaults when absent or empty. A C++ client
+  drove three successful basic capture/export runs per release through the real
+  MCP server without a data-directory environment override. The matching
+  2026.3.1.0 and 2026.2.0.0 results and limits are in
+  [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Actual GPU replay stalled during
+  initialization on both releases (I-007/I-011) and remains unqualified. Profiling
+  and an optional application-side SDK bridge remain planned.
 - The first-release client is Codex, launching a local stdio server process on the
   GPU machine. Persistent Streamable HTTP is accepted later work.
 - Each first-release capture starts a fresh application instance; reusable target
@@ -37,7 +46,10 @@ Keep the selected direction, remaining choices, and interview answers here.
 - Validation is local: build/tests and explicitly invoked GPU integration checks,
   with no first-release CI setup. Compatibility validation must cover at least two
   distinct Nsight Graphics releases; record the exact tested environment for each.
-- Retention defaults and storage-index format remain open.
+- The artifact store uses JSON manifests and directories. Provisional retention
+  defaults are 2 GiB and 30 days, informed by fixture-directory sizes; they have
+  not yet been qualified against representative Nsight captures. See
+  [ARTIFACTS.md](ARTIFACTS.md).
 - The user's highest priority is extensive native Vulkan/tooling integration.
 - The project should support both applications with source access and unmodified Vulkan
   applications; application-side integration is optional.
@@ -68,7 +80,7 @@ Keep the selected direction, remaining choices, and interview answers here.
 4. Installation, release expectations, and large-artifact processing needs.
 5. Clear process ownership, cancellation, data validation, and testability.
 
-For the proposed CLI-based architecture, the server delegates GPU work to Nsight.
+For the selected CLI-based architecture, the server delegates GPU work to Nsight.
 My working assessment is that process control, artifact access, and analysis
 ergonomics matter more initially than server-language execution speed. This is an
 architectural judgment, not a benchmark. Actual parser costs and artifact sizes
@@ -105,11 +117,11 @@ other clients and HTTP remain outside that validation.
 
 | Layer | Python | Rust | Go | TypeScript | C++ |
 | --- | --- | --- | --- | --- | --- |
-| MCP | Official `mcp` SDK | Official `rmcp` SDK | Official Go SDK | Official TypeScript server SDK | fastmcpp preferred |
-| Jobs/processes | `asyncio` subprocesses | Tokio processes/tasks | `os/exec`, contexts, goroutines | Node child processes/streams | Process library and event-loop choice required |
-| Data contracts | Typed models plus runtime validation | Serde and schema generation | Typed structs plus schema validation | Runtime schemas plus TypeScript types | JSON/schema library choice required |
-| Artifact index | Files plus standard-library SQLite if needed | Files plus a SQLite crate if needed | Files plus a selected SQLite driver if needed | Files plus a selected SQLite binding if needed | Files plus SQLite if needed |
-| Development tooling | Locked Python environment, formatter/linter, type checker, test runner | Cargo, rustfmt, Clippy, cargo test | Go modules, gofmt, vet, go test | Lockfile, TypeScript checks, formatter/linter, test runner | CMake, formatter/static analysis, CTest/test framework |
+| MCP | Official `mcp` SDK | Official `rmcp` SDK | Official Go SDK | Official TypeScript server SDK | Pinned fastmcpp with first-party protocol validation |
+| Jobs/processes | `asyncio` subprocesses | Tokio processes/tasks | `os/exec`, contexts, goroutines | Node child processes/streams | First-party Linux process supervisor and job coordinator |
+| Data contracts | Typed models plus runtime validation | Serde and schema generation | Typed structs plus schema validation | Runtime schemas plus TypeScript types | nlohmann/json, typed core records, and first-party validation |
+| Artifact index | Files plus standard-library SQLite if needed | Files plus a SQLite crate if needed | Files plus a selected SQLite driver if needed | Files plus a selected SQLite binding if needed | JSON manifests and directories |
+| Development tooling | Locked Python environment, formatter/linter, type checker, test runner | Cargo, rustfmt, Clippy, cargo test | Go modules, gofmt, vet, go test | Lockfile, TypeScript checks, formatter/linter, test runner | CMake/Ninja, clang-format, CTest, and project-owned checks |
 
 Python documents asynchronous subprocess control directly. RMCP uses Tokio, Serde,
 and schema generation. The current TypeScript SDK separates server and client
@@ -145,7 +157,7 @@ architecture.
 | Component | Current position |
 | --- | --- |
 | Implementation language | C++ throughout; user preference recorded. |
-| MCP library | fastmcpp 3.4.7.1 pinned and source-built; real Codex stdio capability query validated. First-party framing/schema checks handle documented local library gaps. |
+| MCP library | fastmcpp 3.4.7.1 pinned and source-built; real Codex stdio capability query validated at 0.1.0. The 0.2.0 workflow has synthetic checks and real capture/retained-inspection validation through C++ MCP clients. First-party framing/schema checks handle documented local library gaps. |
 | C++ standard | First-party C++20 selected and built with GCC/Clang; dependencies retain upstream language levels. |
 | Formatting | Root .clang-format copied byte-for-byte from lava-chan-viewer; its formatter settings do not choose the compiler language level. |
 | Build | CMake 3.25 minimum, Ninja configure/build/test presets, isolated build trees; exact tested compilers in BUILD_VALIDATION.md. |
@@ -160,10 +172,10 @@ architecture.
 | MCP client | Codex CLI 0.154.0; a real 0.1.0 capability query negotiated MCP 2025-06-18. |
 | MCP transport | Local stdio for the first release; persistent Streamable HTTP later. |
 | Display | System XCB desktop dependency, Vulkan XCB surface; actual KDE Wayland/Xwayland path exercised by the fixture. |
-| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation and basic fixture rendering exercised. Nsight source correlation remains pending. |
-| Nsight integration | Documented interfaces/exports only; explicit capability gaps and recorded failed attempts. |
-| Jobs/processes | Linux process primitive uses a private subreaper supervisor, argv/environment arrays, deadlines, cancellation, and bounded descendant cleanup. Used by the experiment runner; R-011's job coordinator and real Nsight lifecycle remain pending. |
-| Storage | R-012 implements the planned staged/atomic bundles, age/budget pruning, persistent pins, and coordinated usage leases next; no managed capture store is validated yet. SQLite remains optional. |
+| Test shaders | Source-built glslang 16.4.0; Vulkan 1.3/SPIR-V 1.6 debug compilation, seven-shader provenance, and basic/advanced fixture rendering exercised. Nsight source correlation remains pending. |
+| Nsight integration | Documented capture/replay CLI adapter and shared CaptureService implemented; native ngm-capture and MCP workflow use it. CPU checks and three real basic capture/export runs per release pass on 2026.3.1.0 and 2026.2.0.0 with corrected environment defaults. Typed retained queries pass on the qualified 2026.3.1.0 producer. Actual GPU replay stalls during initialization on both releases. See NSIGHT_VALIDATION.md and INVESTIGATIONS.md. |
+| Jobs/processes | Linux process supervisor uses argv/environment arrays, deadlines, cancellation, and bounded descendant cleanup. JobCoordinator serializes state transitions and GPU reservations, validates completion identities, and retains ownership until cleanup is confirmed. See JOBS.md. |
+| Storage | ArtifactStore implements staged/atomic bundles, age/budget pruning, persistent pins, coordinated leases, and restart recovery using JSON manifests and directories. CPU checks pass; real attempts, captures, controls, and image comparisons are pinned, with capture pins verified after restart. See ARTIFACTS.md. |
 
 ### Source-build and linkage policy
 
@@ -242,12 +254,15 @@ Kiln was inspected read-only on 2026-09-17:
 
 The policy is adopted in this repository's `AGENTS.md`, including shaders among
 first-party code. R-013 established CMake version `0.0.1` and the shared
-`ngm::project_version()` accessor; both entry points report it in checked standalone
-queries. R-003 will verify matching MCP server identity. Logs and artifact manifests
-will use the same project version. Keep version output off protocol stdout during
-normal stdio service. R-013 alone does not finish the R-013/R-005/R-003 group, so no
-minor increment is implied. Kiln's package machinery does not add binary packaging
-to our first-release scope.
+`ngm::project_version()` accessor; both entry points reported it in checked standalone
+queries. R-003 verified matching MCP server identity, and the R-013/R-005/R-003
+group completed at 0.1.0. The R-012/R-011/R-001 capture/evidence group completes
+at 0.2.0 after reviewed implementation and real validation. Its acceptance
+evidence records the tested pre-milestone version 0.1.1; the final minor bump
+subsumes the patch increment. Artifact manifests and capture reports derive
+their product version from the same accessor. Keep version output off protocol
+stdout during normal stdio service. Kiln's package machinery does not add binary
+packaging to our first-release scope.
 
 For reproducible investigations, extend the application version with a separate
 build record: source revision, dirty/unknown checkout state, dependency revisions,
@@ -278,7 +293,7 @@ This is an observed installation, not a dependency pin or a successful compilati
 test. R-013 independently pins and builds glslang 16.4.0 from source, using
 `-V --target-env vulkan1.3 -g -Od` for the diagnostic build probe. CPU checks inspect
 embedded GLSL source and line instructions and prove that compilation failure
-removes stale output. R-005 will add the real fixture's compilation/provenance
+removes stale output. R-005 added the real fixture's compilation/provenance
 records and shader hashes. Verify useful source correlation through the selected
 documented capture/export path; embedded debug information alone does not establish
 that an MCP query can retrieve it.
@@ -350,7 +365,10 @@ required dependencies, including the shader compiler, from source. Provide a
 documented Linux source-installation path; persistent Streamable HTTP follows
 later. Link vendored libraries statically and document the allowed system/runtime/
 GPU dependencies. C++20 and the initial source revisions are established by R-013;
-process-supervisor implementation and storage details remain to be finalized.
+the process supervisor, job coordinator, and JSON-manifest artifact store are
+implemented. Basic capture/export through MCP is verified on the recorded
+2026.3.1.0 and 2026.2.0.0 setups; broader compatibility and representative
+advanced/performance retention measurements remain outstanding.
 Run validation locally, including real GPU workflows on at least two Nsight
 releases. R-013 owns the build/toolchain choices, R-005 the fixture/windowing setup,
 R-011 process control, R-012 storage, and R-015 the exact compatibility matrix.

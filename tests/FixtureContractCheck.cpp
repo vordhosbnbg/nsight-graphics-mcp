@@ -80,9 +80,11 @@ Case make_case(const fs::path& executable, const fs::path& root, const std::stri
 }
 
 void copy_bundle(const fs::path& source, const fs::path& destination) {
-    for(const auto* name : {"provenance.json", "scene.vert", "scene.vert.spv", "scene.frag", "scene.frag.spv",
-                            "shader-error.frag", "shader-error.frag.spv"}) {
+    fs::copy_file(source / "provenance.json", destination / "provenance.json");
+    for(const auto* name :
+        {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag"}) {
         fs::copy_file(source / name, destination / name);
+        fs::copy_file(source / (std::string(name) + ".spv"), destination / (std::string(name) + ".spv"));
     }
 }
 
@@ -142,6 +144,42 @@ int main(int argc, char** argv) {
                 "application identity contains actual fixture/core compiler commands");
         require(rejected.at("provenance").at("kind") == "shader_bundle",
                 "shader provenance has a distinct identity kind");
+
+        require(rejected.at("workload").at("required_api_features").empty(),
+                "basic rendering never requires optional bindless features");
+        for(const auto* scenario :
+            {"multipass-reference", "pass-output-error", "bindless-reference", "resource-selection-error",
+             "indirect-reference", "indirect-parameter-error", "combined-reference", "combined-pass-error",
+             "combined-resource-error", "combined-indirect-error"}) {
+            auto advanced = make_case(executable, scratch.path, std::string("advanced input ") + scenario);
+            copy_bundle(built_shaders, advanced.shaders);
+            set_argument(advanced, "--scenario", scenario);
+            require_failure(advanced, 3, "DISPLAY is unset");
+            const auto record = Json::parse(ngm::read_regular_file(advanced.output / "result.json", 1024 * 1024));
+            const auto& requirements = record.at("workload");
+            const std::string_view selected(scenario);
+            const bool combined = selected.starts_with("combined-");
+            const bool bindless =
+                combined || selected == "bindless-reference" || selected == "resource-selection-error";
+            const bool multipass = combined || selected == "multipass-reference" || selected == "pass-output-error";
+            const bool indirect =
+                combined || selected == "indirect-reference" || selected == "indirect-parameter-error";
+            require(requirements.at("bindless_storage_buffers") == bindless &&
+                        requirements.at("post_processing") == multipass &&
+                        requirements.at("offscreen_render_target") == multipass &&
+                        requirements.at("indirect_draw") == indirect,
+                    "each advanced scenario preserves its requested workload even when display is unavailable");
+            require(requirements.at("required_api_features") ==
+                        (bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"})
+                                  : Json::array()),
+                    "only bindless scenarios require the exact descriptor-indexing features");
+            require(record.at("provenance").at("shaders").size() == 7,
+                    "advanced artifacts retained before display check");
+            require(record.at("device_support").empty(), "no device support claimed before a display was opened");
+        }
+        auto invalid_scenario = make_case(executable, scratch.path, "unsupported advanced scenario name");
+        set_argument(invalid_scenario, "--scenario", "combined-unrecognized");
+        require_failure(invalid_scenario, 2, "unknown scenario", false);
 
         auto malformed = make_case(executable, scratch.path, "malformed manifest");
         write_file(malformed.shaders / "provenance.json", "{ not JSON\n");
@@ -206,7 +244,8 @@ int main(int argc, char** argv) {
         require(mkfifo((fifo.shaders / "provenance.json").c_str(), 0600) == 0, "create manifest FIFO with no writer");
         require_failure(fifo, 1, "regular file within the size limit");
 
-        for(const auto* artifact : {"scene.frag", "scene.vert.spv"}) {
+        for(const auto* artifact :
+            {"scene.frag", "scene.vert.spv", "bindless.frag", "post.frag.spv", "indirect.vert.spv"}) {
             auto corrupted = make_case(executable, scratch.path, std::string("corrupted ") + artifact);
             copy_bundle(built_shaders, corrupted.shaders);
             auto bytes = ngm::read_regular_file(corrupted.shaders / artifact, 64 * 1024 * 1024);
@@ -226,6 +265,13 @@ int main(int argc, char** argv) {
         incomplete["shaders"].erase(2);
         write_file(inventory.shaders / "provenance.json", incomplete.dump());
         require_failure(inventory, 1, "missing required artifact shader-error.frag");
+
+        auto advanced_inventory = make_case(executable, scratch.path, "missing advanced inventory entry");
+        copy_bundle(built_shaders, advanced_inventory.shaders);
+        auto missing_advanced = manifest(advanced_inventory);
+        missing_advanced["shaders"].erase(4);
+        write_file(advanced_inventory.shaders / "provenance.json", missing_advanced.dump());
+        require_failure(advanced_inventory, 1, "missing required artifact bindless.frag");
 
         auto invalid = make_case(executable, scratch.path, "invalid CLI range");
         set_argument(invalid, "--frame", "601");

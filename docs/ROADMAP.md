@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **Build/basic-fixture group complete at 0.1.0; R-012 artifacts, R-011 jobs, and R-001 capture in progress.**
+Planning state: **Build/basic-fixture group complete at 0.1.0; capture/evidence group R-012/R-011/R-001 complete at 0.2.0. R-006 inspection, R-010 advanced fixture, and R-015 two-release qualification remain in progress.**
 Last updated: **2026-09-18**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -101,8 +101,9 @@ performance analysis, and a persistent Streamable HTTP service follow later.
 ## Implementation Sequence
 
 The R-013/R-005/R-003 build/basic-fixture group is complete at 0.1.0.
-The capture/evidence group is active; its exit check requires real Nsight runs
-with the shared job and storage components.
+The capture/evidence group completes at 0.2.0 after reviewed CPU checks and
+real basic capture/export matrices on two matching Nsight releases. Early R-006
+queries work on retained 2026.3.1.0 captures; detailed inspection remains active.
 
 | Step | Items | Exit check |
 | --- | --- | --- |
@@ -171,67 +172,43 @@ Item conventions:
 
 ## In Progress
 
-### R-012
-
-```text
-Status: In Progress
-Area: artifacts/core/mcp/test
-Title: Store capture evidence with configurable retention and pinning
-Goal: Keep capture evidence inspectable across server sessions while automatically managing eligible artifact storage and preserving explicitly retained evidence.
-Scope: Server-managed artifact bundles with stable IDs, raw captures/exports/logs/reports, provenance manifests and derived indexes; staging and atomic publication on the destination filesystem, explicit failed-attempt bundles, and interrupted-publication recovery; configurable maximum age and storage budget, oldest-eligible-first pruning, persistent pin/unpin state, temporary usage leases for active readers/writers, storage-usage reporting, and small records explaining expired references. Coordinate protection checks with deletion claims and prune whole bundles. Expose bounded artifact queries and retention controls through MCP.
-Acceptance: Artifacts and pin state remain discoverable after restart; readers never observe partial bundles as complete, interrupted publication is reconciled, and failed attempts retain available evidence with an explicit failure status; fake-clock/filesystem tests demonstrate age and budget pruning of completed unpinned bundles, protection of pinned/in-use data including a pin/lease acquired while pruning is choosing candidates, and cleanup confined to managed artifacts; related files are retained or expired coherently; expired references report their status; quota exhaustion or disk-full failures are actionable without deleting protected data; a before/after capture comparison and an investigation entry can explicitly pin and retrieve their evidence bundles.
-Notes: Retention policy selected in round 8. This is a first-release prerequisite shared by R-011, R-001, R-002, R-006, and R-007; core storage tests do not need a GPU and R-003 supplies the MCP adapter. Pinning exempts data from automatic pruning; references alone do not. Pinned bytes still count toward reported usage, so a storage budget is not a guarantee when protected data exceeds it. Choose and document default limits and age semantics after measuring fixture artifacts. Index format and exact cleanup scheduling remain implementation choices; this item does not require SQLite.
-```
-
-### R-011
-
-```text
-Status: In Progress
-Area: core/platform/mcp/test
-Title: Manage one application launch per capture job
-Goal: Give each capture a fresh, owned application instance and a predictable lifecycle without leaving job processes running after completion or cancellation.
-Scope: Job IDs and state transitions, executable/argument/working-directory inputs, process ownership, captured subprocess logs, configurable deadlines, cancellation, and bounded cleanup on success, failure, or server shutdown; a single coordinator applies worker completions after checking job/capture/attempt identity and expected state. Add test-only C++ command-line stand-ins at the real process boundary, controlling output streams, exits, files, delays, and child processes. Expose job status and cancellation through the MCP adapter.
-Acceptance: Consecutive capture jobs use separate application instances and separately identified outputs; executable stand-ins exercise launch failure, early exit, malformed/missing exports, output-stream handling, hangs, timeout, cancellation, and shutdown without requiring a GPU or Nsight; stale completions cannot revive terminal jobs or cross capture identities; success/cancellation/timeout races resolve once, and GPU reservations remain held until owned-process cleanup is confirmed; owned child processes are cleaned up while unrelated processes remain untouched; a real Nsight capture exercises the same lifecycle; subprocess output stays separate from MCP protocol stdout.
-Notes: First-release lifecycle selected in round 7. Core process handling is independent of MCP; R-003 exposes it and R-001/R-002 use it. Use R-012 for output bundles and protect artifacts while a job is writing or reading them. Real capture acceptance is checked with those integrations and R-005. Validate Nsight launcher/target process behavior before choosing the cleanup mechanism. This work does not introduce application-session reuse or attachment to existing processes.
-```
-
-### R-001
-
-```text
-Status: In Progress
-Area: capture/platform
-Title: Capture unmodified Vulkan applications
-Goal: Let agents capture supported Vulkan workloads without requiring changes to the application's source or an application-side integration.
-Scope: A fresh application launch for each capture through Nsight's documented interface, with executable, arguments, working directory, supported capture triggers, and a managed output destination; expose capture results and useful failure information through R-011's job lifecycle.
-Acceptance: A reproducible Vulkan application produces a saved capture without source changes; the matching replayer reads its metadata; repeating the request launches a new application instance and produces a separate capture; launch/capture failures are reported without claiming success; applications lacking a usable capture delimiter receive an explicit limitation.
-Notes: Accepted application mode in round 2 and fresh-launch lifecycle in round 7. Depends on R-003 for MCP access, R-011's process supervisor, and R-012's artifact store; use R-005 with NGFX integration disabled as the primary fixture and extend capture validation to R-010 before release. Round 8 requires an existing desktop session; verify its display prerequisites and actual window-system path. Exact API features remain to validate. Existing-process attachment, application-session reuse, and fully headless operation are outside first-release scope; compatibility with every Vulkan feature is not promised.
-```
-
-## Pending
-
 ### R-006
 
 ```text
-Status: Pending
+Status: In Progress
 Area: analysis/replay/shaders/artifacts
 Title: Establish the detailed capture-inspection interface
 Goal: Determine and demonstrate which pipeline, shader, and resource evidence can be retrieved programmatically for the visual-debugging workflow.
 Scope: Representative R-005 and R-010 captures, documented Nsight interfaces and real export schemas, event/object identity, draw-to-pipeline and shader association, bindings, and selected resource contents; probes and a capability matrix for R-015's selected Nsight releases, distinguishing native capture data, application-provided evidence, and unavailable information; a record of every failed integration/extraction attempt in docs/INVESTIGATIONS.md. Cover pass relationships, bindless resource selection, and indirect draw evidence where documented interfaces expose them.
 Acceptance: Each required evidence category has a reproducible extraction example or a demonstrated gap tied to the tested backend/version; a minimal extraction path is exercised on a correct/faulty visual pair; each failed attempt records its documented entry point, reproduction steps, expected/observed results, evidence, and revisit condition; unresolved gaps and the chosen next action are recorded before dependent diagnostic features are claimed complete.
-Notes: Depends on R-001 and R-005; initial probes can start with basic fixtures, then the matrix must cover R-010 before release. Store evidence through R-012 and explicitly pin bundles referenced by investigation records. Round 5 limits integration to documented Nsight interfaces and accepts explicit limitations; do not add private RPC, GUI automation, reverse-engineered formats, or a complementary backend to bypass a gap. Detailed state must not be inferred from function names or object counts alone. A documented gap completes investigation of that category, not the missing inspection capability needed by R-007; insufficient evidence leaves the dependent capability incomplete.
+Notes: Depends on R-001 and R-005; initial probes can start with basic fixtures, then the matrix must cover R-010 before release. Store evidence through R-012 and explicitly pin bundles referenced by investigation records. Round 5 limits integration to documented Nsight interfaces and accepts explicit limitations; do not add private RPC, GUI automation, reverse-engineered formats, or a complementary backend to bypass a gap. Detailed state must not be inferred from function names or object counts alone. A documented gap completes investigation of that category, not the missing inspection capability needed by R-007; insufficient evidence leaves the dependent capability incomplete. Early work on 2026-09-18 inspects a pinned correct/faulty pair from Nsight 2026.3.1.0 and adds bounded metadata/event/object parsers with sanitized regression inputs. docs/INSPECTION.md records actual inventory schemas and missing state; the integrated parser CPU check and independent review pass. Typed MCP metadata/event/object queries now pass integrated CPU checks, a fresh independent review, and actual retained-capture pagination/restart queries on the pinned correct/faulty pair; validation report bundle-e8bedf549310ff13da710678546d0a9f is pinned. The C++ capture connection timeout and GPU replay initialization stall are retained in investigations I-006/I-007. Detailed event state, advanced capture cases, and a second typed producer profile remain incomplete.
 ```
 
 ### R-010
 
 ```text
-Status: Pending
+Status: In Progress
 Area: test/platform/shaders
 Title: Add multipass, bindless, and indirect rendering scenarios
 Goal: Make the development application representative of the advanced visual workloads selected for the first release while retaining reproducible defect isolation.
 Scope: Extend R-005 with multiple passes, offscreen render targets, post-processing, bindless resource access, and indirect draws; selectable feature/scenario configurations, a combined workload, correct references, and controlled visual defects involving pass output, resource selection, or indirect draw parameters.
 Acceptance: Each feature can be exercised in a reproducible scenario and the combined workload runs on the validated development configuration; correct and faulty outputs have documented references/tolerances; requested feature support is checked explicitly; the configuration and required API features accompany each run; capture compatibility and inspection gaps are recorded through R-001/R-006 without silently substituting simpler scenarios.
-Notes: Required first-release renderer coverage selected in interview round 6; depends on R-005. Basic fixtures may enable earlier capture experiments, but they do not satisfy this item's advanced coverage. Exact Vulkan feature/extension choices remain to validate on the development GPU and Nsight version. Fixtures should use valid, deterministic API usage for visual defects; arbitrary out-of-bounds access or undefined behavior cannot serve as a stable reference. Standalone compute diagnosis and profiling remain later work.
+Notes: Required first-release renderer coverage selected in interview round 6; depends on R-005. Basic fixtures may enable earlier capture experiments, but they do not satisfy this item's advanced coverage. Exact Vulkan feature/extension choices remain to validate on the development GPU and Nsight version. Fixtures should use valid, deterministic API usage for visual defects; arbitrary out-of-bounds access or undefined behavior cannot serve as a stable reference. Standalone compute diagnosis and profiling remain later work. Implementation and fresh-context review now cover ten advanced scenarios alongside the four basic cases. The full application-readback matrix passes all 57 fresh launches with synchronization validation on the recorded GPU/driver/desktop, deterministic repeats, and the independent oracle. Complete evidence is pinned as bundle-a5e2bf5a70cfdff49bb8705afff9aba5; docs/FIXTURE.md records exact commands and feature requirements. Advanced Nsight capture compatibility and inspection gaps remain to be recorded before completion.
 ```
+
+### R-015
+
+```text
+Status: In Progress
+Area: test/platform/capture/replay/docs
+Title: Validate locally against two Nsight Graphics releases
+Goal: Establish first-release compatibility through reproducible local checks and real GPU workflows on at least two distinct Nsight releases.
+Scope: Local CMake/CTest commands for first-party checks, opt-in hardware integration runs using R-005's isolated experiment runner, explicit Nsight installation selection, matching capture/replay/SDK configuration per release, small sanitized export fixtures and capability differences, and a versioned results matrix for the basic and advanced visual workloads. Start with the installed baseline and select a compatible second release from documented prerequisites.
+Acceptance: Local non-GPU checks cover the relevant parser, job, artifact, and MCP behavior; on each selected Nsight release, real runs demonstrate unmodified capture, optional SDK capture, available evidence queries, and a source-edit/rebuild/recapture verification case; the basic and advanced scenario matrix records pass/fail/unsupported/skipped separately; each result identifies the exact tools, SDK, app/shader build, GPU/driver, desktop, and retained evidence; missing prerequisites and unsupported operations return explicit errors; two-release support is not claimed from mocks, parser fixtures, or skipped runs.
+Notes: Validation location and at least two releases selected in round 10. Uses R-013's build/test entry points and the implemented first-release fixture, MCP, capture, inspection, job, and artifact paths. R-006 supplies per-version capability evidence and R-014 publishes results. Only the 2026.3 installation was observed in /opt/nsight-graphics during planning; a second release must be obtained and validated, not assumed present. Test each release with its own matching tools; cross-version capture-file replay is not required or presumed. Hosted CI, GPU CI runners, and additional GPU generations are outside this item. Failed or unavailable required cases remain incomplete rather than being counted as successful support. Qualification of 2026.2 is now underway: the official 2026.2.0.26134 Linux archive was downloaded and its vendor payload extracted under ignored build/nsight-2026.2/installation, without running package-maintenance scripts or changing the installed driver. The basic hardware harness passes on both 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, with matching tools, all five exports, fresh targets, and pins after restart. docs/NSIGHT_VALIDATION.md identifies the exact evidence and remaining gaps. Actual GPU replay times out on both releases; full SDK/advanced/inspection/repair qualification remains required.
+```
+
+## Pending
 
 ### R-007
 
@@ -255,18 +232,6 @@ Goal: Give applications whose source is available precise native capture control
 Scope: A C++ integration with the NGFX SDK, initialization before Vulkan instance creation, explicit workload boundaries, and per-launch capture configuration/result reporting so the server can request and observe a capture within a fresh application invocation.
 Acceptance: A newly launched instrumented graphics fixture captures a chosen visual workload boundary and returns a usable artifact through the job lifecycle; a second request uses a fresh instance; the unmodified capture path continues to work without this integration.
 Notes: Accepted application mode and native integration priority in rounds 1–2. Depends on R-003, R-005, R-011, R-012, and the capture contract also used by R-001. Add an instrumented fixture mode while retaining a run without NGFX integration. Round 7 makes a reusable application control session unnecessary for this release; choose a per-launch configuration/result mechanism and validate SDK synchronization. Round 6 moves compute-without-presentation validation to R-008. May move earlier if the visual workflow needs precise application-side capture boundaries.
-```
-
-### R-015
-
-```text
-Status: Pending
-Area: test/platform/capture/replay/docs
-Title: Validate locally against two Nsight Graphics releases
-Goal: Establish first-release compatibility through reproducible local checks and real GPU workflows on at least two distinct Nsight releases.
-Scope: Local CMake/CTest commands for first-party checks, opt-in hardware integration runs using R-005's isolated experiment runner, explicit Nsight installation selection, matching capture/replay/SDK configuration per release, small sanitized export fixtures and capability differences, and a versioned results matrix for the basic and advanced visual workloads. Start with the installed baseline and select a compatible second release from documented prerequisites.
-Acceptance: Local non-GPU checks cover the relevant parser, job, artifact, and MCP behavior; on each selected Nsight release, real runs demonstrate unmodified capture, optional SDK capture, available evidence queries, and a source-edit/rebuild/recapture verification case; the basic and advanced scenario matrix records pass/fail/unsupported/skipped separately; each result identifies the exact tools, SDK, app/shader build, GPU/driver, desktop, and retained evidence; missing prerequisites and unsupported operations return explicit errors; two-release support is not claimed from mocks, parser fixtures, or skipped runs.
-Notes: Validation location and at least two releases selected in round 10. Uses R-013's build/test entry points and the implemented first-release fixture, MCP, capture, inspection, job, and artifact paths. R-006 supplies per-version capability evidence and R-014 publishes results. Only the 2026.3 installation was observed in /opt/nsight-graphics during planning; a second release must be obtained and validated, not assumed present. Test each release with its own matching tools; cross-version capture-file replay is not required or presumed. Hosted CI, GPU CI runners, and additional GPU generations are outside this item. Failed or unavailable required cases remain incomplete rather than being counted as successful support.
 ```
 
 ### R-014
@@ -320,6 +285,42 @@ Notes: Accepted later work in interview round 3, outside the first release. Depe
 ## Blocked
 
 ## Done
+
+### R-012
+
+```text
+Status: Done
+Area: artifacts/core/mcp/test
+Title: Store capture evidence with configurable retention and pinning
+Goal: Keep capture evidence inspectable across server sessions while automatically managing eligible artifact storage and preserving explicitly retained evidence.
+Scope: Server-managed artifact bundles with stable IDs, raw captures/exports/logs/reports, provenance manifests and derived indexes; staging and atomic publication on the destination filesystem, explicit failed-attempt bundles, and interrupted-publication recovery; configurable maximum age and storage budget, oldest-eligible-first pruning, persistent pin/unpin state, temporary usage leases for active readers/writers, storage-usage reporting, and small records explaining expired references. Coordinate protection checks with deletion claims and prune whole bundles. Expose bounded artifact queries and retention controls through MCP.
+Acceptance: Artifacts and pin state remain discoverable after restart; readers never observe partial bundles as complete, interrupted publication is reconciled, and failed attempts retain available evidence with an explicit failure status; fake-clock/filesystem tests demonstrate age and budget pruning of completed unpinned bundles, protection of pinned/in-use data including a pin/lease acquired while pruning is choosing candidates, and cleanup confined to managed artifacts; related files are retained or expired coherently; expired references report their status; quota exhaustion or disk-full failures are actionable without deleting protected data; a before/after capture comparison and an investigation entry can explicitly pin and retrieve their evidence bundles.
+Notes: Retention policy selected in round 8. This is a first-release prerequisite shared by R-011, R-001, R-002, R-006, and R-007; core storage tests do not need a GPU and R-003 supplies the MCP adapter. Pinning exempts data from automatic pruning; references alone do not. Pinned bytes still count toward reported usage, so a storage budget is not a guarantee when protected data exceeds it. Choose and document default limits and age semantics after measuring fixture artifacts. Index format and exact cleanup scheduling remain implementation choices; this item does not require SQLite. Completed 2026-09-18 in the R-012/R-011/R-001 capture/evidence group at 0.2.0. JSON manifests/directories, atomic publication and recovery, protected pin/lease retention, quota errors, and expiration records have CPU coverage. Twenty integrated CPU checks pass. All six real basic captures and their two baseline/report pairs are pinned and retrievable after restart; I-005 retains a pinned comparison and investigations retain failed evidence. The selected defaults are 2 GiB/30 days, with measured basic sizes and limitations in docs/ARTIFACTS.md. Independent acceptance review found no blocking defect.
+```
+
+### R-011
+
+```text
+Status: Done
+Area: core/platform/mcp/test
+Title: Manage one application launch per capture job
+Goal: Give each capture a fresh, owned application instance and a predictable lifecycle without leaving job processes running after completion or cancellation.
+Scope: Job IDs and state transitions, executable/argument/working-directory inputs, process ownership, captured subprocess logs, configurable deadlines, cancellation, and bounded cleanup on success, failure, or server shutdown; a single coordinator applies worker completions after checking job/capture/attempt identity and expected state. Add test-only C++ command-line stand-ins at the real process boundary, controlling output streams, exits, files, delays, and child processes. Expose job status and cancellation through the MCP adapter.
+Acceptance: Consecutive capture jobs use separate application instances and separately identified outputs; executable stand-ins exercise launch failure, early exit, malformed/missing exports, output-stream handling, hangs, timeout, cancellation, and shutdown without requiring a GPU or Nsight; stale completions cannot revive terminal jobs or cross capture identities; success/cancellation/timeout races resolve once, and GPU reservations remain held until owned-process cleanup is confirmed; owned child processes are cleaned up while unrelated processes remain untouched; a real Nsight capture exercises the same lifecycle; subprocess output stays separate from MCP protocol stdout.
+Notes: First-release lifecycle selected in round 7. Core process handling is independent of MCP; R-003 exposes it and R-001/R-002 use it. Use R-012 for output bundles and protect artifacts while a job is writing or reading them. Real capture acceptance is checked with those integrations and R-005. Validate Nsight launcher/target process behavior before choosing the cleanup mechanism. This work does not introduce application-session reuse or attachment to existing processes. Completed 2026-09-18 in the R-012/R-011/R-001 capture/evidence group at 0.2.0. Typed coordinator completions, process ownership, deadlines/cancellation/shutdown, stale identity rejection, GPU reservations through cleanup, and protocol-output isolation are covered by the passing 20-check CPU aggregate. Both real basic hardware matrices demonstrate three distinct fresh targets, separate bundles, confirmed cleanup, released reservations, and normal MCP shutdown. The independent acceptance audit found no blocking defect; docs/JOBS.md and docs/NSIGHT_VALIDATION.md record scope and evidence.
+```
+
+### R-001
+
+```text
+Status: Done
+Area: capture/platform
+Title: Capture unmodified Vulkan applications
+Goal: Let agents capture supported Vulkan workloads without requiring changes to the application's source or an application-side integration.
+Scope: A fresh application launch for each capture through Nsight's documented interface, with executable, arguments, working directory, supported capture triggers, and a managed output destination; expose capture results and useful failure information through R-011's job lifecycle.
+Acceptance: A reproducible Vulkan application produces a saved capture without source changes; the matching replayer reads its metadata; repeating the request launches a new application instance and produces a separate capture; launch/capture failures are reported without claiming success; applications lacking a usable capture delimiter receive an explicit limitation.
+Notes: Accepted application mode in round 2 and fresh-launch lifecycle in round 7. Depends on R-003 for MCP access, R-011's process supervisor, and R-012's artifact store; use R-005 with NGFX integration disabled as the primary fixture and extend capture validation to R-010 before release. Round 8 requires an existing desktop session; verify its display prerequisites and actual window-system path. Exact API features remain to validate. Existing-process attachment, application-session reuse, and fully headless operation are outside first-release scope; compatibility with every Vulkan feature is not promised. Completed 2026-09-18 in the R-012/R-011/R-001 capture/evidence group at 0.2.0. The uninstrumented fixture is captured through the shared C++ service and MCP on 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608. Each matching-tool matrix passes reference/repeat/faulty launches, all five exports, metadata readability, cleanup, and retained evidence access. CPU stand-ins cover failures. The presented-frame delimiter requirement is explicit. Independent acceptance review passes. See docs/CAPTURE_VALIDATION.md and docs/NSIGHT_VALIDATION.md; GPU replay and advanced capture compatibility remain separate unfinished work.
+```
 
 ### R-005
 

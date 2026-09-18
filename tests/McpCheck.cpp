@@ -1,48 +1,30 @@
 #include "Check.hpp"
+#include "McpClient.hpp"
 #include "ngm/Version.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <array>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include <fcntl.h>
-#include <poll.h>
-#include <spawn.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 namespace {
 using Json = nlohmann::json;
 using ngm::check::require;
+using ngm::check::mcp::Client;
 using Clock = std::chrono::steady_clock;
 using namespace std::chrono_literals;
-
-void close_fd(int& descriptor) {
-    if(descriptor >= 0) {
-        close(descriptor);
-        descriptor = -1;
-    }
-}
-
-struct Pipe {
-    int descriptors[2] = {-1, -1};
-    Pipe() {
-        require(pipe2(descriptors, O_CLOEXEC) == 0, "create check pipe");
-    }
-    ~Pipe() {
-        close_fd(descriptors[0]);
-        close_fd(descriptors[1]);
-    }
-};
 
 struct Scratch {
     std::filesystem::path path;
@@ -56,146 +38,6 @@ struct Scratch {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
-};
-
-class Client {
-public:
-    Client(const std::string& executable, const std::filesystem::path& path,
-           const std::vector<std::string>& arguments = {}, bool display = false) {
-        std::vector<std::string> command{executable};
-        command.insert(command.end(), arguments.begin(), arguments.end());
-        std::vector<char*> argv;
-        for(auto& argument : command) {
-            argv.push_back(argument.data());
-        }
-        argv.push_back(nullptr);
-        std::vector<std::string> environment{"PATH=" + path.string()};
-        if(display) {
-            environment.emplace_back("DISPLAY=:not-a-real-display");
-        }
-        std::vector<char*> envp;
-        for(auto& variable : environment) {
-            envp.push_back(variable.data());
-        }
-        envp.push_back(nullptr);
-
-        posix_spawn_file_actions_t actions;
-        require(posix_spawn_file_actions_init(&actions) == 0, "initialize spawn actions");
-        const bool valid_actions = posix_spawn_file_actions_adddup2(&actions, input_.descriptors[0], 0) == 0 &&
-                                   posix_spawn_file_actions_adddup2(&actions, output_.descriptors[1], 1) == 0 &&
-                                   posix_spawn_file_actions_adddup2(&actions, error_.descriptors[1], 2) == 0;
-        const auto error = valid_actions
-                               ? posix_spawn(&pid_, executable.c_str(), &actions, nullptr, argv.data(), envp.data())
-                               : EINVAL;
-        posix_spawn_file_actions_destroy(&actions);
-        require(error == 0, "spawn actual MCP server executable");
-        close_fd(input_.descriptors[0]);
-        close_fd(output_.descriptors[1]);
-        close_fd(error_.descriptors[1]);
-    }
-    ~Client() {
-        if(pid_ > 0) {
-            kill(pid_, SIGKILL);
-            while(waitpid(pid_, nullptr, 0) < 0 && errno == EINTR) {
-            }
-        }
-    }
-    void write(std::string_view bytes) {
-        while(!bytes.empty()) {
-            const auto count = ::write(input_.descriptors[1], bytes.data(), bytes.size());
-            if(count < 0 && errno == EINTR) {
-                continue;
-            }
-            require(count > 0, "write MCP request to server");
-            bytes.remove_prefix(static_cast<std::size_t>(count));
-        }
-    }
-    void send(const Json& request) {
-        write(request.dump() + '\n');
-    }
-    Json response() {
-        const auto deadline = Clock::now() + 5s;
-        while(stdout_.find('\n') == std::string::npos) {
-            require(output_.descriptors[0] >= 0, "server exited before response: " + stderr_);
-            pump(deadline);
-        }
-        const auto newline = stdout_.find('\n');
-        const auto line = stdout_.substr(0, newline);
-        stdout_.erase(0, newline + 1);
-        const auto result = Json::parse(line);
-        require(result.is_object() && result.value("jsonrpc", "") == "2.0", "stdout contains only JSON-RPC");
-        require(result.contains("id") && (result.contains("result") != result.contains("error")),
-                "response has an id and exactly one result or error");
-        return result;
-    }
-    Json request(int id, const char* method, Json params = Json::object()) {
-        send({{"jsonrpc", "2.0"}, {"id", id}, {"method", method}, {"params", std::move(params)}});
-        auto result = response();
-        require(result["id"] == id, "response id matches request (notifications produced no response)");
-        return result;
-    }
-    void close_input() {
-        close_fd(input_.descriptors[1]);
-    }
-    int finish() {
-        close_input();
-        const auto deadline = Clock::now() + 5s;
-        while(output_.descriptors[0] >= 0 || error_.descriptors[0] >= 0) {
-            pump(deadline);
-        }
-        require(stdout_.empty(), "EOF has no unexpected protocol output or banner");
-        int status = 0;
-        while(true) {
-            const auto waited = waitpid(pid_, &status, WNOHANG);
-            if(waited == pid_) {
-                pid_ = -1;
-                break;
-            }
-            require(waited == 0 || (waited < 0 && errno == EINTR), "wait for server process");
-            require(Clock::now() < deadline, "server exits promptly on EOF");
-            std::this_thread::sleep_for(1ms);
-        }
-        require(WIFEXITED(status), "server terminates normally");
-        return WEXITSTATUS(status);
-    }
-    const std::string& diagnostics() const {
-        return stderr_;
-    }
-
-private:
-    void pump(Clock::time_point deadline) {
-        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
-        require(remaining.count() > 0, "server response/shutdown deadline");
-        std::array<pollfd, 2> descriptors{{{output_.descriptors[0], POLLIN, 0}, {error_.descriptors[0], POLLIN, 0}}};
-        const auto result = poll(descriptors.data(), descriptors.size(), static_cast<int>(remaining.count()));
-        if(result < 0 && errno == EINTR) {
-            return;
-        }
-        require(result > 0, "server pipe deadline");
-        for(std::size_t index = 0; index < descriptors.size(); ++index) {
-            if(descriptors[index].revents == 0) {
-                continue;
-            }
-            int& descriptor = index == 0 ? output_.descriptors[0] : error_.descriptors[0];
-            auto& destination = index == 0 ? stdout_ : stderr_;
-            std::array<char, 4096> buffer;
-            const auto count = read(descriptor, buffer.data(), buffer.size());
-            if(count == 0) {
-                close_fd(descriptor);
-            } else if(count > 0) {
-                destination.append(buffer.data(), static_cast<std::size_t>(count));
-                require(destination.size() < 256 * 1024, "bounded protocol and diagnostic output");
-            } else {
-                require(errno == EINTR, "read server output");
-            }
-        }
-    }
-    Pipe input_;
-    Pipe output_;
-    Pipe error_;
-    pid_t pid_ = -1;
-    std::string stdout_;
-    std::string stderr_;
 };
 
 Json initialize(Client& client, std::string_view protocol = "2025-11-25") {
@@ -218,13 +60,13 @@ void expect_error(const Json& response, int code) {
             "actionable error message");
 }
 
-void expect_tool_error(const Json& response) {
+void expect_tool_error(const Json& response, std::string_view expected = {}) {
     require(response.contains("result") && !response.contains("error"), "tool input error is a tool result");
     const auto& result = response["result"];
     require(result["isError"] == true, "invalid tool input sets isError");
     require(result["content"].size() == 1 && result["content"][0]["type"] == "text", "tool error text content");
-    require(result["content"][0]["text"].get<std::string>().find("Remove all argument properties") != std::string::npos,
-            "tool input error explains how to correct the call");
+    const auto message = result["content"][0]["text"].get<std::string>();
+    require(!message.empty() && message.find(expected) != std::string::npos, "actionable tool error: " + message);
     require(!result.contains("structuredContent"), "input error does not masquerade as a capabilities report");
 }
 
@@ -237,11 +79,21 @@ Json query_capabilities(Client& client) {
     const auto report = result["structuredContent"];
     require(Json::parse(result["content"][0]["text"].get<std::string>()) == report, "text and structured result agree");
     require(report["server"]["version"] == ngm::project_version(), "capabilities use project version");
-    require(report["implemented_tools"] == Json::array({"capabilities"}), "only available tool advertised");
-    for(const auto& operation : report["operations"]) {
+    require(report["implemented_tools"] ==
+                Json::array({"capabilities", "capture", "job_status", "job_cancel", "artifact_list", "artifact_info",
+                             "artifact_files", "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune",
+                             "artifact_import", "capture_metadata", "capture_events", "capture_objects"}),
+            "exactly the implemented tools advertised");
+    for(const auto* name : {"profiling", "fixture_via_mcp"}) {
+        const auto& operation = report["operations"][name];
         require(operation["available"] == false && operation["status"] == "not_implemented",
-                "pending integrations remain unavailable");
+                "pending typed integrations remain unavailable");
     }
+    const auto storage = report["prerequisites"]["artifact_store"]["configured"].get<bool>();
+    require(report["operations"]["inspection"]["available"] == storage &&
+                report["operations"]["inspection"]["status"] ==
+                    (storage ? "retained_exports_only" : "missing_prerequisites"),
+            "inventory inspection requires retained storage, not live tool or desktop observations");
     require(report["prerequisites"]["nsight"]["compatibility"] == "not_verified", "paths do not prove support");
     require(report["prerequisites"]["nsight"]["version"].is_null(), "no invented Nsight version");
     require(report["prerequisites"]["gpu"]["status"] == "not_probed", "no GPU claim from filenames");
@@ -253,10 +105,14 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 1 && listing[0]["name"] == "capabilities", "discover exactly the implemented tool");
-    require(listing[0]["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
-    require(listing[0].contains("outputSchema"), "structured output schema advertised");
-    require(listing[0]["annotations"]["readOnlyHint"] == true, "read-only tool annotation");
+    require(listing.size() == 15, "discover exactly the implemented tools");
+    for(const auto& tool : listing) {
+        require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
+        require(tool.contains("outputSchema"), "structured output schema advertised");
+        if(tool["name"] == "capabilities") {
+            require(tool["annotations"]["readOnlyHint"] == true, "read-only capability annotation");
+        }
+    }
     auto report = query_capabilities(client);
     require(report["server"]["protocol_version"] == "2025-11-25", "capabilities report actual negotiation");
     for(const auto& executable : report["prerequisites"]["nsight"]["executables"]) {
@@ -363,7 +219,9 @@ void discovery_check(const std::string& server, const Scratch& scratch) {
     }
     // A non-executable file is not an executable observation.
     std::filesystem::permissions(tools / "ngfx-replay", std::filesystem::perms::owner_read);
-    Client explicit_root(server, scratch.path, {"--nsight-root", root.string()}, true);
+    const auto unopened = scratch.path / "discovery-must-not-create-this";
+    Client explicit_root(server, scratch.path, {"--nsight-root", root.string(), "--artifact-root", unopened.string()},
+                         true);
     initialize(explicit_root);
     const auto report = query_capabilities(explicit_root);
     require(report["prerequisites"]["nsight"]["discovery_source"] == "explicit_root", "explicit installation");
@@ -374,7 +232,10 @@ void discovery_check(const std::string& server, const Scratch& scratch) {
     require(report["prerequisites"]["desktop"]["display_environment_present"] == true &&
                 report["prerequisites"]["desktop"]["connection"] == "not_verified",
             "display variable is not a working connection claim");
+    require(report["prerequisites"]["artifact_store"]["configured"] == true, "configured artifact root observed");
+    require(report["operations"]["capture"]["available"] == false, "missing replay blocks capture readiness");
     require(explicit_root.finish() == 0, "explicit-root server EOF");
+    require(!std::filesystem::exists(unopened), "discovery-only session never creates the artifact root");
 
     const auto search = scratch.path / "search-bin";
     std::filesystem::create_directory(search);
@@ -400,16 +261,578 @@ void discovery_check(const std::string& server, const Scratch& scratch) {
     require(bad_root.finish() == 2, "relative root rejected");
     require(bad_root.diagnostics().find("absolute directory") != std::string::npos, "root error on stderr");
 }
+
+Json call(Client& client, const char* name, Json arguments = Json::object()) {
+    return client.request(42, "tools/call", {{"name", name}, {"arguments", std::move(arguments)}});
+}
+Json successful_call(Client& client, const char* name, Json arguments = Json::object()) {
+    const auto response = call(client, name, std::move(arguments));
+    if(std::string_view(name).starts_with("capture_")) {
+        require(response.dump().size() <= 1024U * 1024U,
+                "inspection protocol reply stays within 1 MiB including fallback");
+    }
+    require(response.contains("result") && !response["result"].value("isError", false),
+            std::string(name) + " succeeds: " + response.dump());
+    const auto& result = response["result"];
+    require(result.contains("structuredContent") && result["structuredContent"].is_object(),
+            "structured workflow result");
+    require(Json::parse(result["content"][0]["text"].get<std::string>()) == result["structuredContent"],
+            "workflow text and structured results agree");
+    return result["structuredContent"];
+}
+Json await_job(Client& client, const std::string& id) {
+    const auto deadline = Clock::now() + 10s;
+    while(Clock::now() < deadline) {
+        auto result = successful_call(client, "job_status", {{"job_id", id}});
+        const auto state = result.at("state").get<std::string>();
+        if(state != "running" && state != "queued" && result.at("worker_running") == false &&
+           result.at("finalization_pending") == false) {
+            return result;
+        }
+        std::this_thread::sleep_for(5ms);
+    }
+    throw std::runtime_error("job did not terminate before test deadline");
+}
+void await_record(const std::filesystem::path& path) {
+    const auto deadline = Clock::now() + 5s;
+    while(Clock::now() < deadline) {
+        std::error_code error;
+        if(std::filesystem::is_regular_file(path, error) && std::filesystem::file_size(path, error) > 0 && !error) {
+            return;
+        }
+        std::this_thread::sleep_for(5ms);
+    }
+    throw std::runtime_error("capture target did not publish its PID before test deadline");
+}
+pid_t recorded_pid(const std::filesystem::path& path) {
+    pid_t result = 0;
+    std::ifstream(path) >> result;
+    require(result > 0, "target PID recorded");
+    return result;
+}
+void require_gone(pid_t process) {
+    require(kill(process, 0) < 0 && errno == ESRCH, "owned target process is gone");
+}
+
+void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
+    const auto root = scratch.path / "invalid-inputs-must-not-create-this";
+    Client client(server, scratch.path, {"--artifact-root", root.string()});
+    initialize(client);
+    const std::string id = "bundle-" + std::string(32, '0');
+    for(const auto* name :
+        {"capture", "job_status", "job_cancel", "artifact_info", "artifact_files", "artifact_read", "artifact_pin",
+         "artifact_import", "capture_metadata", "capture_events", "capture_objects"}) {
+        expect_tool_error(call(client, name));
+    }
+    for(const auto* name : {"capture", "job_status", "job_cancel", "artifact_list", "artifact_info", "artifact_files",
+                            "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune", "artifact_import",
+                            "capture_metadata", "capture_events", "capture_objects"}) {
+        expect_tool_error(call(client, name, {{"unknown", true}}));
+    }
+    for(const auto& invalid : {Json(-1), Json(0), Json(101), Json(1.5), Json("10"), Json(true)}) {
+        expect_tool_error(call(client, "artifact_list", {{"limit", invalid}}));
+    }
+    expect_tool_error(call(client, "job_status", {{"job_id", "../job-x"}}));
+    expect_tool_error(call(client, "artifact_info", {{"artifact_id", "not-a-bundle"}}));
+    expect_tool_error(call(client, "artifact_pin", {{"artifact_id", id}, {"pinned", 1}}));
+    expect_tool_error(call(client, "artifact_files", {{"artifact_id", id}, {"offset", 4097}}));
+    for(const auto* tool : {"capture_metadata", "capture_events", "capture_objects"}) {
+        expect_tool_error(call(client, tool, {{"capture_id", "invalid"}}));
+    }
+    for(const auto& invalid : {Json(0), Json(101), Json(-1), Json(1.5), Json("1")}) {
+        expect_tool_error(call(client, "capture_events", {{"capture_id", id}, {"limit", invalid}}));
+    }
+    expect_tool_error(call(client, "capture_objects", {{"capture_id", id}, {"offset", 100001}}));
+    for(const auto* path : {"../outside", "/absolute", "raw/../outside", "raw//file", "raw/./file", "manifest.json"}) {
+        expect_tool_error(call(client, "artifact_read", {{"artifact_id", id}, {"path", path}}));
+    }
+    expect_tool_error(call(client, "artifact_read", {{"artifact_id", id}, {"path", "raw/a"}, {"max_bytes", 65537}}));
+    expect_tool_error(call(client, "artifact_read", {{"artifact_id", id}, {"path", std::string("raw/a\0b", 7)}}));
+    expect_tool_error(call(client, "artifact_import", {{"source", "relative/path"}}));
+    expect_tool_error(
+        call(client, "artifact_import", {{"source", scratch.path.string()}, {"required_outputs", {"../file"}}}));
+    const Json valid_capture{{"executable", server}, {"working_directory", scratch.path.string()}};
+    const Json invalid_capture_fields{{"capture_frame", 1},
+                                      {"timeout_ms", 600001},
+                                      {"pin", 1},
+                                      {"arguments", "wrong-type"},
+                                      {"application_provenance", Json::object()}};
+    for(const auto& [name, value] : invalid_capture_fields.items()) {
+        auto arguments = valid_capture;
+        arguments[name] = value;
+        expect_tool_error(call(client, "capture", arguments));
+    }
+    for(const auto& argv :
+        {Json::array({7}), Json::array({std::string("a\0b", 3)}), Json::array({std::string(4097, 'x')})}) {
+        auto arguments = valid_capture;
+        arguments["arguments"] = argv;
+        expect_tool_error(call(client, "capture", arguments));
+    }
+    auto bad_option = valid_capture;
+    bad_option["application_output_option"] = "--two options";
+    expect_tool_error(call(client, "capture", bad_option));
+    expect_tool_error(
+        call(client, "capture", {{"executable", "relative"}, {"working_directory", scratch.path.string()}}));
+    expect_tool_error(
+        call(client, "capture",
+             {{"executable", "/nonexistent-ngm-executable"}, {"working_directory", scratch.path.string()}}));
+    require(client.finish() == 0, "invalid workflow calls do not damage the protocol");
+    require(!std::filesystem::exists(root), "invalid inputs are checked before lazy storage initialization");
+
+    Client disabled(server, scratch.path);
+    initialize(disabled);
+    expect_tool_error(call(disabled, "artifact_usage"), "--artifact-root");
+    expect_tool_error(call(disabled, "capture", valid_capture), "--artifact-root");
+    expect_tool_error(call(disabled, "capture_metadata", {{"capture_id", id}}), "--artifact-root");
+    require(disabled.finish() == 0, "unconfigured workflow errors preserve EOF");
+
+    for(const auto& arguments : std::vector<std::vector<std::string>>{
+            {"--artifact-root", "relative"},
+            {"--artifact-root", "/"},
+            {"--artifact-root"},
+            {"--artifact-max-bytes", "1"},
+            {"--artifact-root", root.string(), "--artifact-max-bytes", "-1"},
+            {"--artifact-root", root.string(), "--artifact-max-age-seconds", "18446744073709551616"},
+            {"--artifact-root", root.string(), "--artifact-max-bytes", "3x"},
+            {"--artifact-root", root.string(), "--artifact-root", root.string()}}) {
+        Client invalid(server, scratch.path, arguments);
+        require(invalid.finish() == 2 && !invalid.diagnostics().empty(), "invalid CLI configuration fails on stderr");
+    }
+    require(!std::filesystem::exists(root), "invalid startup arguments do not create storage");
+}
+
+Json snapshot_tree(const std::filesystem::path& root) {
+    Json result = Json::object();
+    result["."] = {{"kind", "directory"}, {"mtime", std::filesystem::last_write_time(root).time_since_epoch().count()}};
+    for(const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        const auto name = entry.path().lexically_relative(root).generic_string();
+        const auto status = entry.symlink_status();
+        if(std::filesystem::is_symlink(status)) {
+            result[name] = {{"kind", "symlink"}, {"target", std::filesystem::read_symlink(entry.path()).string()}};
+        } else if(std::filesystem::is_directory(status)) {
+            result[name] = {{"kind", "directory"}, {"mtime", entry.last_write_time().time_since_epoch().count()}};
+        } else {
+            require(std::filesystem::is_regular_file(status),
+                    "import regression fixture contains only ordinary entries");
+            std::ifstream stream(entry.path());
+            const std::string contents{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+            result[name] = {{"kind", "file"},
+                            {"contents", contents},
+                            {"mtime", entry.last_write_time().time_since_epoch().count()}};
+        }
+    }
+    return result;
+}
+
+void import_overlap_check(const std::string& server, const Scratch& scratch) {
+    const auto group = scratch.path / "import-overlap";
+    const auto source = group / "source";
+    const auto nested = source / "nested";
+    std::filesystem::create_directories(nested);
+    std::filesystem::create_directory(group / "empty");
+    std::ofstream(source / "evidence.txt") << "original source bytes\n";
+    std::ofstream(nested / "evidence.txt") << "original nested source bytes\n";
+    const auto source_alias = group / "source-alias";
+    const auto store_alias = group / "store-alias";
+    std::filesystem::create_directory_symlink(source, source_alias);
+    std::filesystem::create_directory_symlink(source, store_alias);
+    const auto before = snapshot_tree(group);
+    const std::vector<std::pair<std::filesystem::path, std::filesystem::path>> overlaps{
+        {source / "new-parent/new-store", source},
+        {group / "empty", group / "empty"},
+        {source, source},
+        {source, nested},
+        {source / "new-store", source_alias},
+        {store_alias / "new-store", source},
+        {store_alias / "new-store", source_alias},
+        {store_alias, nested},
+        {source / "new-store", source / "nested/.."}};
+    for(const auto& [root, input] : overlaps) {
+        Client client(server, scratch.path, {"--artifact-root", root.string()});
+        initialize(client);
+        expect_tool_error(call(client, "artifact_import", {{"source", input.string()}}),
+                          "must not contain or reside within the artifact store");
+        require(client.finish() == 0, "rejected overlapping import shuts down normally");
+        require(snapshot_tree(group) == before,
+                "rejected import cannot create store directories or change source data/metadata");
+    }
+
+    // Component containment must not mistake a shared filename prefix for an
+    // ancestor. This valid import still leaves the complete source unchanged.
+    const auto source_before = snapshot_tree(source);
+    Client disjoint(server, scratch.path, {"--artifact-root", (group / "source-managed").string()});
+    initialize(disjoint);
+    const auto result = successful_call(disjoint, "artifact_import", {{"source", source.string()}});
+    require(result["status"] == "complete", "common filename prefix is not directory containment");
+    require(disjoint.finish() == 0, "disjoint import shuts down normally");
+    require(snapshot_tree(source) == source_before, "successful disjoint import preserves source tree");
+}
+
+void bounded_job_error_check(const std::string& server, const std::string& target, const Scratch& scratch) {
+    auto root = scratch.path / "long-root";
+    while(root.string().size() + 241 < 4000) {
+        root /= std::string(240, 'd');
+    }
+    root /= std::string(4000 - root.string().size() - 1, 'd');
+    require(root.string().size() == 4000, "long-path regression stays inside the accepted root limit");
+    Client client(
+        server, scratch.path,
+        {"--artifact-root", root.string(), "--nsight-root", (scratch.path / "standin-installation").string()});
+    initialize(client);
+    const auto submission =
+        successful_call(client, "capture", {{"executable", target}, {"working_directory", scratch.path.string()}});
+    const auto result = await_job(client, submission["identity"]["job_id"]);
+    require(result["state"] == "failed" && result["cleanup_confirmed"] == true,
+            "discovery path limit fails without leaving owned processes");
+    const auto error = result["error"].get<std::string>();
+    require(!error.empty() && error.size() <= 4096, "long job diagnostic obeys its advertised output bound");
+    const auto info = successful_call(client, "artifact_info", {{"artifact_id", submission["artifact_id"]}});
+    require(info["status"] == "failed" && info["quarantined"] == false,
+            "cleanup-confirmed long-path failure publishes ordinary failed evidence");
+    require(successful_call(client, "artifact_pin",
+                            {{"artifact_id", submission["artifact_id"]}, {"pinned", false}})["pinned"] == false,
+            "cleanup-confirmed long-path evidence can be unpinned");
+    require(client.finish() == 0, "long-path failure does not break MCP shutdown");
+}
+
+void workflow_check(const std::string& server, const std::string& standin, const std::string& target,
+                    const Scratch& scratch) {
+    const auto installation = scratch.path / "standin-installation";
+    std::filesystem::create_directories(installation);
+    for(const auto* name : {"ngfx", "ngfx-capture", "ngfx-replay"}) {
+        std::filesystem::copy_file(standin, installation / name);
+        std::filesystem::permissions(installation / name, std::filesystem::perms::owner_all);
+    }
+    const auto root = scratch.path / "managed";
+    const std::vector<std::string> options{"--nsight-root",
+                                           installation.string(),
+                                           "--artifact-root",
+                                           root.string(),
+                                           "--artifact-max-bytes",
+                                           "0",
+                                           "--artifact-max-age-seconds",
+                                           "0"};
+    Client client(server, scratch.path, options, true, {"XDG_DATA_DIRS=/opt/ngm-test-driver/share:/usr/share"});
+    initialize(client);
+    const auto capabilities = query_capabilities(client);
+    require(capabilities["operations"]["capture"]["available"] == true &&
+                capabilities["operations"]["capture"]["status"] == "prerequisites_observed",
+            "observed prerequisites enable submission without claiming verified compatibility");
+    require(!std::filesystem::exists(root), "handshake and capabilities do not initialize storage");
+
+    const auto capture_arguments = [&](const std::filesystem::path& record, bool wait = false) {
+        auto argv = Json::array({"--mcp-target", "--record", record.string()});
+        if(wait) {
+            argv.push_back("--wait");
+        }
+        return Json{{"executable", target},
+                    {"arguments", argv},
+                    {"working_directory", scratch.path.string()},
+                    {"timeout_ms", 10000},
+                    {"capture_frame", 2}};
+    };
+    const auto record1 = scratch.path / "target1.pid";
+    auto first_arguments = capture_arguments(record1);
+    first_arguments["pin"] = true;
+    const auto first = successful_call(client, "capture", first_arguments);
+    const auto first_job = first["identity"]["job_id"].get<std::string>();
+    const auto first_id = first["artifact_id"].get<std::string>();
+    require(first["identity"]["capture_id"] == first_id, "submission scopes job identity to its artifact");
+    auto result = await_job(client, first_job);
+    require(result["state"] == "succeeded" && result["cleanup_confirmed"] == true,
+            "stand-in capture and replay finish with confirmed cleanup: " + result.dump());
+    require_gone(recorded_pid(record1));
+    require(successful_call(client, "job_cancel", {{"job_id", first_job}})["result"] == "already_terminal",
+            "terminal cancellation is idempotent");
+    const auto first_info = successful_call(client, "artifact_info", {{"artifact_id", first_id}});
+    require(first_info["status"] == "complete" && first_info["pinned"] == true, "completed capture explicitly pinned");
+    const auto report_text =
+        successful_call(client, "artifact_read", {{"artifact_id", first_id}, {"path", "raw/report.json"}});
+    const auto report = Json::parse(report_text["text"].get<std::string>());
+    require(report["environment"]["XDG_DATA_DIRS"] == "/opt/ngm-test-driver/share:/usr/share",
+            "MCP forwards the caller's explicit system data search path to capture");
+    require(report["evidence_origin"] == "nsight_capture" && report["backend"] == "documented_nsight_cli",
+            "capture report labels its evidence origin");
+    require(report["caller_provided_application_provenance"].empty(), "MCP does not inject expected diagnoses");
+    const auto metadata = successful_call(client, "capture_metadata", {{"capture_id", first_id}});
+    require(metadata["capture_id"] == first_id && metadata["metadata"]["metadata_version"] == 1 &&
+                metadata["producer"]["capture_tool"]["version"] == "2026.3.1.0" &&
+                metadata["producer"]["metadata_nsight_version"] == "2026.3.1" &&
+                metadata["unavailable_from_these_exports"].size() == 8,
+            "typed inspection preserves capture scope, observed producer strings, and state limits");
+    require(metadata.dump().find("synthetic-private") == std::string::npos &&
+                !metadata["metadata"].contains("process_environment") &&
+                !metadata["metadata"].contains("process_command_line"),
+            "ordinary inspection omits process environment and command line");
+    const auto events = successful_call(client, "capture_events", {{"capture_id", first_id}, {"limit", 1}});
+    require(events["events"].size() == 1 && events["total"] == 3 && events["next_offset"] == 1 &&
+                events["events"][0]["event_index"] == 10,
+            "event inventory uses export-order offsets rather than noncontiguous IDs");
+    const auto later_events = successful_call(client, "capture_events", {{"capture_id", first_id}, {"offset", 1}});
+    require(later_events["events"].size() == 2 && later_events["next_offset"].is_null() &&
+                later_events["events"][0]["sequence_id"].is_null(),
+            "event pagination and optional IDs are explicit");
+    const auto objects = successful_call(client, "capture_objects", {{"capture_id", first_id}});
+    require(objects["objects"].size() == 1 && objects["objects"][0]["uid"] == 7 &&
+                objects["objects"][0]["access_flags"] == 32 && objects["next_offset"].is_null(),
+            "capture-scoped object inventory retains opaque access values");
+    const auto capture_stdout = report["capture"]["stdout"].get<std::string>();
+    require(successful_call(client, "artifact_read", {{"artifact_id", first_id}, {"path", capture_stdout}})["text"]
+                    .get<std::string>()
+                    .find("mcp target stdout") != std::string::npos,
+            "target stdout is retained as an artifact log");
+    const auto files = successful_call(client, "artifact_files", {{"artifact_id", first_id}, {"limit", 1}});
+    require(files["files"].size() == 1 && files["next_offset"] == 1, "file inventory pagination");
+    require(!successful_call(client, "artifact_files", {{"artifact_id", first_id}, {"offset", 1}})["files"].empty(),
+            "file inventory subsequent page");
+
+    const auto record2 = scratch.path / "target2.pid";
+    const auto second = successful_call(client, "capture", capture_arguments(record2));
+    require(await_job(client, second["identity"]["job_id"])["state"] == "succeeded", "second capture succeeds");
+    require(recorded_pid(record1) != recorded_pid(record2), "each capture launches a fresh process");
+    const auto page = successful_call(client, "artifact_list", {{"limit", 1}});
+    require(page["artifacts"].size() == 1 && page["next_after"].is_string(), "artifact list pagination");
+    require(!successful_call(client, "artifact_list", {{"after_id", page["next_after"]}})["artifacts"].empty(),
+            "artifact list subsequent page");
+    require(successful_call(client, "artifact_usage")["completed_bytes"].get<std::uint64_t>() > 0,
+            "storage usage recorded");
+    expect_tool_error(call(client, "job_status", {{"job_id", "job-unknown"}}), "Unknown job ID");
+    expect_tool_error(call(client, "job_cancel", {{"job_id", "job-unknown"}}), "Unknown job ID");
+
+    const auto waiting_record = scratch.path / "waiting.pid";
+    const auto waiting = successful_call(client, "capture", capture_arguments(waiting_record, true));
+    await_record(waiting_record);
+    expect_tool_error(call(client, "capture_metadata", {{"capture_id", waiting["artifact_id"]}}), "not published");
+    const auto queued_record = scratch.path / "queued-must-not-launch.pid";
+    const auto queued = successful_call(client, "capture", capture_arguments(queued_record));
+    require(successful_call(client, "job_status", {{"job_id", queued["identity"]["job_id"]}})["state"] == "queued",
+            "same-GPU capture serializes behind active work");
+    successful_call(client, "job_cancel", {{"job_id", queued["identity"]["job_id"]}});
+    require(await_job(client, queued["identity"]["job_id"])["state"] == "cancelled", "queued cancellation");
+    require(!std::filesystem::exists(queued_record), "queued cancellation never launches its application");
+    const auto queued_info = successful_call(client, "artifact_info", {{"artifact_id", queued["artifact_id"]}});
+    require(queued_info["status"] == "failed" && queued_info["quarantined"] == false,
+            "queued cancellation finalizes failed evidence after poll completion");
+    expect_tool_error(call(client, "capture_events", {{"capture_id", queued["artifact_id"]}}), "incomplete_capture");
+    successful_call(client, "job_cancel", {{"job_id", waiting["identity"]["job_id"]}});
+    result = await_job(client, waiting["identity"]["job_id"]);
+    require(result["state"] == "cancelled" && result["cleanup_confirmed"] == true && result["gpu_reserved"] == false,
+            "running cancellation releases GPU after owned-process cleanup");
+    require_gone(recorded_pid(waiting_record));
+
+    const auto timeout_record = scratch.path / "timeout.pid";
+    auto timeout_arguments = capture_arguments(timeout_record, true);
+    timeout_arguments["timeout_ms"] = 1200;
+    const auto timeout = successful_call(client, "capture", timeout_arguments);
+    await_record(timeout_record);
+    result = await_job(client, timeout["identity"]["job_id"]);
+    require(result["state"] == "timed_out" && result["cleanup_confirmed"] == true, "deadline cleanup through MCP");
+    require_gone(recorded_pid(timeout_record));
+
+    const auto source = scratch.path / "import-source";
+    std::filesystem::create_directory(source);
+    std::ofstream(source / "note.txt") << "retained investigation evidence\n";
+    std::ofstream(source / "large.txt") << std::string(65537, 'x');
+    {
+        std::ofstream binary(source / "binary.bin", std::ios::binary);
+        binary.write("a\0b", 3);
+    }
+    {
+        std::ofstream invalid(source / "invalid.bin", std::ios::binary);
+        invalid.put(static_cast<char>(0xff));
+    }
+    const auto imported =
+        successful_call(client, "artifact_import", {{"source", source.string()}, {"required_outputs", {"note.txt"}}});
+    const auto imported_id = imported["id"].get<std::string>();
+    require(imported["pinned"] == true && imported["provenance"]["evidence_origin"] == "caller_provided_import",
+            "import defaults to a durable pin with distinct evidence origin");
+    expect_tool_error(call(client, "capture_metadata", {{"capture_id", imported_id}}), "not_capture");
+    const auto text =
+        successful_call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/note.txt"}});
+    require(text["status"] == "text" && text["text"] == "retained investigation evidence\n",
+            "bounded text evidence retrieval");
+    const auto large =
+        successful_call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/large.txt"}});
+    require(large["status"] == "reference_only" && large["text"].is_null() && large["bytes"] == 65537 &&
+                std::filesystem::is_regular_file(large["local_path"].get<std::string>()),
+            "large text stays on disk and returns a usable file reference");
+    expect_tool_error(
+        call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/binary.bin"}}), "NUL");
+    expect_tool_error(
+        call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/invalid.bin"}}), "UTF-8");
+    require(client.request(77, "ping").contains("result"), "binary evidence rejection preserves protocol stdout");
+    expect_tool_error(
+        call(client, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/missing.txt"}}),
+        "inventory");
+
+    const auto eof_record = scratch.path / "eof.pid";
+    const auto eof = successful_call(client, "capture", capture_arguments(eof_record, true));
+    await_record(eof_record);
+    require(client.finish() == 0, "EOF waits for cancellation and owned-process cleanup");
+    require_gone(recorded_pid(eof_record));
+    require(client.diagnostics().find("mcp target stdout") == std::string::npos &&
+                client.diagnostics().find("stand-in diagnostic") == std::string::npos,
+            "child diagnostics are artifact logs, not server protocol/stderr traffic");
+
+    Client restarted(
+        server, scratch.path,
+        {"--artifact-root", root.string(), "--artifact-max-bytes", "1", "--artifact-max-age-seconds", "0"});
+    initialize(restarted);
+    require(successful_call(restarted, "artifact_info", {{"artifact_id", imported_id}})["pinned"] == true,
+            "import pin survives server restart");
+    require(successful_call(restarted, "artifact_info", {{"artifact_id", first_id}})["pinned"] == true,
+            "capture pin survives server restart");
+    require(successful_call(restarted, "capture_events", {{"capture_id", first_id}})["total"] == 3,
+            "retained inspection works after restart with no Nsight installation or desktop configured");
+    const auto eof_info = successful_call(restarted, "artifact_info", {{"artifact_id", eof["artifact_id"]}});
+    require(eof_info["status"] == "failed" && eof_info["quarantined"] == false,
+            "EOF publishes cleanup-confirmed failed evidence");
+    expect_tool_error(call(restarted, "job_status", {{"job_id", first_job}}), "Unknown job ID");
+    successful_call(restarted, "artifact_pin", {{"artifact_id", imported_id}, {"pinned", false}});
+    const auto prune = successful_call(restarted, "artifact_prune");
+    require(prune["expired_count"].get<std::uint64_t>() > 0 && prune["usage"]["quota_exceeded"] == true,
+            "prune reports protected data preventing the configured quota");
+    require(successful_call(restarted, "artifact_info", {{"artifact_id", imported_id}})["status"] == "expired",
+            "unpin permits whole-bundle pruning with an expiration explanation");
+    require(successful_call(restarted, "artifact_info", {{"artifact_id", first_id}})["status"] == "complete",
+            "quota pressure cannot delete a pinned baseline");
+    expect_tool_error(
+        call(restarted, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/note.txt"}}), "expired");
+    require(std::filesystem::is_regular_file(source / "note.txt"),
+            "pruning imported evidence never changes its source");
+    require(restarted.finish() == 0, "artifact-only restart shutdown");
+}
+
+void inspection_workflow_check(const std::string& server, const std::string& target, const Scratch& scratch) {
+    const auto installation = scratch.path / "standin-installation";
+    const auto exports = installation / "inspection-exports";
+    std::filesystem::create_directory(exports);
+    const auto set_export = [&](const char* name, const std::string& text) {
+        std::ofstream output(exports / (std::string(name) + ".raw"), std::ios::binary);
+        output << text;
+        output.close();
+        require(output.good(), "write process-boundary inspection fixture");
+    };
+    Client client(server, scratch.path,
+                  {"--nsight-root", installation.string(), "--artifact-root",
+                   (scratch.path / "inspection-managed").string(), "--artifact-max-bytes", "0",
+                   "--artifact-max-age-seconds", "0"});
+    initialize(client);
+    std::size_t invocation = 0;
+    const auto capture = [&] {
+        const auto record = scratch.path / ("inspection-target-" + std::to_string(++invocation) + ".pid");
+        const auto submission = successful_call(client, "capture",
+                                                {{"executable", target},
+                                                 {"arguments", {"--mcp-target", "--record", record.string()}},
+                                                 {"working_directory", scratch.path.string()},
+                                                 {"timeout_ms", 10000}});
+        require(await_job(client, submission["identity"]["job_id"])["state"] == "succeeded",
+                "raw metadata readability remains separate from typed inspection schema validity");
+        require_gone(recorded_pid(record));
+        return submission["artifact_id"].get<std::string>();
+    };
+
+    Json functions = Json::array();
+    for(std::size_t index = 0; index < 80; ++index) {
+        functions.push_back(
+            {{"event_index", index * 3 + 1000}, {"function_name", std::string(8000, '"')}, {"thread_index", 0}});
+    }
+    set_export("functions", functions.dump());
+    const auto large = capture();
+    std::size_t count = 0;
+    do {
+        const auto page =
+            successful_call(client, "capture_events", {{"capture_id", large}, {"offset", count}, {"limit", 100}});
+        require(page["total"] == 80 && page["events"].size() < 80 && !page["events"].empty() &&
+                    page.dump().size() <= 256U * 1024U,
+                "MCP byte pagination stops before the row limit while preserving the total");
+        for(const auto& event : page["events"]) {
+            require(event["event_index"] == count * 3 + 1000, "MCP pages contain each observed event exactly once");
+            ++count;
+        }
+        if(page["next_offset"].is_null()) {
+            break;
+        }
+        require(page["next_offset"] == count, "MCP continuation reflects consumed rows");
+    } while(true);
+    require(count == 80, "MCP pages retrieve the complete large inventoried file");
+    require(successful_call(client, "artifact_read",
+                            {{"artifact_id", large}, {"path", "raw/exports/functions.raw"}})["status"] ==
+                "reference_only",
+            "typed inspection's extended core read cap does not raise MCP artifact_read's 64 KiB cap");
+
+    set_export("functions", "not valid JSON");
+    set_export("metadata", R"({"metadata_version":2})");
+    const auto wrong_metadata = capture();
+    expect_tool_error(call(client, "capture_events", {{"capture_id", wrong_metadata}}),
+                      "metadata export unsupported_version");
+    expect_tool_error(call(client, "capture_objects", {{"capture_id", wrong_metadata}}),
+                      "metadata export unsupported_version");
+    std::filesystem::remove(exports / "metadata.raw");
+    const auto malformed = capture();
+    require(successful_call(client, "capture_metadata", {{"capture_id", malformed}})["metadata_version"] == 1,
+            "malformed optional inventory does not prevent validated capture metadata");
+    expect_tool_error(call(client, "capture_events", {{"capture_id", malformed}}), "functions export malformed_json");
+    std::filesystem::remove(exports / "functions.raw");
+    set_export("objects", "{not JSON");
+    const auto missing_objects = capture();
+    expect_tool_error(call(client, "capture_objects", {{"capture_id", missing_objects}}), "export_unavailable");
+    require(successful_call(client, "capture_events", {{"capture_id", missing_objects}})["total"] == 3,
+            "a failed optional export leaves other validated inventory queries available");
+    require(client.finish() == 0, "inspection errors and byte pagination preserve clean protocol shutdown");
+    std::filesystem::remove_all(exports);
+}
+
+int target_main(int argc, char** argv) {
+    std::filesystem::path record;
+    bool wait = false;
+    for(int index = 2; index < argc; ++index) {
+        const std::string_view argument = argv[index];
+        if(argument == "--record" && index + 1 < argc) {
+            record = argv[++index];
+        } else if(argument == "--wait") {
+            wait = true;
+        } else {
+            return 83;
+        }
+    }
+    if(record.empty()) {
+        return 84;
+    }
+    {
+        std::ofstream stream(record);
+        stream << getpid() << '\n';
+    }
+    std::cout << "mcp target stdout\n" << std::flush;
+    std::cerr << "mcp target stderr\n" << std::flush;
+    if(wait) {
+        std::signal(SIGTERM, SIG_IGN);
+        while(true) {
+            std::this_thread::sleep_for(50ms);
+        }
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
+    if(argc > 1 && std::string_view(argv[1]) == "--mcp-target") {
+        return target_main(argc, argv);
+    }
     std::signal(SIGPIPE, SIG_IGN);
     return ngm::check::run([&] {
-        require(argc == 2, "usage: ngm_mcp_check /absolute/path/to/nsight-graphics-mcp");
+        require(argc == 3,
+                "usage: ngm_mcp_check /absolute/path/to/nsight-graphics-mcp /absolute/path/to/nsight-standin");
         const Scratch scratch;
         protocol_check(argv[1], scratch);
         malformed_input_check(argv[1], scratch);
         discovery_check(argv[1], scratch);
+        invalid_workflow_check(argv[1], scratch);
+        import_overlap_check(argv[1], scratch);
+        workflow_check(argv[1], argv[2], std::filesystem::canonical(argv[0]).string(), scratch);
+        inspection_workflow_check(argv[1], std::filesystem::canonical(argv[0]).string(), scratch);
+        bounded_job_error_check(argv[1], std::filesystem::canonical(argv[0]).string(), scratch);
         for(const auto* requested : {"2024-11-05", "2025-03-26", "2099-01-01"}) {
             Client unsupported(argv[1], scratch.path);
             require(initialize(unsupported, requested)["protocolVersion"] == "2025-11-25",

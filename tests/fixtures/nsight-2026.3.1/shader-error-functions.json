@@ -1,0 +1,122 @@
+[
+  {
+    "event_index": 0,
+    "function_name": "CaptureBegin",
+    "sequence_id": 0,
+    "thread_index": 0
+  },
+  {
+    "event_index": 1,
+    "function_name": "vkWaitForFences",
+    "sequence_id": 0,
+    "thread_index": 0
+  },
+  {
+    "event_index": 2,
+    "function_name": "vkWaitForFences",
+    "sequence_id": 1,
+    "thread_index": 0
+  },
+  {
+    "event_index": 3,
+    "function_name": "vkAcquireNextImageKHR",
+    "sequence_id": 2,
+    "thread_index": 0
+  },
+  {
+    "event_index": 4,
+    "function_name": "vkResetFences",
+    "sequence_id": 3,
+    "thread_index": 0
+  },
+  {
+    "event_index": 5,
+    "function_name": "vkResetCommandBuffer",
+    "sequence_id": 4,
+    "thread_index": 0
+  },
+  {
+    "event_index": 6,
+    "function_name": "CommandRecording",
+    "sequence_id": 5,
+    "thread_index": 0
+  },
+  {
+    "event_index": 7,
+    "function_name": "vkQueueSubmit",
+    "sequence_id": 6,
+    "thread_index": 0
+  },
+  {
+    "event_index": 8,
+    "function_name": "vkBeginCommandBuffer",
+    "thread_index": 0
+  },
+  {
+    "event_index": 9,
+    "function_name": "vkCmdBeginDebugUtilsLabelEXT",
+    "thread_index": 0
+  },
+  {
+    "event_index": 10,
+    "function_name": "vkCmdBeginDebugUtilsLabelEXT",
+    "thread_index": 0
+  },
+  {
+    "event_index": 11,
+    "function_name": "vkCmdBeginRenderPass",
+    "thread_index": 0
+  },
+  {
+    "event_index": 12,
+    "function_name": "vkCmdBindPipeline",
+    "thread_index": 0
+  },
+  {
+    "event_index": 13,
+    "function_name": "vkCmdBindDescriptorSets",
+    "thread_index": 0
+  },
+  {
+    "event_index": 14,
+    "function_name": "vkCmdDraw",
+    "thread_index": 0
+  },
+  {
+    "event_index": 15,
+    "function_name": "vkCmdEndRenderPass",
+    "thread_index": 0
+  },
+  {
+    "event_index": 16,
+    "function_name": "vkCmdEndDebugUtilsLabelEXT",
+    "thread_index": 0
+  },
+  {
+    "event_index": 17,
+    "function_name": "vkCmdPipelineBarrier",
+    "thread_index": 0
+  },
+  {
+    "event_index": 18,
+    "function_name": "vkCmdEndDebugUtilsLabelEXT",
+    "thread_index": 0
+  },
+  {
+    "event_index": 19,
+    "function_name": "vkEndCommandBuffer",
+    "thread_index": 0
+  },
+  {
+    "event_index": 20,
+    "function_name": "vkResetFences",
+    "sequence_id": 7,
+    "thread_index": 0
+  },
+  {
+    "event_index": 21,
+    "function_name": "vkQueuePresentKHR",
+    "sequence_id": 8,
+    "thread_index": 0
+  }
+]

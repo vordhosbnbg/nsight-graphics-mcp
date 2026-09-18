@@ -69,6 +69,60 @@ int main(int argc, char** argv) {
                          {"driver_version_raw", 0}};
         result["desktop"] = {
             {"backend", "xcb"}, {"display", "test-only"}, {"session_type", "test-only"}, {"wayland_display", ""}};
+        const bool combined = scenario.starts_with("combined-");
+        const bool multipass = combined || scenario == "multipass-reference" || scenario == "pass-output-error";
+        const bool bindless = combined || scenario == "bindless-reference" || scenario == "resource-selection-error";
+        const bool indirect = combined || scenario == "indirect-reference" || scenario == "indirect-parameter-error";
+        using Json = nlohmann::json;
+        result["workload"] = {
+            {"offscreen_render_target", multipass},
+            {"post_processing", multipass},
+            {"bindless_storage_buffers", bindless},
+            {"indirect_draw", indirect},
+            {"render_pass_count", multipass ? 2 : 1},
+            {"minimum_api_version", "1.3.0"},
+            {"required_device_extensions", {"VK_KHR_swapchain"}},
+            {"required_api_features",
+             bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"}) : Json::array()},
+            {"offscreen_format", multipass ? Json("R8G8B8A8_UNORM") : Json(nullptr)},
+            {"offscreen_format_features", multipass ? Json({"COLOR_ATTACHMENT", "SAMPLED_IMAGE"}) : Json::array()},
+            {"descriptor_array_count", bindless ? 2 : 0},
+            {"indirect_command", indirect ? Json("vkCmdDrawIndirect") : Json(nullptr)},
+            {"indirect_draw_count", indirect ? 1 : 0},
+            {"indirect_first_instance", 0}};
+        result["rendering"] = {
+            {"enabled_api_features",
+             {{"runtimeDescriptorArray", bindless}, {"shaderStorageBufferArrayNonUniformIndexing", bindless}}}};
+        result["device_support"] = {
+            {{"name", "CPU stand-in; not a GPU result"},
+             {"api_version", "test-only"},
+             {"status", "selected"},
+             {"missing_requirements", Json::array()},
+             {"queried_api_features",
+              {{"runtimeDescriptorArray", true}, {"shaderStorageBufferArrayNonUniformIndexing", true}}},
+             {"offscreen_rgba8_color_attachment_and_sampled_image", true},
+             {"limits",
+              {{"maxPerStageDescriptorStorageBuffers", 2},
+               {"maxDescriptorSetStorageBuffers", 2},
+               {"maxPushConstantsSize", 128},
+               {"maxDrawIndirectCount", 1}}}}};
+        if(scenario == "missing-workload") {
+            result.erase("workload");
+        } else if(scenario == "contradictory-workload") {
+            result["workload"]["indirect_draw"] = true;
+        } else if(scenario == "floating-workload-count") {
+            result["workload"]["render_pass_count"] = 1.0;
+        } else if(scenario == "missing-device-support") {
+            result["device_support"] = Json::array();
+        } else if(scenario == "contradictory-feature-enablement") {
+            result["rendering"]["enabled_api_features"]["runtimeDescriptorArray"] = true;
+        } else if(scenario == "combined-unsupported-feature") {
+            result["device_support"][0]["queried_api_features"]["runtimeDescriptorArray"] = false;
+        } else if(scenario == "combined-unsupported-format") {
+            result["device_support"][0]["offscreen_rgba8_color_attachment_and_sampled_image"] = false;
+        } else if(scenario == "combined-unsupported-limit") {
+            result["device_support"][0]["limits"]["maxPerStageDescriptorStorageBuffers"] = 1;
+        }
         const auto test_digest = ngm::sha256(std::as_bytes(std::span("test", 4)));
         const nlohmann::json build{
             {"schema_version", 1},
@@ -95,13 +149,14 @@ int main(int argc, char** argv) {
             {"shader_compiler", {{"version", "test-only"}, {"sha256", test_digest}, {"arguments", {"test-only"}}}},
             {"shaders", nlohmann::json::array()}};
         std::filesystem::create_directory(directory / "shaders");
-        for(const auto* name : {"scene.vert", "scene.frag", "shader-error.frag"}) {
+        for(const auto* name : {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag",
+                                "post.vert", "post.frag"}) {
             const std::string source = name;
             std::ofstream(directory / "shaders" / source) << "test";
             std::ofstream(directory / "shaders" / (source + ".spv")) << "test";
             result["provenance"]["shaders"].push_back({{"source", source},
                                                        {"spirv", source + ".spv"},
-                                                       {"stage", source == "scene.vert" ? "vertex" : "fragment"},
+                                                       {"stage", source.ends_with(".vert") ? "vertex" : "fragment"},
                                                        {"source_sha256", test_digest},
                                                        {"spirv_sha256", test_digest}});
         }
