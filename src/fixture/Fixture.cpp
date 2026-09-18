@@ -1,5 +1,6 @@
 #include "Fixture.hpp"
 #include "FixtureBuildIdentity.hpp"
+#include "SdkControl.hpp"
 
 #include "ngm/File.hpp"
 #include "ngm/Hash.hpp"
@@ -279,7 +280,8 @@ struct Buffer {
 
 class Renderer {
 public:
-    explicit Renderer(const Options& options) : options_(options), workload_(workload(options.scenario)) {}
+    Renderer(const Options& options, SdkControl& sdk) :
+        options_(options), sdk_(sdk), workload_(workload(options.scenario)) {}
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
     ~Renderer() {
@@ -356,6 +358,7 @@ public:
             poll_window();
             check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns), "waiting for frame completion");
             wait_for_present();
+            sdk_.before_frame(frame, graphics_queue_);
             update_palettes(frame);
             std::uint32_t image_index = 0;
             const auto acquire =
@@ -1510,6 +1513,7 @@ private:
     }
 
     const Options& options_;
+    SdkControl& sdk_;
     const Workload workload_;
     Json device_support_ = Json::array();
     xcb_connection_t* connection_ = nullptr;
@@ -1589,6 +1593,8 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.height = parse_uint(value, option);
         } else if(option == "--frame") {
             options.frame = parse_uint(value, option);
+        } else if(option == "--sdk-first-boundary-frame") {
+            options.sdk_first_boundary_frame = parse_uint(value, option);
         } else if(option == "--output") {
             options.output = value;
         } else if(option == "--shader-dir") {
@@ -1615,6 +1621,10 @@ Options parse_arguments(std::span<const char* const> arguments) {
         throw std::invalid_argument("output and shader directory paths must not be empty");
     }
     options.output = std::filesystem::absolute(options.output);
+    if(options.sdk_first_boundary_frame &&
+       (options.frame < 2 || *options.sdk_first_boundary_frame > options.frame - 2)) {
+        throw std::invalid_argument("SDK first boundary must leave at least two subsequent application frames");
+    }
     options.shader_directory = std::filesystem::absolute(options.shader_directory);
     return options;
 }
@@ -1640,17 +1650,25 @@ void run(const Options& options) {
                   {"display", environment("DISPLAY")},
                   {"session_type", environment("XDG_SESSION_TYPE")},
                   {"wayland_display", environment("WAYLAND_DISPLAY")}}}};
-    Renderer renderer(options);
+    SdkControl sdk(options.sdk_first_boundary_frame, options.output / "sdk-control.json");
+    Renderer renderer(options, sdk);
     try {
         result["application"] = {{"executable_sha256", ngm::sha256_file("/proc/self/exe")},
                                  {"build", Json::parse(build_identity_json)}};
         result["provenance"] = retain_shaders(options);
         result["provenance"]["kind"] = "shader_bundle";
+        sdk.initialize_before_vulkan({{"application", result.at("application")},
+                                      {"inputs", result.at("inputs")},
+                                      {"workload", result.at("workload")},
+                                      {"shader_bundle", result.at("provenance")},
+                                      {"desktop", result.at("desktop")}});
+        result["sdk_control"] = sdk.report();
         renderer.initialize();
         result["device_support"] = renderer.device_support();
         result["gpu"] = renderer.gpu_metadata();
         result["rendering"] = renderer.rendering_metadata();
         renderer.render();
+        result["sdk_control"] = sdk.report();
         result["image"] = {{"path", "image.ppm"},
                            {"width", options.width},
                            {"height", options.height},
@@ -1659,6 +1677,7 @@ void run(const Options& options) {
         result["status"] = "pass";
         write_json(options.output / "result.json", result);
     } catch(const std::exception& error) {
+        result["sdk_control"] = sdk.report();
         result["device_support"] = renderer.device_support();
         result["status"] = dynamic_cast<const Unsupported*>(&error) ? "unsupported" : "failed";
         result["error"] = error.what();

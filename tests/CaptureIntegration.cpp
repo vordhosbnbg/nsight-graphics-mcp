@@ -8,12 +8,14 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <set>
 #include <span>
 #include <string>
@@ -32,12 +34,20 @@ using namespace std::chrono_literals;
 constexpr std::uint32_t seed = 42;
 constexpr std::uint32_t width = 192;
 constexpr std::uint32_t height = 128;
-constexpr std::uint32_t baseline_frame = 2;
 constexpr std::uint32_t capture_frame = 2;
 constexpr std::uint32_t application_final_frame = 20;
 constexpr auto capture_timeout = 120s;
 constexpr auto job_timeout = 180s;
 constexpr std::size_t maximum_file_bytes = 16U * 1024U * 1024U;
+
+struct BoundarySelection {
+    std::optional<std::uint32_t> sdk_first_frame;
+    std::uint32_t baseline_frame = 2;
+
+    const char* delimiter() const {
+        return sdk_first_frame ? "graphics_capture_api" : "present";
+    }
+};
 
 struct CaptureWorkload {
     const char* name;
@@ -349,7 +359,7 @@ void validate_png(const std::string& bytes) {
 }
 
 void inspect_capture(Session& session, Report& report, const fs::path& store, std::size_t index,
-                     const std::string& fixture_hash, const Json& baseline_shader) {
+                     const std::string& fixture_hash, const Json& baseline_shader, const BoundarySelection& boundary) {
     auto& capture = report.value["captures"][index];
     const auto id = capture.at("submission").at("artifact_id").get<std::string>();
     capture["artifact"] = session.tool("artifact_info", {{"artifact_id", id}});
@@ -380,13 +390,62 @@ void inspect_capture(Session& session, Report& report, const fs::path& store, st
                 source.at("application").at("sha256_after_launch") == fixture_hash,
             "capture observes the isolated fixture executable identity");
     require(source.at("capture_settings").at("capture_frame") == capture_frame &&
-                source.at("capture_settings").at("frame_count") == 1,
-            "capture uses the requested single frame");
+                source.at("capture_settings").at("frame_count") == 1 &&
+                source.at("capture_settings").at("delimiter") == boundary.delimiter() &&
+                source.at("sdk").at("status") ==
+                    (boundary.sdk_first_frame ? "application_control_requested" : "application_control_not_requested"),
+            "capture retains the requested delimiter and single interval without assuming SDK observations");
     const auto stdout_file = read_file(session, store, id, source.at("capture").at("stdout").get<std::string>(), true);
     capture["target_process"] = target_pid(stdout_file);
     const auto shader = read_file(session, store, id, "raw/application/shaders/provenance.json");
     require(Json::parse(shader.bytes) == baseline_shader, "capture and baseline retain the same shader build manifest");
     capture["shader_provenance"] = shader.reference;
+    if(boundary.sdk_first_frame) {
+        const auto control_file = read_file(session, store, id, "raw/application/sdk-control.json");
+        const auto control = Json::parse(control_file.bytes);
+        capture["sdk_control"] = {{"reference", control_file.reference}, {"report", control}};
+        report.save();
+        const auto& context = control.at("application_context");
+        auto expected_shader_bundle = baseline_shader;
+        expected_shader_bundle["kind"] = "shader_bundle";
+        require(control.at("schema_version") == 1 && control.at("evidence_origin") == "application_sdk_control" &&
+                    control.at("requested") == true && control.at("initialization_result") == 0 &&
+                    control.at("initialized_before_vulkan_instance") == true &&
+                    control.at("first_boundary_application_frame") == *boundary.sdk_first_frame &&
+                    control.at("delimiter") == boundary.delimiter(),
+                "application reports SDK initialization before Vulkan and the requested boundary selection");
+        require(context.at("application").at("executable_sha256") == fixture_hash &&
+                    context.at("application").at("build").at("nsight_sdk") == control.at("sdk_build") &&
+                    context.at("shader_bundle") == expected_shader_bundle &&
+                    context.at("inputs") == Json{{"scenario", capture.at("scenario")},
+                                                 {"seed", seed},
+                                                 {"width", width},
+                                                 {"height", height},
+                                                 {"frame", application_final_frame}},
+                "pre-call SDK evidence retains this executable, shader bundle, and workload identity");
+        const auto tool_version = source.at("nsight").at("capture").at("version").get<std::string>();
+        const auto sdk_version = tool_version == "2026.3.1.0"   ? "0.9.2"
+                                 : tool_version == "2026.2.0.0" ? "0.9.0"
+                                                                : "unqualified";
+        require(control.at("sdk_build").at("compiled") == true && control.at("sdk_build").at("version") == sdk_version,
+                "selected capture tools match the fixture's identified SDK source bundle");
+        const auto entered = control.at("boundaries_entered").get<std::uint32_t>();
+        const auto completed = control.at("boundaries_completed").get<std::uint32_t>();
+        require(entered >= 2 && completed >= 1 && entered <= application_final_frame + 1 &&
+                    (entered == completed || entered == completed + 1) &&
+                    control.at("last_boundary_application_frame") == *boundary.sdk_first_frame + entered - 1 &&
+                    control.at("last_completed_boundary_application_frame") ==
+                        *boundary.sdk_first_frame + completed - 1,
+                "entered and completed SDK boundaries retain distinct consecutive application frames");
+        require(entered == completed
+                    ? control.at("status") == "boundary_completed" && control.at("last_boundary_result") == 0
+                    : control.at("status") == "boundary_pending" && control.at("last_boundary_result").is_null(),
+                "termination inside a boundary never borrows a previous successful call result");
+    } else {
+        require(std::none_of(capture.at("files").begin(), capture.at("files").end(),
+                             [](const Json& file) { return file.at("path") == "raw/application/sdk-control.json"; }),
+                "the uninstrumented fixture mode emits no SDK control report");
+    }
     std::set<std::string> expected{"metadata", "functions", "objects", "logs", "screenshot"};
     capture["exports"] = Json::array();
     for(const auto& exported : source.at("exports")) {
@@ -487,7 +546,7 @@ std::string overall_status(const Report& report) {
 }
 
 int run(const fs::path& server, const fs::path& fixture, const fs::path& installation, const fs::path& store,
-        const fs::path& output, const CaptureWorkload& workload) {
+        const fs::path& output, const CaptureWorkload& workload, const BoundarySelection& boundary) {
     const auto directory = allocate(output);
     fs::create_directory(directory / "report");
     Report report{
@@ -506,7 +565,10 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
            {"seed", seed},
            {"width", width},
            {"height", height},
-           {"baseline_application_frame", baseline_frame},
+           {"baseline_application_frame", boundary.baseline_frame},
+           {"delimiter", boundary.delimiter()},
+           {"sdk_first_boundary_application_frame",
+            boundary.sdk_first_frame ? Json(*boundary.sdk_first_frame) : Json(nullptr)},
            {"capture_frame", capture_frame},
            {"capture_application_final_frame", application_final_frame},
            {"capture_timeout_ms", std::chrono::duration_cast<std::chrono::milliseconds>(capture_timeout).count()},
@@ -524,8 +586,8 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
         report.value["checks"][name] = observation("skipped", "Required evidence not yet available");
     }
     report.value["checks"]["cross_origin_pixels"] =
-        observation("skipped", "PNG pixels are not decoded by this harness; app frame 2 and capture frame 2 remain "
-                               "explicitly distinct selectors");
+        observation("skipped", "PNG pixels are not decoded by this harness; the recorded application baseline frame "
+                               "and capture delimiter ordinal remain explicitly distinct selectors");
     report.value["checks"]["source_edit_rebuild_recapture"] =
         observation("skipped", "This capture slice does not perform source repair");
     report.value["checks"]["gpu_replay"] =
@@ -573,7 +635,7 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
         baseline_options.seed = seed;
         baseline_options.width = width;
         baseline_options.height = height;
-        baseline_options.frame = baseline_frame;
+        baseline_options.frame = boundary.baseline_frame;
         const auto baseline = ngm::run_experiment(baseline_options);
         report.value["baseline"] = {{"directory", baseline.directory.string()}, {"report", baseline.report}};
         const auto baseline_status = baseline.report.at("status").get<std::string>();
@@ -589,6 +651,9 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
         require(imported.at("pinned") == true, "standalone baseline, including failures, is pinned");
         report.save();
         if(baseline_status == "pass") {
+            require(baseline.report.at("result").at("sdk_control").at("requested") == false &&
+                        baseline.report.at("result").at("sdk_control").at("status") == "not_requested",
+                    "standalone baseline does not invoke SDK control, even with an SDK-enabled executable");
             const auto shaders = baseline.directory / "output/shaders";
             const auto baseline_shader =
                 Json::parse(ngm::read_regular_file(shaders / "provenance.json", maximum_file_bytes));
@@ -600,7 +665,7 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
                 try {
                     const auto working = directory / ("capture-" + std::to_string(index));
                     fs::create_directory(working);
-                    const auto arguments =
+                    auto arguments =
                         Json{{"executable", executed_fixture.string()},
                              {"working_directory", working.string()},
                              {"arguments",
@@ -608,16 +673,21 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
                                std::to_string(width), "--height", std::to_string(height), "--frame",
                                std::to_string(application_final_frame), "--shader-dir", shaders.string()}},
                              {"capture_frame", capture_frame},
+                             {"delimiter", boundary.delimiter()},
                              {"timeout_ms", 120000},
                              {"application_output_option", "--output"},
                              {"pin", true}};
+                    if(boundary.sdk_first_frame) {
+                        arguments["arguments"].push_back("--sdk-first-boundary-frame");
+                        arguments["arguments"].push_back(std::to_string(*boundary.sdk_first_frame));
+                    }
                     capture["arguments"] = arguments;
                     report.save();
                     capture["submission"] = session->tool("capture", arguments);
                     retained.push_back(capture.at("submission").at("artifact_id").get<std::string>());
                     report.save();
                     await_job(*session, report, index);
-                    inspect_capture(*session, report, store, index, fixture_hash, baseline_shader);
+                    inspect_capture(*session, report, store, index, fixture_hash, baseline_shader, boundary);
                 } catch(const std::exception& error) {
                     capture["status"] = "fail";
                     capture["reason"] = error.what();
@@ -717,10 +787,37 @@ int run(const fs::path& server, const fs::path& fixture, const fs::path& install
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     try {
-        require(argc == 6 || (argc == 8 && std::string_view(argv[6]) == "--workload"),
+        require(argc >= 6 && argc % 2 == 0,
                 "usage: ngm_capture_integration SERVER FIXTURE NSIGHT_ROOT ARTIFACT_ROOT OUTPUT_ROOT "
-                "[--workload NAME]");
-        const auto& workload = select_workload(argc == 8 ? argv[7] : "basic");
+                "[--workload NAME] [--sdk-first-boundary-frame N --baseline-frame N]");
+        BoundarySelection boundary;
+        std::string_view workload_name = "basic";
+        std::set<std::string_view> selected;
+        for(int index = 6; index < argc; index += 2) {
+            const std::string_view option(argv[index]);
+            const std::string_view value(argv[index + 1]);
+            require(selected.insert(option).second, "each capture validation option may appear once");
+            if(option == "--workload") {
+                workload_name = value;
+                continue;
+            }
+            require(option == "--sdk-first-boundary-frame" || option == "--baseline-frame",
+                    "unknown capture validation option");
+            std::uint32_t frame = 0;
+            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), frame);
+            require(!value.empty() && parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() &&
+                        frame <= application_final_frame,
+                    "boundary and baseline frames must be unsigned integers within the fixture's captured run");
+            if(option == "--sdk-first-boundary-frame") {
+                require(frame <= application_final_frame - 2, "SDK selection must leave two later application frames");
+                boundary.sdk_first_frame = frame;
+            } else {
+                boundary.baseline_frame = frame;
+            }
+        }
+        require(boundary.sdk_first_frame.has_value() == selected.contains("--baseline-frame"),
+                "SDK validation requires an explicit application baseline frame; normal capture uses frame 2");
+        const auto& workload = select_workload(workload_name);
         const auto server = fs::canonical(argv[1]);
         const auto fixture = fs::canonical(argv[2]);
         const auto installation = fs::canonical(argv[3]);
@@ -732,7 +829,7 @@ int main(int argc, char** argv) {
         require(fs::is_directory(installation), "Nsight root must be an existing installation directory");
         require(!contains_path(store, output) && !contains_path(output, store),
                 "artifact and output roots must not overlap; reports are imported from outside the managed store");
-        return run(server, fixture, installation, store, output, workload);
+        return run(server, fixture, installation, store, output, workload, boundary);
     } catch(const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

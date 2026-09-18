@@ -387,3 +387,60 @@ workflow group remains unfinished, so this code commit increments patch rather
 than minor. Inventory success does not qualify detailed state, GPU replay, SDK
 control, diagnosis/source repair, compute, or profiling. R-006 and R-015 remain
 in progress; no required skipped case is counted as a pass.
+
+## Optional SDK control at 0.2.2
+
+Date: **2026-09-18**. R-002 adds explicit optional SDK source selection, fixture
+initialization before Vulkan and per-launch boundaries, and a shared
+present/graphics-capture-API delimiter selection in the native command and MCP.
+SDK requests retain application observations separately from the server's
+requested delimiter. The default build needs no SDK installation.
+
+Fresh-context reviews prompted retention of full application/build/workload
+context before the first SDK call, clearing a previous boundary result before
+entering the next call, request-scoped SDK status in generic capture reports,
+and capability wording aligned with the selectable delimiter. An initial MCP
+CPU run exposed a missing `maxLength` on the new schema string; the correction
+passes the actual protocol check. The initial real SDK hardware-harness run
+exposed a shader-manifest representation mismatch, independently identified by
+review. Its pinned failure and passing correction are investigation **I-012**.
+
+Executed checks and local logs under `build/capture-acceptance/`:
+
+| Configuration / target | Result | Transcript |
+| --- | --- | --- |
+| GCC 16.2.1 Debug, capture service and MCP | Pass, 6.34 / 14.68 seconds | `check-0.2.2-sdk-harness-1.log` |
+| GCC Debug, SDK 0.9.2 fixture contract | Pass, 28.22 seconds | `check-0.2.2-sdk-0.9.2.log` |
+| GCC Debug, SDK 0.9.0 fixture contract | Pass, 28.86 seconds | `check-0.2.2-sdk-0.9.0.log` |
+| GCC Debug, default SDK-free `ngm_check` | All 20 pass, 153.19 seconds | `check-0.2.2-default-aggregate.log` |
+| Clang 22.1.8 Debug, default fixture contract after correction | Pass, 23.15 seconds | `check-0.2.2-clang-sdk-default-correction.log` |
+| GCC Debug, default fixture contract after portability correction | Pass, 28.00 seconds | `check-0.2.2-gcc-sdk-portability-correction.log` |
+
+The initial Clang default build rejected `completed_` as an unused private field
+when SDK calls are compiled out; the failed log is
+`check-0.2.2-clang-sdk-default.log`. A `[[maybe_unused]]` annotation fixes that
+configuration without changing SDK behavior. The focused checks above verify
+the correction on both compilers. The aggregate and GPU evidence precede this
+annotation and retain their actual source/build hashes. Both configure presets
+are left with an empty `NGM_NSIGHT_SDK_ROOT`; the two SDK-enabled builds were
+explicitly selected for qualification, not made default.
+
+Real C++ MCP qualification passes **18 fresh captures**: two independently
+selected SDK boundaries and a no-SDK-call regression on each matching release,
+with three targets per case. All exports, process cleanup, distinct PIDs,
+retained identities, repeat/variant checks, and pins after restart pass.
+Independent RGB decoding verifies all 12 reference screenshots against their
+standalone application frames and all 6 controlled faulty-image differences.
+[SDK_CONTROL.md](SDK_CONTROL.md) records exact inputs and limits. A fresh
+acceptance reviewer independently checks the 31 matrix/snapshot/baseline/capture/
+report bundles, raw tool and SDK identities, pins, file inventory sizes, PID
+markers and decoded images; no hardware acceptance defect was found.
+
+The combined source/input/report/comparison snapshot is pinned as
+`bundle-7b6c2aa712deb108b66af94d86b50e75`. Its outer import manifest records the
+retained **0.1.1** importer; the actual harness, server, fixture and capture
+payloads identify **0.2.2**. No historical evidence is relabeled. This completes
+R-002 for the recorded basic windowed workload. R-006/R-007/R-015, advanced SDK
+qualification, no-presentation compute and profiling are not established by
+these runs. The larger visual workflow group remains unfinished, so 0.2.2 is
+a patch increment.

@@ -349,39 +349,45 @@ bool WorkflowTools::shutdown() {
 }
 
 void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
-    add_tool(tools, "capture",
-             object_schema({{"executable", string_schema(4096, 1)},
-                            {"arguments", array_schema(string_schema(4096), 256)},
-                            {"working_directory", string_schema(4096, 1)},
-                            {"capture_frame", integer_schema(2)},
-                            {"timeout_ms", integer_schema(1, 600000)},
-                            {"pin", boolean_schema()},
-                            {"application_output_option", string_schema(64)}},
-                           {"executable", "working_directory"}),
-             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
-                           {"identity", "artifact_id"}),
-             "Submit asynchronous Nsight capture of a fresh application. Absolute executable and working directory "
-             "are required; arguments are bounded strings. Defaults: frame 2, timeout 120000 ms, pin false. "
-             "Optional application_output_option appends an option and a fresh output directory for application "
-             "evidence, kept distinct from Nsight exports. Captures one presented frame; the target must present. "
-             "Non-presenting workloads require a separate boundary path not implemented by this service. "
-             "Poll job_status; submission is not capture success.",
-             false, false, [this](const Json& arguments) {
-                 CaptureRequest request;
-                 request.executable = absolute_path(arguments.at("executable"), true);
-                 request.working_directory = absolute_path(arguments.at("working_directory"));
-                 request.arguments = arguments.value("arguments", std::vector<std::string>{});
-                 request.capture_frame = arguments.value("capture_frame", std::uint64_t{2});
-                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
-                 request.pin = arguments.value("pin", false);
-                 request.application_output_option = arguments.value("application_output_option", "");
-                 if(!request.application_output_option.empty() &&
-                    (request.application_output_option.front() != '-' ||
-                     request.application_output_option.find_first_of(" \t\r\n") != std::string::npos)) {
-                     throw std::invalid_argument("application_output_option must be one option starting with '-'");
-                 }
-                 return Json(service().capture(std::move(request)));
-             });
+    add_tool(
+        tools, "capture",
+        object_schema(
+            {{"executable", string_schema(4096, 1)},
+             {"arguments", array_schema(string_schema(4096), 256)},
+             {"working_directory", string_schema(4096, 1)},
+             {"capture_frame", integer_schema(2)},
+             {"delimiter",
+              {{"type", "string"}, {"minLength", 1}, {"maxLength", 20}, {"enum", {"present", "graphics_capture_api"}}}},
+             {"timeout_ms", integer_schema(1, 600000)},
+             {"pin", boolean_schema()},
+             {"application_output_option", string_schema(64)}},
+            {"executable", "working_directory"}),
+        object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                      {"identity", "artifact_id"}),
+        "Submit asynchronous Nsight capture of a fresh application. Absolute executable and working directory "
+        "are required; arguments are bounded strings. Defaults: frame 2, timeout 120000 ms, pin false. "
+        "Optional application_output_option appends an option and a fresh output directory for application "
+        "evidence, kept distinct from Nsight exports. The delimiter defaults to present. "
+        "graphics_capture_api requires an application that initializes the NGFX SDK and emits its own "
+        "boundaries. capture_frame counts the selected delimiters, not application frame indices. "
+        "Poll job_status; submission is not capture success.",
+        false, false, [this](const Json& arguments) {
+            CaptureRequest request;
+            request.executable = absolute_path(arguments.at("executable"), true);
+            request.working_directory = absolute_path(arguments.at("working_directory"));
+            request.arguments = arguments.value("arguments", std::vector<std::string>{});
+            request.capture_frame = arguments.value("capture_frame", std::uint64_t{2});
+            request.delimiter = parse_capture_delimiter(arguments.value("delimiter", "present"));
+            request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+            request.pin = arguments.value("pin", false);
+            request.application_output_option = arguments.value("application_output_option", "");
+            if(!request.application_output_option.empty() &&
+               (request.application_output_option.front() != '-' ||
+                request.application_output_option.find_first_of(" \t\r\n") != std::string::npos)) {
+                throw std::invalid_argument("application_output_option must be one option starting with '-'");
+            }
+            return Json(service().capture(std::move(request)));
+        });
     const auto job_input = object_schema({{"job_id", string_schema(256, 1)}}, {"job_id"});
     add_tool(
         tools, "job_status", job_input, job_schema(),

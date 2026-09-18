@@ -219,6 +219,8 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
         capture.working_directory = request.working_directory;
         capture.capture_file = root / "raw/capture.ngfx-capture";
         capture.capture_frame = request.capture_frame;
+        capture.delimiter = request.delimiter == CaptureDelimiter::Present ? NsightDelimiter::Present
+                                                                           : NsightDelimiter::GraphicsCaptureApi;
         completion.cleanup_confirmed = false;
         const auto captured = run_nsight_capture(installation, capture, context.stop);
         completion.cleanup_confirmed = !captured.launched || captured.process.cleanup_confirmed;
@@ -327,6 +329,26 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
 }
 } // namespace
 
+std::string_view capture_delimiter_name(CaptureDelimiter delimiter) {
+    switch(delimiter) {
+        case CaptureDelimiter::Present:
+            return "present";
+        case CaptureDelimiter::GraphicsCaptureApi:
+            return "graphics_capture_api";
+    }
+    throw std::invalid_argument("Capture delimiter must be present or graphics_capture_api");
+}
+
+CaptureDelimiter parse_capture_delimiter(std::string_view name) {
+    if(name == "present") {
+        return CaptureDelimiter::Present;
+    }
+    if(name == "graphics_capture_api") {
+        return CaptureDelimiter::GraphicsCaptureApi;
+    }
+    throw std::invalid_argument("Capture delimiter must be present or graphics_capture_api");
+}
+
 CaptureService::CaptureService(CaptureServiceOptions options) :
     options_(std::move(options)), artifacts_(options_.artifacts) {}
 
@@ -335,6 +357,7 @@ CaptureService::~CaptureService() {
 }
 
 CaptureSubmission CaptureService::capture(CaptureRequest request) {
+    const auto delimiter = capture_delimiter_name(request.delimiter);
     if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.capture_frame < 2 ||
        request.arguments.size() > 256 || !request.application_provenance.is_object() ||
        request.application_provenance.dump().size() > 65536) {
@@ -375,9 +398,11 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
                     {"capture_settings",
                      {{"capture_frame", request.capture_frame},
                       {"frame_count", 1},
-                      {"delimiter", "present"},
+                      {"delimiter", delimiter},
                       {"timeout_ms", request.timeout.count()}}},
-                    {"sdk", {{"status", "not_used"}}}};
+                    {"sdk",
+                     {{"status", request.delimiter == CaptureDelimiter::Present ? "application_control_not_requested"
+                                                                                : "application_control_requested"}}}};
     auto attempt = std::make_shared<Attempt>();
     attempt->artifacts = &artifacts_;
     attempt->provenance = provenance;

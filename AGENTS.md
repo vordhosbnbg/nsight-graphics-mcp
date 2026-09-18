@@ -94,8 +94,14 @@ profiles at **0.2.1**. The basic and advanced matrix passes 54 fresh captures
 across nine workload pairs on matching tools; all 54 retained captures also pass
 typed metadata/event/object pagination and restart queries. The full fixture
 passes 57 fresh application-readback launches with synchronization validation.
-R-010 is complete with recorded advanced capture compatibility and export gaps;
-detailed state, optional SDK control, and source repair remain unfinished.
+R-010 is complete with recorded advanced capture compatibility and export gaps.
+R-002 completes at **0.2.2** with optional per-launch SDK control, tested matching
+SDK 0.9.2/0.9.0 builds, 12 real basic SDK captures and 6 default-mode regressions
+through MCP, independently decoded frame correspondence, and retained pins.
+The default GCC Debug aggregate passes 20 checks; a subsequent portability
+annotation passes focused fixture checks on GCC and Clang. Exact SDK evidence,
+source/build identities, and limits are in docs/SDK_CONTROL.md. Detailed state
+and source repair remain unfinished.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
 evidence, and limits are in docs/BUILD_VALIDATION.md, docs/NSIGHT_VALIDATION.md,
@@ -200,6 +206,10 @@ Recheck its availability when evaluating new documented integration options.
 - Build required dependency libraries and the glslang shader compiler from those
   sources. The installed shader compiler is a discovery observation, not the
   selected reproducible build input. Pin and record the tested source revisions.
+- The explicitly enabled NGFX fixture uses fingerprinted headers from the matching
+  separately installed Nsight toolchain, as documented in `docs/SDK_CONTROL.md`.
+  This optional GPU-toolchain source exception does not change the six vendored
+  submodules or the SDK-free default build; do not download SDK sources at build time.
 - Statically link vendored dependency code and audit the produced binaries, not
   just CMake flags. Document required OS/compiler-runtime, desktop, Vulkan-loader,
   and GPU-driver dependencies, including libraries loaded at runtime. This follows

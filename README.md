@@ -15,8 +15,11 @@ workload pairs on matching Nsight **2026.3.1.0/build 38722833** and
 all 54 retained captures, including server restart. Other producer tuples are
 explicitly rejected until qualified. The application-readback fixture matrix
 passes 57 launches with synchronization validation. R-010's advanced fixture is
-complete; detailed event state, optional SDK control, and the
-diagnosis/source-repair/recapture workflow remain unfinished. Actual GPU replay
+complete. At **0.2.2**, optional SDK control passes 12 basic captures and 6
+default-mode regressions on matching SDK 0.9.2/0.9.0 toolchains, with independently
+verified frame selection; see [SDK_CONTROL.md](docs/SDK_CONTROL.md).
+Detailed event state and the diagnosis/source-repair/recapture workflow remain
+unfinished. Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),
 [INSPECTION.md](docs/INSPECTION.md), and the pinned failed attempts in

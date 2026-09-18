@@ -7,9 +7,14 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ngm {
+enum class CaptureDelimiter { Present, GraphicsCaptureApi };
+std::string_view capture_delimiter_name(CaptureDelimiter delimiter);
+CaptureDelimiter parse_capture_delimiter(std::string_view name);
+
 struct CaptureServiceOptions {
     ArtifactOptions artifacts;
     std::optional<std::filesystem::path> nsight_root;
@@ -24,6 +29,7 @@ struct CaptureRequest {
     std::vector<std::string> arguments;
     std::filesystem::path working_directory;
     std::uint64_t capture_frame = 2;
+    CaptureDelimiter delimiter = CaptureDelimiter::Present;
     std::chrono::milliseconds timeout{120000};
     bool pin = false;
     // Optional source-controlled fixture/app convention: append this option and

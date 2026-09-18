@@ -61,12 +61,17 @@ endif()
 
 # These are the first-party translation units linked into this executable from
 # ngm_core. Unused objects from that static archive are deliberately excluded.
-set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp
+set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp src/fixture/SdkControl.cpp
     src/core/Hash.cpp src/core/File.cpp src/core/Version.cpp)
 set(inputs ${translation_units}
-    src/fixture/Fixture.hpp include/ngm/Hash.hpp include/ngm/File.hpp include/ngm/Version.hpp
+    src/fixture/Fixture.hpp src/fixture/SdkControl.hpp include/ngm/Hash.hpp include/ngm/File.hpp include/ngm/Version.hpp
     CMakeLists.txt CMakePresets.json cmake/Fixture.cmake cmake/FixtureBuildIdentity.cmake
-    cmake/Version.hpp.in cmake/Dependencies.cmake)
+    cmake/Version.hpp.in cmake/Dependencies.cmake cmake/NsightSdk.cmake)
+if(NOT DEFINED SDK_MANIFEST OR NOT EXISTS "${SDK_MANIFEST}")
+    message(FATAL_ERROR "SDK_MANIFEST is required for the fixture's optional SDK build identity")
+endif()
+file(READ "${SDK_MANIFEST}" sdk_manifest)
+string(JSON identity SET "${identity}" nsight_sdk "${sdk_manifest}")
 set(input_records "[]")
 set(index 0)
 foreach(path IN LISTS inputs)

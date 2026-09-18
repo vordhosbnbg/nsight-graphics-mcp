@@ -532,6 +532,56 @@ initialization. Preserve matching tools, input capture, and cleanup evidence.
 Source: the retained 2026.2 `ngfx-replay --help` and the
 [capture/replay CLI documentation](https://docs.nvidia.com/nsight-graphics/UserGuide/graphics-capture-cli.html).
 
+### I-012 — SDK capture harness compares different shader-provenance representations
+
+Date: **2026-09-18**. State: **Resolved for this harness configuration**.
+Related items: R-002/R-015. Product **0.2.2**, GCC **16.2.1 Debug**, matching
+Nsight **2026.3.1.0/build 38722833** and SDK **0.9.2**, on the RTX 3080 Ti /
+615.71.09 / KDE Wayland-Xwayland configuration recorded above.
+
+Reproduction: the new C++ `ngm_capture_integration` harness selects the basic
+workload with `--sdk-first-boundary-frame 6 --baseline-frame 7`. It requests
+Graphics Capture API delimiter ordinal 2, seed 42, 192×128, and application
+final frame 20. The exact argument array, executed binaries and harness source
+are retained in `bundle-cf13ba74e9bb509e0125eb9507e74c48`.
+
+Expected: validate the pre-call SDK report against the retained executable,
+shader build and workload, then continue with fresh repeat and faulty captures.
+Observed: the first capture job succeeds, all five exports succeed, and process
+cleanup and artifact publication complete. The harness rejects the shader-bundle
+comparison: the raw `shaders/provenance.json` has no `kind` field, while the
+application's typed SDK context adds `kind: "shader_bundle"`. The harness exits
+1 and skips the remaining captures. A fresh-context reviewer independently found
+the same representation mismatch. This is a harness failure, not an SDK capture
+or evidence-extraction failure.
+
+Evidence, all persistently pinned under `artifacts/nsight-evidence`:
+
+- Harness report and MCP transcript: `bundle-e3d274fd8982fb847b7580c1ba683b78`.
+- Standalone frame-7 baseline: `bundle-a75d80b0eaa96dafbfc4db2ed6a6f034`.
+- Successful SDK capture: `bundle-b1f6b4cc9835b14c8d45eaeab5e4e11c`.
+- Exact failed harness source, inputs and command: `bundle-cf13ba74e9bb509e0125eb9507e74c48`.
+
+Baseline and capture pins pass inspection after server restart; both server
+sessions and report publication exit normally. The imported report bundle is a
+complete copy of a failed validation report and does not imply validation passed.
+The local report is
+`build/sdk-validation/sdk-0.9.2-mcp/sdk-frame6/capture-validation-mNNrhm/report/report.json`.
+
+Correction: add the expected typed `kind` tag before comparing the complete
+shader manifest, matching the existing experiment runner's validation. The
+fresh-context reviewer reports no remaining code findings after the correction.
+The rebuilt harness passes the same SDK selection through MCP, including three
+fresh captures, all five exports each, matching provenance and boundary reports,
+distinct target PIDs, repeat/variant PNG checks, cleanup, and pins after restart.
+Corrected report `bundle-5ae595db97eecc3d2d117e1a5123c31f` and baseline
+`bundle-4f743867c23e9429d81e3e2ef2ec3bb5` are pinned, as are captures
+`bundle-7a4f272db685aafccb5845031c5a40ca`,
+`bundle-5964f875d33d9890fd2cb386eb2af1ea`, and
+`bundle-56721d17ee8014faad7685808ea6ee50`.
+Revisit if the application context or raw shader-manifest representation changes;
+the harness still must compare their complete content after the explicit tag.
+
 ## Entry template
 
 Use the next unused I-### ID. An unsuccessful retry gets a new entry linked to the

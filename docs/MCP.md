@@ -36,7 +36,7 @@ and the equivalent mechanism in
 
 | Tool | Inputs and behavior |
 | --- | --- |
-| `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one presented frame; the fresh target must present. Returns `identity` and `artifact_id`. |
+| `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, or `graphics_capture_api`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. Returns `identity` and `artifact_id`. |
 | `job_status` | Required `job_id`; returns state, stop reason, cleanup/reservation flags, elapsed milliseconds, a bounded diagnostic error, and evidence IDs. IDs belong to this server session. |
 | `job_cancel` | Required `job_id`; requests cancellation and reports whether it was already requested or terminal. Poll status for cleanup completion. |
 | `artifact_list` | Optional `after_id` and `limit` (default 50, range 1–100); includes staging, complete, failed, and expired summaries with `next_after`. |
@@ -91,10 +91,13 @@ does not establish full event state, descriptor contents, shader inspection, or
 resource extraction. `application_output_option` appends that option and a fresh
 bundle-local output directory to the application argv. This optional convention
 labels its files as application-provided evidence, separate from Nsight exports.
-The service selects the documented present delimiter and one frame. A workload
-without presentation needs a separate documented boundary/control path, which
-this service does not implement. A timeout alone does not identify missing
-presentation as its cause; inspect the retained process logs and report.
+The service defaults to the documented present delimiter and one frame. Its
+optional `graphics_capture_api` delimiter selects the documented SDK boundary
+path described in [SDK_CONTROL.md](SDK_CONTROL.md), qualified for its recorded
+basic fixture workloads on the two matching tool/SDK pairs. Capture frame ordinals refer to the selected delimiters, not
+application frame indices. A timeout alone does not identify a missing delimiter
+as its cause; inspect the retained process logs and report. Compute without
+presentation is outside the current qualification.
 
 Poll until the state is terminal **and** `worker_running` and
 `finalization_pending` are both false before reading finalized evidence. Check

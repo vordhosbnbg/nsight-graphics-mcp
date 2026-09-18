@@ -47,11 +47,12 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
     const bool capture_ready = storage && tool_paths && desktop;
     const Json capture{{"available", capture_ready},
                        {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
-                       {"reason",
-                        "Implemented asynchronous fresh-process capture. Requires --artifact-root, matching "
-                        "Nsight tools, a working desktop, and a compatible GPU/driver. Paths/environment "
-                        "only establish observable prerequisites; each job checks tools and retains results. "
-                        "Captures one presented frame and requires presentation; other boundary paths are pending."}};
+                       {"reason", "Implemented asynchronous fresh-process capture. Requires --artifact-root, matching "
+                                  "Nsight tools, a working desktop, and a compatible GPU/driver. Paths/environment "
+                                  "only establish observable prerequisites; each job checks tools and retains results. "
+                                  "Captures one delimiter interval, using presentation by default. Optional "
+                                  "graphics_capture_api boundaries require application SDK initialization and calls; "
+                                  "qualification is specific to the application, SDK, and matching Nsight release."}};
     const Json store{{"available", storage},
                      {"status", storage ? "configured" : "missing_prerequisites"},
                      {"reason", storage ? "Implemented; storage is opened lazily by a workflow call. "

@@ -2,6 +2,7 @@
 #include "ngm/CaptureService.hpp"
 #include "ngm/File.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <filesystem>
 #include <fstream>
@@ -86,7 +87,9 @@ int main(int argc, char** argv) {
         {
             ngm::CaptureService service(options);
             const auto first = service.capture(request);
-            const auto second = service.capture(request);
+            auto sdk_request = request;
+            sdk_request.delimiter = ngm::CaptureDelimiter::GraphicsCaptureApi;
+            const auto second = service.capture(sdk_request);
             require(first.identity.job_id != second.identity.job_id && first.artifact_id != second.artifact_id,
                     "fresh jobs have separate captures and bundles");
             for(const auto& submission : {first, second}) {
@@ -100,6 +103,20 @@ int main(int argc, char** argv) {
                         "successful bundle is published and persistently pinned");
                 const auto report =
                     nlohmann::json::parse(service.artifacts().read(submission.artifact_id, "raw/report.json"));
+                const bool sdk_delimiter = submission.artifact_id == second.artifact_id;
+                require(report.at("capture_settings").at("delimiter") ==
+                                (sdk_delimiter ? "graphics_capture_api" : "present") &&
+                            report.at("sdk").at("status") ==
+                                (sdk_delimiter ? "application_control_requested" : "application_control_not_requested"),
+                        "each capture retains the selected delimiter without claiming observed SDK success");
+                const auto command = report.at("capture").at("arguments").get<std::vector<std::string>>();
+                require(std::find(command.begin(), command.end(),
+                                  sdk_delimiter ? "--delimiter-graphics-capture-api" : "--delimiter-present") !=
+                                command.end() &&
+                            std::find(command.begin(), command.end(),
+                                      sdk_delimiter ? "--delimiter-present" : "--delimiter-graphics-capture-api") ==
+                                command.end(),
+                        "the real executable boundary receives only the selected delimiter");
                 for(const auto& exported : report.at("exports")) {
                     require(exported.at("outcome") == "success",
                             "every happy-path export actually succeeds: " + exported.dump());

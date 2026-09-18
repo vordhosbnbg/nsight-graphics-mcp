@@ -352,11 +352,9 @@ void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
     expect_tool_error(
         call(client, "artifact_import", {{"source", scratch.path.string()}, {"required_outputs", {"../file"}}}));
     const Json valid_capture{{"executable", server}, {"working_directory", scratch.path.string()}};
-    const Json invalid_capture_fields{{"capture_frame", 1},
-                                      {"timeout_ms", 600001},
-                                      {"pin", 1},
-                                      {"arguments", "wrong-type"},
-                                      {"application_provenance", Json::object()}};
+    const Json invalid_capture_fields{{"capture_frame", 1},        {"delimiter", "automatic"},
+                                      {"timeout_ms", 600001},      {"pin", 1},
+                                      {"arguments", "wrong-type"}, {"application_provenance", Json::object()}};
     for(const auto& [name, value] : invalid_capture_fields.items()) {
         auto arguments = valid_capture;
         arguments[name] = value;
@@ -587,8 +585,22 @@ void workflow_check(const std::string& server, const std::string& standin, const
             "file inventory subsequent page");
 
     const auto record2 = scratch.path / "target2.pid";
-    const auto second = successful_call(client, "capture", capture_arguments(record2));
+    auto sdk_arguments = capture_arguments(record2);
+    sdk_arguments["delimiter"] = "graphics_capture_api";
+    const auto second = successful_call(client, "capture", sdk_arguments);
     require(await_job(client, second["identity"]["job_id"])["state"] == "succeeded", "second capture succeeds");
+    const auto sdk_report =
+        Json::parse(successful_call(client, "artifact_read",
+                                    {{"artifact_id", second["artifact_id"]}, {"path", "raw/report.json"}})["text"]
+                        .get<std::string>());
+    require(sdk_report["capture_settings"]["delimiter"] == "graphics_capture_api" &&
+                sdk_report["sdk"]["status"] == "application_control_requested",
+            "MCP preserves requested SDK delimiter without claiming observed application instrumentation");
+    const auto sdk_command = sdk_report["capture"]["arguments"].get<std::vector<std::string>>();
+    require(std::find(sdk_command.begin(), sdk_command.end(), "--delimiter-graphics-capture-api") !=
+                    sdk_command.end() &&
+                std::find(sdk_command.begin(), sdk_command.end(), "--delimiter-present") == sdk_command.end(),
+            "SDK delimiter reaches the real capture subprocess boundary through MCP");
     require(recorded_pid(record1) != recorded_pid(record2), "each capture launches a fresh process");
     const auto page = successful_call(client, "artifact_list", {{"limit", 1}});
     require(page["artifacts"].size() == 1 && page["next_after"].is_string(), "artifact list pagination");

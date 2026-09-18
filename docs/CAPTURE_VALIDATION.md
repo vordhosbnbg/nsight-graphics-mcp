@@ -121,6 +121,18 @@ and version, not a general equivalence between application and Nsight frame
 numbering. The harness retains the selectors separately and does not decode PNG
 pixels or assert cross-origin image equality.
 
+The optional SDK mode adds `--sdk-first-boundary-frame N --baseline-frame M` to
+the harness invocation. Both selectors are required together: N selects the
+application's first explicit SDK boundary, while M independently selects the
+standalone application readback. The capture delimiter ordinal remains 2. No
+formula equating those selectors is assumed by the harness. Each run still uses
+reference/reference/variant in fresh targets. The baseline makes no SDK calls,
+including when built with SDK support. The SDK mode additionally checks the
+retained pre-call initialization, exact tool/SDK pairing, executable and shader
+identities, workload inputs, and separate entered/completed boundary records.
+Normal mode verifies the absence of the fixture's SDK-control output. Decoded
+pixel correspondence is qualified separately in [SDK_CONTROL.md](SDK_CONTROL.md).
+
 The harness checks:
 
 - Successful matching-tool capture and metadata readability, completed job

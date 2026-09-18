@@ -13,6 +13,7 @@ int main(int argc, char** argv) {
     if(argc == 2 && std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: ngm-vulkan-fixture --scenario NAME --seed UINT --width UINT --height UINT\n"
                      "                          --frame UINT --output NEW_DIRECTORY [--shader-dir DIRECTORY]\n"
+                     "                          [--sdk-first-boundary-frame UINT]\n"
                      "       ngm-vulkan-fixture [--version | --help]\n"
                      "Scenarios: reference, shader-error, binding-error, pipeline-error,\n"
                      "multipass-reference, pass-output-error, bindless-reference, resource-selection-error,\n"
@@ -21,7 +22,9 @@ int main(int argc, char** argv) {
                      "All six inputs are required. Frame is zero-based (0..600); dimensions are 32..4096.\n"
                      "Uses an existing X11/Xwayland desktop through DISPLAY, a Vulkan 1.3 device,\n"
                      "and verified diagnostic GLSL/SPIR-V artifacts. Each launch presents frames 0..frame\n"
-                     "and saves the selected frame as application readback in image.ppm and result.json.\n";
+                     "and saves the selected frame as application readback in image.ppm and result.json.\n"
+                     "SDK boundaries are optional, require an SDK-enabled build and Nsight injection, and start\n"
+                     "before the selected zero-based application frame; at least two later frames must remain.\n";
         return 0;
     }
     try {

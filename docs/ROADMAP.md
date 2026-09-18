@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **Build/basic-fixture group complete at 0.1.0; capture/evidence group R-012/R-011/R-001 complete at 0.2.0. R-010 advanced fixture complete at 0.2.1. R-006 inspection and R-015 two-release qualification remain in progress.**
+Planning state: **Build/basic-fixture group complete at 0.1.0; capture/evidence group R-012/R-011/R-001 complete at 0.2.0. R-010 advanced fixture complete at 0.2.1. R-002 optional SDK control complete at 0.2.2. R-006 inspection and R-015 two-release qualification remain in progress.**
 Last updated: **2026-09-18**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -104,7 +104,8 @@ The R-013/R-005/R-003 build/basic-fixture group is complete at 0.1.0.
 The capture/evidence group completes at 0.2.0 after reviewed CPU checks and
 real basic capture/export matrices on two matching Nsight releases. Early R-006
 queries now pass on 54 basic/advanced captures from two exact producer profiles
-at 0.2.1; R-010 is complete and detailed inspection remains active.
+at 0.2.1; R-010 is complete and detailed inspection remains active. Optional
+SDK control completes R-002 at 0.2.2 for its recorded two-release basic workload.
 
 | Step | Items | Exit check |
 | --- | --- | --- |
@@ -194,7 +195,7 @@ Title: Validate locally against two Nsight Graphics releases
 Goal: Establish first-release compatibility through reproducible local checks and real GPU workflows on at least two distinct Nsight releases.
 Scope: Local CMake/CTest commands for first-party checks, opt-in hardware integration runs using R-005's isolated experiment runner, explicit Nsight installation selection, matching capture/replay/SDK configuration per release, small sanitized export fixtures and capability differences, and a versioned results matrix for the basic and advanced visual workloads. Start with the installed baseline and select a compatible second release from documented prerequisites.
 Acceptance: Local non-GPU checks cover the relevant parser, job, artifact, and MCP behavior; on each selected Nsight release, real runs demonstrate unmodified capture, optional SDK capture, available evidence queries, and a source-edit/rebuild/recapture verification case; the basic and advanced scenario matrix records pass/fail/unsupported/skipped separately; each result identifies the exact tools, SDK, app/shader build, GPU/driver, desktop, and retained evidence; missing prerequisites and unsupported operations return explicit errors; two-release support is not claimed from mocks, parser fixtures, or skipped runs.
-Notes: Validation location and at least two releases selected in round 10. Uses R-013's build/test entry points and the implemented first-release fixture, MCP, capture, inspection, job, and artifact paths. R-006 supplies per-version capability evidence and R-014 publishes results. Only the 2026.3 installation was observed in /opt/nsight-graphics during planning; a second release must be obtained and validated, not assumed present. Test each release with its own matching tools; cross-version capture-file replay is not required or presumed. Hosted CI, GPU CI runners, and additional GPU generations are outside this item. Failed or unavailable required cases remain incomplete rather than being counted as successful support. Qualification of 2026.2 is now underway: the official 2026.2.0.26134 Linux archive was downloaded and its vendor payload extracted under ignored build/nsight-2026.2/installation, without running package-maintenance scripts or changing the installed driver. The basic hardware harness passes on both 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, with matching tools, all five exports, fresh targets, and pins after restart. docs/NSIGHT_VALIDATION.md identifies the exact evidence and remaining gaps. At 0.2.1, all nine basic/advanced workload pairs pass on both releases: 54 fresh captures with all five exports, cleanup, repeats/variant differences, and pins after restart. The batch is pinned as bundle-a4bce77c1a8d615412702da25e33fa75. A separate typed query matrix passes on all 54 captures and is pinned as bundle-a1af3b8bb46feebabcc66a3bd821ab80. Actual GPU replay times out on both releases; SDK capture, sufficient diagnostic evidence, and source repair remain unqualified.
+Notes: Validation location and at least two releases selected in round 10. Uses R-013's build/test entry points and the implemented first-release fixture, MCP, capture, inspection, job, and artifact paths. R-006 supplies per-version capability evidence and R-014 publishes results. Only the 2026.3 installation was observed in /opt/nsight-graphics during planning; a second release must be obtained and validated, not assumed present. Test each release with its own matching tools; cross-version capture-file replay is not required or presumed. Hosted CI, GPU CI runners, and additional GPU generations are outside this item. Failed or unavailable required cases remain incomplete rather than being counted as successful support. Qualification of 2026.2 is now underway: the official 2026.2.0.26134 Linux archive was downloaded and its vendor payload extracted under ignored build/nsight-2026.2/installation, without running package-maintenance scripts or changing the installed driver. The basic hardware harness passes on both 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608, with matching tools, all five exports, fresh targets, and pins after restart. docs/NSIGHT_VALIDATION.md identifies the exact evidence and remaining gaps. At 0.2.1, all nine basic/advanced workload pairs pass on both releases: 54 fresh captures with all five exports, cleanup, repeats/variant differences, and pins after restart. The batch is pinned as bundle-a4bce77c1a8d615412702da25e33fa75. A separate typed query matrix passes on all 54 captures and is pinned as bundle-a1af3b8bb46feebabcc66a3bd821ab80. At 0.2.2, optional SDK capture is qualified for the basic workload on matching SDK 0.9.2/0.9.0 toolchains: 12 SDK captures plus 6 default regressions, with independent decoded frame correspondence; complete matrix bundle-7b6c2aa712deb108b66af94d86b50e75 is pinned. Actual GPU replay times out on both releases; sufficient diagnostic evidence and source repair remain unqualified.
 ```
 
 ## Pending
@@ -209,18 +210,6 @@ Goal: Let Codex investigate incorrect rendered output, identify the responsible 
 Scope: Bounded queries over available events, pipeline/shader associations and resource data; output previews/comparison; evidence references; and integration checks covering diagnosis, source/shader edits, rebuild, recapture, and fix verification against R-005's basic and R-010's advanced visual-defect scenarios. Reuse R-005's isolated experiment runner to select equivalent inputs/frames and link before/after reports with explicit evidence origins. Codex's normal development tools perform edits and builds.
 Acceptance: For each supported scenario, Codex identifies the implicated draw/pass and explains the defect using retrievable evidence, edits the responsible source/shader, rebuilds, and obtains a new capture; the repaired output matches the correct reference within declared tolerances; before/after captures, build identities, and the source change are linked; unavailable state is reported explicitly; expected-answer metadata or selecting a prebuilt correct variant does not substitute for diagnosis and repair.
 Notes: First workflow priority from round 4, expanded to the edit/rebuild/recapture/verify loop in round 5 and selected as the first-release boundary in round 6. Depends on R-003, R-005, R-010, R-012's evidence store, and a sufficient documented inspection path from R-006. Protect inputs during comparison and explicitly pin retained verification baselines. Repair validation uses a source-available fixture; unmodified applications still support capture and available diagnosis without promising source repair. Live breakpoints/stepping/variable inspection, compute correctness, and performance profiling are outside first-release scope.
-```
-
-### R-002
-
-```text
-Status: Pending
-Area: capture/platform
-Title: Add optional application-side capture controls
-Goal: Give applications whose source is available precise native capture control at meaningful workload boundaries while preserving the unmodified-application path.
-Scope: A C++ integration with the NGFX SDK, initialization before Vulkan instance creation, explicit workload boundaries, and per-launch capture configuration/result reporting so the server can request and observe a capture within a fresh application invocation.
-Acceptance: A newly launched instrumented graphics fixture captures a chosen visual workload boundary and returns a usable artifact through the job lifecycle; a second request uses a fresh instance; the unmodified capture path continues to work without this integration.
-Notes: Accepted application mode and native integration priority in rounds 1–2. Depends on R-003, R-005, R-011, R-012, and the capture contract also used by R-001. Add an instrumented fixture mode while retaining a run without NGFX integration. Round 7 makes a reusable application control session unnecessary for this release; choose a per-launch configuration/result mechanism and validate SDK synchronization. Round 6 moves compute-without-presentation validation to R-008. May move earlier if the visual workflow needs precise application-side capture boundaries.
 ```
 
 ### R-014
@@ -274,6 +263,18 @@ Notes: Accepted later work in interview round 3, outside the first release. Depe
 ## Blocked
 
 ## Done
+
+### R-002
+
+```text
+Status: Done
+Area: capture/platform
+Title: Add optional application-side capture controls
+Goal: Give applications whose source is available precise native capture control at meaningful workload boundaries while preserving the unmodified-application path.
+Scope: A C++ integration with the NGFX SDK, initialization before Vulkan instance creation, explicit workload boundaries, and per-launch capture configuration/result reporting so the server can request and observe a capture within a fresh application invocation.
+Acceptance: A newly launched instrumented graphics fixture captures a chosen visual workload boundary and returns a usable artifact through the job lifecycle; a second request uses a fresh instance; the unmodified capture path continues to work without this integration.
+Notes: Accepted application mode and native integration priority in rounds 1–2. Depends on R-003, R-005, R-011, R-012, and the capture contract also used by R-001. Add an instrumented fixture mode while retaining a run without NGFX integration. Round 7 makes a reusable application control session unnecessary for this release; choose a per-launch configuration/result mechanism and validate SDK synchronization. Round 6 moves compute-without-presentation validation to R-008. Moved into implementation after R-010 completion. The first slice uses documented SDK initialization before Vulkan and explicit frame boundaries inside each fresh CLI-launched fixture, selected by per-launch arguments; it does not self-inject or create a reusable application session. Optional SDK source builds use explicitly selected, fingerprinted headers from the matching separately installed Nsight toolchain. Shared capture requests select present or graphics_capture_api delimiters, retaining the request separately from application-reported SDK observations. Completed 2026-09-18 at 0.2.2 after fresh-context implementation and acceptance reviews, corrections, the default GCC Debug 20-check aggregate, and focused GCC/Clang fixture checks. The C++ MCP harness passes 12 SDK-controlled basic captures and 6 default-mode regressions on matching Nsight 2026.3.1.0/build 38722833 with SDK 0.9.2 and 2026.2.0.0/build 37991608 with SDK 0.9.0. Each request starts a fresh target; all five exports, cleanup, exact application/build/SDK observations, and pins after restart pass. Independent RGB comparison confirms two distinct chosen workload boundaries against separate application readbacks. Complete matrix/source/input/comparison snapshot bundle-7b6c2aa712deb108b66af94d86b50e75 is pinned; docs/SDK_CONTROL.md records the exact scope and importer/payload identities. I-012 preserves the corrected hardware-harness failure. This qualifies the selected basic windowed workload, not advanced SDK scenarios, headless compute, detailed state, or source repair.
+```
 
 ### R-010
 

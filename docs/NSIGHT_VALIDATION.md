@@ -2,8 +2,10 @@
 
 Date: **2026-09-18**. R-015 remains **In Progress**. Basic/advanced uninstrumented
 capture/export and typed inventory queries pass on two exact producers across
-**54 captures** at product **0.2.1**. The SDK and source-edit/rebuild/recapture
-workflow remain unqualified; this is not the complete visual-debugging release.
+**54 captures** at product **0.2.1**. At **0.2.2**, optional SDK control passes
+12 basic captures plus 6 default-mode regressions on matching tool/SDK pairs.
+The source-edit/rebuild/recapture workflow remains unqualified; this is not the
+complete visual-debugging release.
 
 ## Tools and common environment
 
@@ -152,8 +154,8 @@ SHA-256 is
 This records the received file, not verification against a publisher signature.
 Only the vendor payload was extracted into the ignored repository build tree;
 Debian maintainer scripts were not run, and no installed driver, desktop, or
-system profiling settings were changed. The available SDK was observed but not
-loaded by these tests.
+system profiling settings were changed. The SDK was only observed during that
+acquisition; its later runtime qualification is recorded below.
 
 The archived [2026.2 release notes](https://archive.docs.nvidia.com/nsight-graphics/2026.2/ReleaseNotes/index.html)
 specify Linux driver 580.126.18 or newer. The tested driver exceeds that version
@@ -163,6 +165,31 @@ copy is explicitly pinned as `bundle-0effb14aea52838c6dbe2c7bfd5b4cd3`, alongsid
 the source of the C++ importer. Proprietary tool binaries and the package remain
 outside version control.
 
+## Optional SDK qualification at 0.2.2
+
+The C++ MCP harness passes **18 fresh captures**: on each release, three basic
+captures with SDK boundaries starting at application frame 6, three starting at
+frame 10, and three with no SDK calls using the default present delimiter.
+Each group captures reference/reference/shader-error with matching tools,
+completed cleanup, separate target PID observations, all five exports, and
+persistent pins verified after server restart. Fixtures are explicitly built
+against matching **SDK 0.9.2** for 2026.3.1.0/build 38722833 and **SDK 0.9.0**
+for 2026.2.0.0/build 37991608.
+
+Independent RGB decoding confirms SDK reference screenshots match separately
+rendered application frames 7 and 11 respectively, and the default references
+match application frame 2. The frame-7 and frame-11 outputs differ, establishing
+the effect of the selected boundary for these inputs. This is not a general
+frame-numbering rule. Advanced SDK workloads, no-presentation compute, actual
+GPU replay and source repair are not established by this matrix.
+
+The combined matrix, comparison script, frozen inputs and exact bundle mapping
+are persistently pinned as `bundle-7b6c2aa712deb108b66af94d86b50e75`.
+[SDK_CONTROL.md](SDK_CONTROL.md) records invocation, identities, all measured
+limits, and the distinction between the snapshot importer's version and its
+0.2.2 payload. I-012 retains the first failed harness assertion and successful
+correction separately from the underlying capture results.
+
 ## Remaining qualification
 
 The typed inspection profiles accept the two exact version/build tuples above,
@@ -170,8 +197,8 @@ with matching same-bundle schema-1 Vulkan metadata. Other producers are rejected
 until separately qualified; raw export success alone does not qualify them. See
 [INSPECTION.md](INSPECTION.md) for the known fields and absent event state.
 
-Complete R-015 still requires optional SDK capture and an actual source
-edit/rebuild/recapture verification on each selected release, including sufficient
+Complete R-015 still requires an actual source edit/rebuild/recapture
+verification on each selected release, including sufficient
 retrievable diagnostic evidence. Failed or skipped required cases do not
 count as full support. Replay failures and other documented-interface probes are
 retained in [INVESTIGATIONS.md](INVESTIGATIONS.md).

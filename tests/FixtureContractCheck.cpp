@@ -140,10 +140,39 @@ int main(int argc, char** argv) {
         const auto rejected = Json::parse(ngm::read_regular_file(display.output / "result.json", 1024 * 1024));
         require(rejected.at("application").at("executable_sha256") == ngm::sha256_file(executable),
                 "standalone result identifies the running executable even when display prerequisites fail");
-        require(rejected.at("application").at("build").at("compile_commands").size() == 5,
+        require(rejected.at("application").at("build").at("compile_commands").size() == 6,
                 "application identity contains actual fixture/core compiler commands");
         require(rejected.at("provenance").at("kind") == "shader_bundle",
                 "shader provenance has a distinct identity kind");
+        require(rejected.at("sdk_control").at("requested") == false &&
+                    rejected.at("sdk_control").at("status") == "not_requested" &&
+                    !fs::exists(display.output / "sdk-control.json"),
+                "ordinary fixture launch performs no SDK initialization or boundary calls");
+
+        auto sdk = make_case(executable, scratch.path, "sdk request without injection");
+        copy_bundle(built_shaders, sdk.shaders);
+        sdk.process.arguments.insert(sdk.process.arguments.end(), {"--sdk-first-boundary-frame", "0"});
+        require_failure(sdk, 3, "SDK");
+        const auto sdk_report = Json::parse(ngm::read_regular_file(sdk.output / "sdk-control.json", 64 * 1024));
+        require(sdk_report.at("requested") == true && sdk_report.at("initialized_before_vulkan_instance") == false &&
+                    sdk_report.at("boundaries_entered") == 0 && sdk_report.at("boundaries_completed") == 0 &&
+                    (sdk_report.at("status") == "not_compiled" || sdk_report.at("status") == "unavailable"),
+                "missing SDK build/injection fails before Vulkan and preserves explicit application evidence");
+        require(sdk_report.at("application_context").at("application").at("executable_sha256") ==
+                        ngm::sha256_file(executable) &&
+                    sdk_report.at("application_context").at("application").at("build").at("nsight_sdk") ==
+                        sdk_report.at("sdk_build") &&
+                    sdk_report.at("application_context").at("inputs").at("scenario") == "reference" &&
+                    sdk_report.at("application_context").at("shader_bundle").at("shaders").size() == 7,
+                "SDK report preserves build/workload/shader context before initialization or capture termination");
+
+        for(const auto* value : {"-1", "1", "600", "4294967296", "1x"}) {
+            auto invalid_sdk = make_case(executable, scratch.path, std::string("invalid sdk frame ") + value);
+            invalid_sdk.process.arguments.insert(invalid_sdk.process.arguments.end(),
+                                                 {"--sdk-first-boundary-frame", value});
+            require_failure(invalid_sdk, 2, "unsupported arguments", false);
+            require(!fs::exists(invalid_sdk.output), "invalid SDK selection fails before creating output");
+        }
 
         require(rejected.at("workload").at("required_api_features").empty(),
                 "basic rendering never requires optional bindless features");

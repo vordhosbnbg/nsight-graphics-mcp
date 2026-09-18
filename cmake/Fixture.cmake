@@ -1,6 +1,8 @@
 include("${CMAKE_CURRENT_LIST_DIR}/Shaders.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NsightSdk.cmake")
 
 function(ngm_configure_fixture target)
+    ngm_configure_fixture_sdk(${target})
     # XCB is the selected desktop/runtime exception. Vulkan and the shader
     # compiler continue to come from the pinned source dependencies.
     find_package(PkgConfig REQUIRED)
@@ -32,6 +34,7 @@ function(ngm_configure_fixture target)
             "-DHOST_COMPILER_VERSION=${CMAKE_CXX_COMPILER_VERSION}"
             "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}"
             "-DHOST_COMPILER_FLAGS=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${build_type_upper}}"
+            "-DSDK_MANIFEST=${NGM_FIXTURE_SDK_MANIFEST}"
             -P "${PROJECT_SOURCE_DIR}/cmake/FixtureBuildIdentity.cmake"
         BYPRODUCTS "${identity_header}" "${identity_dir}/identity.json"
         VERBATIM)

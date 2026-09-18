@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0; R-010 advanced fixture complete at 0.2.1. The recorded CPU aggregate passes 20 checks. Basic/advanced capture and retained typed queries pass across 54 captures on two Nsight releases, with current focused CPU checks passing. Application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
+Status: **Build/basic-fixture group complete at 0.1.0; capture/evidence group complete at 0.2.0; R-010 advanced fixture complete at 0.2.1; R-002 optional SDK control complete at 0.2.2 for the qualified basic workload. The recorded CPU aggregate passes 20 checks. Basic/advanced capture and retained typed queries pass across 54 captures on two Nsight releases, with current focused CPU checks passing. Application readback passes 57 launches. GPU replay and the complete visual-debugging workflow remain unqualified.**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
@@ -28,7 +28,12 @@ Keep the selected direction, remaining choices, and interview answers here.
   2026.3.1.0 and 2026.2.0.0 results and limits are in
   [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). Actual GPU replay stalled during
   initialization on both releases (I-007/I-011) and remains unqualified. Profiling
-  and an optional application-side SDK bridge remain planned.
+  remains planned. R-002 now implements optional application-side SDK boundaries
+  using explicitly selected, fingerprinted headers from the separately installed
+  Nsight toolchain. At 0.2.2, 12 SDK-controlled basic MCP captures and 6 default
+  captures pass on matching 2026.3.1.0/SDK 0.9.2 and 2026.2.0.0/SDK 0.9.0 pairs,
+  including independently decoded frame correspondence and persistent pins. See
+  [SDK_CONTROL.md](SDK_CONTROL.md).
 - The first-release client is Codex, launching a local stdio server process on the
   GPU machine. Persistent Streamable HTTP is accepted later work.
 - Each first-release capture starts a fresh application instance; reusable target

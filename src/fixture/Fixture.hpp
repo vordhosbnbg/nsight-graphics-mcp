@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -15,6 +16,7 @@ struct Options {
     std::uint32_t frame = 0;
     std::filesystem::path output;
     std::filesystem::path shader_directory;
+    std::optional<std::uint32_t> sdk_first_boundary_frame;
 };
 
 class Unsupported : public std::runtime_error {

@@ -2,8 +2,11 @@
 
 The fixture presents a real window using Vulkan 1.3 and `VK_KHR_xcb_surface`.
 On the development machine this is Xwayland within the existing KDE Wayland
-session. It uses no NGFX SDK and produces **application readback**, not Nsight
-capture evidence. Nsight capture/source inspection remains separate work.
+session. Its normal mode makes no NGFX SDK calls and produces **application
+readback**, distinct from Nsight capture evidence. R-002's optional SDK build and
+per-launch boundary controls pass the basic two-release matrix at 0.2.2; see
+[SDK_CONTROL.md](SDK_CONTROL.md) for the exact qualified workload and evidence.
+Source inspection remains separate work.
 
 Build the normal GCC Debug preset, then launch an isolated experiment:
 
@@ -102,13 +105,15 @@ inputs are bounded; image files must be regular files and cannot block on FIFOs.
 The runner forwards only the selected desktop session/authentication locations,
 sets fresh HOME/XDG directories, and disables implicit Vulkan layers for its
 fixture-only launch. It does not copy authentication contents into reports.
-The recorded Nsight and SDK states are `not_used`. A future capture adapter must
-configure its documented injection environment separately.
+The standalone runner records Nsight and SDK states as `not_used`; its normal
+fixture invocation makes no SDK calls. The capture adapter configures its
+documented injection environment separately, and optional SDK observations are
+retained in `sdk-control.json` as described in [SDK_CONTROL.md](SDK_CONTROL.md).
 
-These directories are local experiment records. They are outside the future
-R-012 managed artifact store and are not automatically pruned or represented as
-pinned capture bundles. Keep important local results until they can be imported
-and explicitly pinned by that store.
+These directories are local experiment records outside the managed artifact
+store. They are not automatically pruned or pinned. Import and explicitly pin
+important runs through the implemented artifact store; the capture validation
+harness does this for its standalone baselines.
 
 ## Explicit hardware checks
 
@@ -218,8 +223,9 @@ are respectively pinned as `bundle-a4bce77c1a8d615412702da25e33fa75` and
 `bundle-a1af3b8bb46feebabcc66a3bd821ab80`. Exact inputs and version differences
 are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md); [INSPECTION.md](INSPECTION.md)
 records the missing pipeline, binding, shader, resource, and pass state. This
-completes R-010's renderer/capture-gap requirements. GPU replay, SDK control,
-and actual source repair remain separate unfinished work.
+completes R-010's renderer/capture-gap requirements. At 0.2.2, optional SDK control
+also passes the separately recorded basic two-release matrix. GPU replay and
+actual source repair remain unfinished.
 
 The desktop dependencies are documented in [DEPENDENCIES.md](DEPENDENCIES.md).
 The [Khronos XCB surface reference](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_xcb_surface.html)

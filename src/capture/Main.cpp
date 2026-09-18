@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
             << "Usage: ngm-capture --artifact-root DIR --executable PATH --working-directory DIR\n"
                "  [--nsight-root DIR] [--argument TEXT ...] [--capture-frame N] [--timeout-ms N]\n"
                "  [--application-output-option NAME] [--provenance-json PATH] [--pin]\n"
+               "  [--delimiter present|graphics_capture_api]\n"
                "Launch a fresh application with documented Nsight CLI, export evidence, and retain a managed bundle.\n"
                "Arguments are subject to the documented adapter's safe-token limit. --pin protects retained "
                "evidence.\n";
@@ -65,6 +66,8 @@ int main(int argc, char** argv) {
                 request.application_output_option = value;
             } else if(key == "--capture-frame") {
                 request.capture_frame = integer(value, "--capture-frame");
+            } else if(key == "--delimiter") {
+                request.delimiter = ngm::parse_capture_delimiter(value);
             } else if(key == "--timeout-ms") {
                 const auto timeout = integer(value, "--timeout-ms");
                 if(timeout < 1 || timeout > 600000) {

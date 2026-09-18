@@ -2,7 +2,8 @@
 
 R-013 source pins, selected and built on 2026-09-17. Gitlinks are authoritative;
 tags below describe the selected revisions, not moving update policies.
-All sources are unmodified submodules under `external/`.
+All vendored sources are unmodified submodules under `external/`. The optional
+NGFX SDK is separately installed toolchain source, described below.
 
 | Path | Upstream/version | Exact commit | Purpose and linkage |
 | --- | --- | --- | --- |
@@ -95,6 +96,15 @@ Xwayland, with system XCB 1.17.0. GPU validation and provenance are recorded in
 [FIXTURE.md](FIXTURE.md). Nsight injection remains to be audited with R-001.
 CPU checks cannot qualify GPU runtime behavior or two-release Nsight compatibility.
 The binaries are not fully static or independent of system/runtime/GPU software.
+
+The optional R-002 fixture build can consume the header-only NGFX SDK from an
+explicitly selected, separately installed Nsight toolchain. This is a GPU-toolchain
+exception, not another downloaded/prebuilt vendored library. The default build
+has no SDK dependency, and the MCP server does not include the SDK. Exact accepted
+source-bundle fingerprints, compilation/provenance boundaries, and the distinction
+between build availability and runtime qualification are in
+[SDK_CONTROL.md](SDK_CONTROL.md). Nsight runtime libraries remain separately
+installed inputs; no vendor binary is committed or linked as a project library.
 
 On 2026-09-18, a successful reference run under `strace -f -e trace=openat`
 recorded the actual fixture runtime path at product version 0.1.0. Besides the
