@@ -444,6 +444,12 @@ void image_checks(const fs::path& root) {
                  std::string(error.what()).find("exceeds the read limit") != std::string::npos;
     }
     require(denied, "equal-sized valid images exceeding the encoded-byte cap fail at the artifact read limit");
+    const auto preview = ngm::preview_artifact_image(store, candidate);
+    require(preview.metadata.at("source").at("artifact_status") == "failed" &&
+                preview.metadata.at("source").at("rgb_sha256") == report.at("candidate").at("rgb_sha256") &&
+                preview.metadata.at("resampled") == false &&
+                ngm::decode_image(preview.png).rgb == std::vector<std::uint8_t>{1, 3, 6},
+            "preview preserves failed-bundle status and original pixel identity");
     for(const auto* path : {"raw/invalid.bin", "raw/wide.ppm", "raw/missing.ppm", "../image.ppm"}) {
         denied = false;
         try {

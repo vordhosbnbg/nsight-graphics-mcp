@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(NsightGraphicsMCP VERSION 0.2.4 LANGUAGES C CXX)
+project(NsightGraphicsMCP VERSION 0.2.5 LANGUAGES C CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Only Linux builds are currently supported.")
@@ -29,7 +29,7 @@ configure_file(cmake/Version.hpp.in generated/ngm/BuildVersion.hpp @ONLY)
 add_library(ngm_core STATIC src/core/Version.cpp src/core/Bootstrap.cpp src/core/Hash.cpp src/core/File.cpp
     src/core/Image.cpp src/core/Process.cpp)
 target_include_directories(ngm_core PUBLIC include PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
-target_link_libraries(ngm_core PUBLIC Threads::Threads)
+target_link_libraries(ngm_core PUBLIC Threads::Threads PRIVATE ngm_lodepng)
 ngm_first_party(ngm_core)
 include(cmake/Jobs.cmake)
 ngm_add_jobs()

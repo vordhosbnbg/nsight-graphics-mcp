@@ -26,6 +26,10 @@ investigation is complete with explicit capability gaps. At **0.2.4**, bounded
 P6/BMP image comparison brings the surface to **17 tools**.
 The basic shader source edit/rebuild/recapture case passes on both releases with
 exact repaired/reference RGB equality; see [SHADER_REPAIR.md](docs/SHADER_REPAIR.md).
+At **0.2.5**, `artifact_preview_image` adds bounded PNG previews for retained
+P6/PNG/BMP images, with explicit crop/downsampling metadata (**18 tools**).
+PNG input also works for original-image comparisons. See
+[IMAGE_PREVIEWS.md](docs/IMAGE_PREVIEWS.md).
 Typed deep state and the remaining visual diagnosis/repair cases remain unfinished.
 Actual GPU replay
 timed out on both releases. See
@@ -109,7 +113,7 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_dependency_check` | Source-built fastmcpp/JSON calls and uninitialized volk calls, with no GPU or loader initialization. |
 | `ngm_shader_check` | Valid SPIR-V 1.6 with embedded GLSL source and source-line instructions. |
 | `ngm_hash_check` | SHA-256 standard known answers for content identities. |
-| `ngm_image_check` | Bounded PPM/BMP parsing, channel comparisons, malformed images, and nonblocking FIFO rejection. |
+| `ngm_image_check` | Bounded PPM/BMP/PNG decoding, PNG encoding, crop/downsampling, channel comparisons, malformed images, and FIFO rejection. |
 | `ngm_process_check` | Actual executable boundary, timeout/cancellation, descendants, process ownership, and isolated logs/environment. |
 | `ngm_jobs_check` | Serialized state transitions, GPU reservations, completion identities, deadlines, cancellation, and cleanup ownership using CPU workers. |
 | `ngm_artifacts_check` | Atomic publication, persistent pins, leases, retention, quota exhaustion, imports, and restart recovery in temporary directories. |

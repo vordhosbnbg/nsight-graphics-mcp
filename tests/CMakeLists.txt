@@ -3,7 +3,7 @@ ngm_add_check(ngm_shader_check SOURCES ShaderCheck.cpp
     ARGS "${CMAKE_BINARY_DIR}/shaders/build.vert.spv" DEPENDS ngm_shaders)
 ngm_add_check(ngm_hash_check SOURCES HashCheck.cpp LIBRARIES ngm_core)
 ngm_add_check(ngm_image_check SOURCES ImageCheck.cpp LIBRARIES ngm_core
-    ARGS "${CMAKE_CURRENT_BINARY_DIR}/image-check")
+    ARGS "${CMAKE_CURRENT_BINARY_DIR}/image-check" "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/images")
 add_executable(ngm_process_standin ProcessStandin.cpp)
 ngm_first_party(ngm_process_standin)
 ngm_add_check(ngm_process_check SOURCES ProcessCheck.cpp LIBRARIES ngm_core
@@ -59,6 +59,13 @@ ngm_add_hardware_check(ngm_shader_repair_integration SOURCES ShaderRepairIntegra
         "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")
 add_dependencies(ngm_shader_repair_integration nsight-graphics-mcp ngm-vulkan-fixture)
 
+set(NGM_IMAGE_CASES "" CACHE FILEPATH "Explicit retained-image inputs for opt-in validation")
+ngm_add_hardware_check(ngm_retained_image_integration SOURCES RetainedImageIntegration.cpp
+    LIBRARIES ngm_core fastmcpp_core
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "${NGM_CAPTURE_ARTIFACT_ROOT}"
+        "${NGM_IMAGE_CASES}" "${NGM_CAPTURE_VALIDATION_ROOT}")
+add_dependencies(ngm_retained_image_integration nsight-graphics-mcp)
+
 ngm_register_check(ngm_cli_check
     COMMAND "${CMAKE_COMMAND}"
         "-DSERVER=$<TARGET_FILE:nsight-graphics-mcp>"
@@ -89,7 +96,7 @@ ngm_register_check(ngm_linkage_check
     COMMAND "${CMAKE_COMMAND}" "-DREADELF=${NGM_READELF}" "-DAR=${CMAKE_AR}"
         "-DBINARIES=$<TARGET_FILE:nsight-graphics-mcp>|$<TARGET_FILE:ngm-vulkan-fixture>|$<TARGET_FILE:ngm-experiment>|$<TARGET_FILE:ngm-capture>|$<TARGET_FILE:ngm_dependency_check>|$<TARGET_FILE:glslang-standalone>"
         "-DDESKTOP_BINARY=$<TARGET_FILE:ngm-vulkan-fixture>"
-        "-DARCHIVES=$<TARGET_FILE:fastmcpp_core>|$<TARGET_FILE:volk>|$<TARGET_FILE:glslang>|$<TARGET_FILE:glslang-default-resource-limits>"
+        "-DARCHIVES=$<TARGET_FILE:fastmcpp_core>|$<TARGET_FILE:volk>|$<TARGET_FILE:glslang>|$<TARGET_FILE:glslang-default-resource-limits>|$<TARGET_FILE:ngm_lodepng>"
         -P "${PROJECT_SOURCE_DIR}/cmake/AuditLinkage.cmake"
     DEPENDS nsight-graphics-mcp ngm-vulkan-fixture ngm-experiment ngm-capture ngm_dependency_check glslang-standalone)
 

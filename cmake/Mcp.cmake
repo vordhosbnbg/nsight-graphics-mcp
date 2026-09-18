@@ -11,7 +11,7 @@ endfunction()
 # Invoke from tests/CMakeLists.txt before ngm_finalize_checks().
 function(ngm_add_mcp_checks)
     ngm_add_check(ngm_mcp_check SOURCES "${PROJECT_SOURCE_DIR}/tests/McpCheck.cpp"
-        LIBRARIES ngm_core nlohmann_json::nlohmann_json
+        LIBRARIES ngm_core nlohmann_json::nlohmann_json fastmcpp_core
         ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm_nsight_standin>"
         DEPENDS nsight-graphics-mcp ngm_nsight_standin)
 endfunction()

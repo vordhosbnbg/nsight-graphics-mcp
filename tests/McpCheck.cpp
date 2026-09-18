@@ -1,6 +1,9 @@
 #include "Check.hpp"
 #include "McpClient.hpp"
+#include "ngm/Hash.hpp"
+#include "ngm/Image.hpp"
 #include "ngm/Version.hpp"
+#include <fastmcpp/util/pagination.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -82,8 +85,8 @@ Json query_capabilities(Client& client) {
     require(report["implemented_tools"] ==
                 Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
                              "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                             "artifact_prune", "artifact_import", "artifact_compare_images", "capture_metadata",
-                             "capture_events", "capture_objects"}),
+                             "artifact_prune", "artifact_import", "artifact_compare_images", "artifact_preview_image",
+                             "capture_metadata", "capture_events", "capture_objects"}),
             "exactly the implemented tools advertised");
     for(const auto* name : {"profiling", "fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
@@ -106,7 +109,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 17, "discover exactly the implemented tools");
+    require(listing.size() == 18, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -320,14 +323,15 @@ void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
     Client client(server, scratch.path, {"--artifact-root", root.string()});
     initialize(client);
     const std::string id = "bundle-" + std::string(32, '0');
-    for(const auto* name :
-        {"capture", "job_status", "job_cancel", "artifact_info", "artifact_files", "artifact_read", "artifact_pin",
-         "artifact_import", "artifact_compare_images", "capture_metadata", "capture_events", "capture_objects"}) {
+    for(const auto* name : {"capture", "job_status", "job_cancel", "artifact_info", "artifact_files", "artifact_read",
+                            "artifact_pin", "artifact_import", "artifact_compare_images", "artifact_preview_image",
+                            "capture_metadata", "capture_events", "capture_objects"}) {
         expect_tool_error(call(client, name));
     }
-    for(const auto* name : {"capture", "job_status", "job_cancel", "artifact_list", "artifact_info", "artifact_files",
-                            "artifact_read", "artifact_pin", "artifact_usage", "artifact_prune", "artifact_import",
-                            "artifact_compare_images", "capture_metadata", "capture_events", "capture_objects"}) {
+    for(const auto* name :
+        {"capture", "job_status", "job_cancel", "artifact_list", "artifact_info", "artifact_files", "artifact_read",
+         "artifact_pin", "artifact_usage", "artifact_prune", "artifact_import", "artifact_compare_images",
+         "artifact_preview_image", "capture_metadata", "capture_events", "capture_objects"}) {
         expect_tool_error(call(client, name, {{"unknown", true}}));
     }
     for(const auto& invalid : {Json(-1), Json(0), Json(101), Json(1.5), Json("10"), Json(true)}) {
@@ -682,6 +686,8 @@ void workflow_check(const std::string& server, const std::string& standin, const
         std::ofstream invalid(source / "invalid.bin", std::ios::binary);
         invalid.put(static_cast<char>(0xff));
     }
+    const ngm::Image preview_pixels{384, 384, std::vector<std::uint8_t>(384 * 384 * 3, 127)};
+    std::ofstream(source / "preview.png", std::ios::binary) << ngm::encode_png(preview_pixels);
     const auto imported =
         successful_call(client, "artifact_import", {{"source", source.string()}, {"required_outputs", {"note.txt"}}});
     const auto imported_id = imported["id"].get<std::string>();
@@ -726,6 +732,47 @@ void workflow_check(const std::string& server, const std::string& standin, const
     auto malformed = comparison_arguments;
     malformed["candidate"]["path"] = "raw/imported/binary.bin";
     expect_tool_error(call(client, "artifact_compare_images", malformed), "Unsupported image");
+    const Json preview_arguments{{"artifact_id", imported_id}, {"path", "raw/imported/preview.png"}};
+    const auto preview_response = call(client, "artifact_preview_image", preview_arguments);
+    require(preview_response.dump().size() < 1024U * 1024U && preview_response.contains("result"),
+            "maximum-size preview including text fallback/base64 and envelope fits protocol budget");
+    const auto& preview_result = preview_response.at("result");
+    require(!preview_result.value("isError", false) && preview_result.at("content").size() == 2 &&
+                preview_result.at("content").at(1).at("type") == "image" &&
+                preview_result.at("content").at(1).at("mimeType") == "image/png",
+            "preview returns real MCP image content alongside metadata");
+    const auto preview_metadata = preview_result.at("structuredContent");
+    require(Json::parse(preview_result.at("content").at(0).at("text").get<std::string>()) == preview_metadata,
+            "preview metadata agrees with text fallback");
+    const auto preview_png =
+        fastmcpp::util::pagination::base64_decode(preview_result.at("content").at(1).at("data").get<std::string>());
+    require(ngm::decode_image(preview_png).rgb == preview_pixels.rgb && preview_metadata.at("resampled") == false &&
+                preview_metadata.at("width") == 384 && preview_metadata.at("height") == 384,
+            "base64 PNG carries unchanged known full-size preview pixels");
+    auto cropped = preview_arguments;
+    cropped["region"] = {{"x", 10}, {"y", 20}, {"width", 100}, {"height", 50}};
+    cropped["max_edge"] = 20;
+    const auto cropped_result = successful_call(client, "artifact_preview_image", cropped);
+    require(cropped_result.at("resampled") == true && cropped_result.at("width") == 20 &&
+                cropped_result.at("height") == 10 && cropped_result.at("region") == cropped.at("region"),
+            "preview crop/downsampling explicitly reported");
+    for(const auto& invalid : {Json(-1), Json(0), Json(385), Json(1.5), Json(true)}) {
+        auto changed = preview_arguments;
+        changed["max_edge"] = invalid;
+        expect_tool_error(call(client, "artifact_preview_image", changed));
+    }
+    for(const auto& invalid : {Json{{"x", 383}, {"y", 0}, {"width", 2}, {"height", 1}},
+                               Json{{"x", -1}, {"y", 0}, {"width", 1}, {"height", 1}},
+                               Json{{"x", 0}, {"y", 0}, {"width", 1}, {"height", 1}, {"extra", 0}}}) {
+        auto changed = preview_arguments;
+        changed["region"] = invalid;
+        expect_tool_error(call(client, "artifact_preview_image", changed));
+    }
+    for(const auto* invalid : {"../preview.png", "raw/imported/missing.png", "raw/imported/binary.bin"}) {
+        auto changed = preview_arguments;
+        changed["path"] = invalid;
+        expect_tool_error(call(client, "artifact_preview_image", changed));
+    }
     const auto eof_record = scratch.path / "eof.pid";
     const auto eof = successful_call(client, "capture", capture_arguments(eof_record, true));
     await_record(eof_record);
@@ -739,6 +786,9 @@ void workflow_check(const std::string& server, const std::string& standin, const
         server, scratch.path,
         {"--artifact-root", root.string(), "--artifact-max-bytes", "1", "--artifact-max-age-seconds", "0"});
     initialize(restarted);
+    const auto restarted_preview = call(restarted, "artifact_preview_image", preview_arguments);
+    require(restarted_preview.at("result") == preview_result,
+            "preview image and identities survive restart without GPU/Nsight");
     require(successful_call(restarted, "artifact_compare_images", comparison_arguments) == comparison,
             "image comparison is identical after restart without Nsight or desktop");
     require(successful_call(restarted, "artifact_info", {{"artifact_id", imported_id}})["pinned"] == true,
@@ -766,6 +816,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
     expect_tool_error(
         call(restarted, "artifact_read", {{"artifact_id", imported_id}, {"path", "raw/imported/note.txt"}}), "expired");
     expect_tool_error(call(restarted, "artifact_compare_images", comparison_arguments), "expired");
+    expect_tool_error(call(restarted, "artifact_preview_image", preview_arguments), "expired");
     require(std::filesystem::is_regular_file(source / "note.txt"),
             "pruning imported evidence never changes its source");
     require(restarted.finish() == 0, "artifact-only restart shutdown");

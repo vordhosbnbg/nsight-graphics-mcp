@@ -5,6 +5,8 @@
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/Version.hpp"
 
+#include <fastmcpp/util/pagination.hpp>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -327,8 +329,8 @@ void add_tool(fastmcpp::tools::ToolManager& tools, const char* name, Schema inpu
 Json implemented_tool_names() {
     return Json::array({"capabilities", "capture", "capture_cpp", "job_status", "job_cancel", "artifact_list",
                         "artifact_info", "artifact_files", "artifact_read", "artifact_pin", "artifact_usage",
-                        "artifact_prune", "artifact_import", "artifact_compare_images", "capture_metadata",
-                        "capture_events", "capture_objects"});
+                        "artifact_prune", "artifact_import", "artifact_compare_images", "artifact_preview_image",
+                        "capture_metadata", "capture_events", "capture_objects"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -576,6 +578,55 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
     for(const auto* field : {"artifact_status", "encoded_bytes", "encoded_sha256", "rgb_sha256"}) {
         image_result["required"].push_back(field);
     }
+    const auto region_schema = object_schema({{"x", integer_schema(0, 4095)},
+                                              {"y", integer_schema(0, 4095)},
+                                              {"width", integer_schema(1, 4096)},
+                                              {"height", integer_schema(1, 4096)}},
+                                             {"x", "y", "width", "height"});
+    auto preview_input = image_reference;
+    preview_input["properties"]["region"] = region_schema;
+    preview_input["properties"]["max_edge"] = integer_schema(1, 384);
+    add_tool(
+        tools, "artifact_preview_image", preview_input,
+        object_schema({{"evidence_origin", {{"type", "string"}, {"enum", {"caller_selected_artifact_image_preview"}}}},
+                       {"source", image_result},
+                       {"source_width", integer_schema(1, 4096)},
+                       {"source_height", integer_schema(1, 4096)},
+                       {"region", region_schema},
+                       {"width", integer_schema(1, 384)},
+                       {"height", integer_schema(1, 384)},
+                       {"max_edge", integer_schema(1, 384)},
+                       {"resampled", boolean_schema()},
+                       {"sampling", {{"type", "string"}, {"enum", {"nearest_neighbor_top_left"}}}},
+                       {"mime_type", {{"type", "string"}, {"enum", {"image/png"}}}},
+                       {"png_bytes", integer_schema(1, 512 * 1024)},
+                       {"png_sha256", string_schema(64, 64)},
+                       {"preview_rgb_sha256", string_schema(64, 64)},
+                       {"preview_scope", string_schema(512)}},
+                      {"evidence_origin", "source", "source_width", "source_height", "region", "width", "height",
+                       "max_edge", "resampled", "sampling", "mime_type", "png_bytes", "png_sha256",
+                       "preview_rgb_sha256", "preview_scope"}),
+        "Preview a retained P6, opaque RGB/RGBA8 PNG or supported BMP as PNG image content. Input at most 16 MiB. "
+        "Optional in-bounds region; max_edge 1..384 (default 384), nearest-neighbor downsampling, no upscale. "
+        "Returns source/crop/pixel identities and explicit resizing. Imports and failed bundles are allowed. "
+        "Use original-image comparisons for verification; the preview may omit pixels.",
+        true, false, [this](const Json& arguments) {
+            const ImageReference source{artifact_id(arguments), arguments.at("path").get<std::string>()};
+            relative_path(source.path);
+            std::optional<ImageRegion> region;
+            if(arguments.contains("region")) {
+                const auto& value = arguments.at("region");
+                region = ImageRegion{value.at("x").get<std::uint32_t>(), value.at("y").get<std::uint32_t>(),
+                                     value.at("width").get<std::uint32_t>(), value.at("height").get<std::uint32_t>()};
+            }
+            const auto preview =
+                preview_artifact_image(service().artifacts(), source, region, arguments.value("max_edge", 384U));
+            return Json{{"structuredContent", preview.metadata},
+                        {"content", Json::array({{{"type", "text"}, {"text", preview.metadata.dump()}},
+                                                 {{"type", "image"},
+                                                  {"mimeType", "image/png"},
+                                                  {"data", fastmcpp::util::pagination::base64_encode(preview.png)}}})}};
+        });
     add_tool(
         tools, "artifact_compare_images",
         object_schema({{"reference", image_reference},

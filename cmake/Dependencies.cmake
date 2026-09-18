@@ -16,10 +16,19 @@ function(ngm_add_dependencies)
     ngm_require_source(glslang CMakeLists.txt)
     ngm_require_source(vulkan-headers CMakeLists.txt)
     ngm_require_source(volk CMakeLists.txt)
+    ngm_require_source(lodepng lodepng.cpp)
+    ngm_require_source(lodepng lodepng.h)
 
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Vendored libraries are static" FORCE)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "Never download while configuring" FORCE)
     set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Never update while configuring" FORCE)
+
+    # Compile only the pinned PNG codec, without disk I/O, metadata expansion,
+    # tests, tools or transitive discovery. Its zlib implementation is included.
+    add_library(ngm_lodepng STATIC "${PROJECT_SOURCE_DIR}/external/lodepng/lodepng.cpp")
+    target_include_directories(ngm_lodepng SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/lodepng")
+    target_compile_definitions(ngm_lodepng PUBLIC LODEPNG_NO_COMPILE_DISK
+        LODEPNG_NO_COMPILE_ANCILLARY_CHUNKS PRIVATE LODEPNG_MAX_ALLOC=134217728)
 
     set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
     set(JSON_CI OFF CACHE BOOL "" FORCE)
@@ -64,7 +73,7 @@ function(ngm_add_dependencies)
     set(ENABLE_GLSLANG_BINARIES ON CACHE BOOL "Build our shader compiler" FORCE)
     add_subdirectory(external/glslang SYSTEM EXCLUDE_FROM_ALL)
 
-    foreach(target IN ITEMS fastmcpp_core volk glslang glslang-default-resource-limits)
+    foreach(target IN ITEMS fastmcpp_core volk glslang glslang-default-resource-limits ngm_lodepng)
         get_target_property(kind ${target} TYPE)
         if(NOT kind STREQUAL "STATIC_LIBRARY")
             message(FATAL_ERROR "Vendored target ${target} must be a static library, got ${kind}")

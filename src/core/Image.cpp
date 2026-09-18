@@ -1,5 +1,6 @@
 #include "ngm/Image.hpp"
 #include "ngm/File.hpp"
+#include <lodepng.h>
 
 #include <algorithm>
 #include <bit>
@@ -62,6 +63,62 @@ void validate(const Image& image) {
        image.rgb.size() != static_cast<std::size_t>(image.width) * image.height * 3) {
         throw std::runtime_error("Invalid RGB8 image dimensions or storage");
     }
+}
+Image decode_png(std::string_view encoded) {
+    const auto* data = reinterpret_cast<const unsigned char*>(encoded.data());
+    lodepng::State state;
+    unsigned width = 0, height = 0;
+    const auto header_error = lodepng_inspect(&width, &height, &state, data, encoded.size());
+    if(header_error) {
+        throw std::runtime_error(std::string("Invalid PNG header: ") + lodepng_error_text(header_error));
+    }
+    if(width == 0 || height == 0 || width > 4096 || height > 4096 || state.info_png.color.bitdepth != 8 ||
+       (state.info_png.color.colortype != LCT_RGB && state.info_png.color.colortype != LCT_RGBA)) {
+        throw std::runtime_error("PNG requires RGB/RGBA8 and dimensions between 1 and 4096");
+    }
+    // Validate all chunk boundaries/CRCs, including ignored ancillary chunks.
+    // Do not silently render the first frame of an animation or accept trailing data.
+    std::size_t offset = 8, chunks = 0;
+    bool ended = false;
+    while(offset < encoded.size()) {
+        if(++chunks > 4096 || encoded.size() - offset < 12) {
+            throw std::runtime_error("PNG chunk count or length exceeds limit");
+        }
+        const auto length = lodepng_chunk_length(data + offset);
+        if(length > encoded.size() - offset - 12 || lodepng_chunk_check_crc(data + offset)) {
+            throw std::runtime_error("Invalid PNG chunk length or CRC");
+        }
+        const auto type = encoded.substr(offset + 4, 4);
+        if(type == "acTL" || type == "fcTL" || type == "fdAT") {
+            throw std::runtime_error("Animated PNG is unsupported");
+        }
+        offset += static_cast<std::size_t>(length) + 12;
+        if(type == "IEND") {
+            ended = length == 0 && offset == encoded.size();
+            break;
+        }
+    }
+    if(!ended) {
+        throw std::runtime_error("PNG requires a final empty IEND without trailing data");
+    }
+    state.info_raw.colortype = LCT_RGBA;
+    state.info_raw.bitdepth = 8;
+    state.decoder.zlibsettings.max_output_size = static_cast<std::size_t>(width) * height * 8 + 4096;
+    std::vector<unsigned char> rgba;
+    const auto error = lodepng::decode(rgba, width, height, state, data, encoded.size());
+    if(error) {
+        throw std::runtime_error(std::string("Invalid PNG pixels: ") + lodepng_error_text(error));
+    }
+    Image result{width, height, {}};
+    result.rgb.reserve(static_cast<std::size_t>(width) * height * 3);
+    for(std::size_t pixel = 0; pixel < rgba.size(); pixel += 4) {
+        if(rgba[pixel + 3] != 255) {
+            throw std::runtime_error("PNG alpha must be opaque; no implicit background compositing");
+        }
+        result.rgb.insert(result.rgb.end(), rgba.begin() + pixel, rgba.begin() + pixel + 3);
+    }
+    validate(result);
+    return result;
 }
 Image decode_ppm(std::string_view encoded) {
     std::istringstream input{std::string(encoded)};
@@ -145,7 +202,48 @@ Image decode_image(std::string_view encoded) {
     if(encoded.starts_with("BM")) {
         return decode_bmp(encoded);
     }
-    throw std::runtime_error("Unsupported image format; expected P6 RGB8 or uncompressed BMP");
+    if(encoded.starts_with(std::string_view("\x89PNG\r\n\x1a\n", 8))) {
+        return decode_png(encoded);
+    }
+    throw std::runtime_error("Unsupported image format; expected P6 RGB8, opaque RGB/RGBA8 PNG or uncompressed BMP");
+}
+
+std::string encode_png(const Image& image) {
+    validate(image);
+    lodepng::State state;
+    state.info_raw.colortype = state.info_png.color.colortype = LCT_RGB;
+    state.info_raw.bitdepth = state.info_png.color.bitdepth = 8;
+    state.encoder.auto_convert = 0;
+    state.encoder.filter_strategy = LFS_ZERO;
+    // Stored deflate blocks provide deterministic size bounds for MCP previews.
+    state.encoder.zlibsettings.btype = 0;
+    std::vector<unsigned char> output;
+    const auto error = lodepng::encode(output, image.rgb, image.width, image.height, state);
+    if(error) {
+        throw std::runtime_error(std::string("PNG encoding failed: ") + lodepng_error_text(error));
+    }
+    return {reinterpret_cast<const char*>(output.data()), output.size()};
+}
+
+Image preview_image(const Image& image, ImageRegion region, std::uint32_t max_edge) {
+    validate(image);
+    if(max_edge == 0 || max_edge > 384 || region.width == 0 || region.height == 0 || region.x >= image.width ||
+       region.y >= image.height || region.width > image.width - region.x || region.height > image.height - region.y) {
+        throw std::invalid_argument("Preview requires an in-bounds nonempty region and max_edge between 1 and 384");
+    }
+    const auto divisor = std::max({region.width, region.height, max_edge});
+    Image output{std::max(1U, region.width * max_edge / divisor), std::max(1U, region.height * max_edge / divisor), {}};
+    output.rgb.resize(static_cast<std::size_t>(output.width) * output.height * 3);
+    for(std::uint32_t y = 0; y < output.height; ++y) {
+        for(std::uint32_t x = 0; x < output.width; ++x) {
+            const auto source = (static_cast<std::size_t>(region.y + y * region.height / output.height) * image.width +
+                                 region.x + x * region.width / output.width) *
+                                3;
+            const auto destination = (static_cast<std::size_t>(y) * output.width + x) * 3;
+            std::copy_n(image.rgb.begin() + source, 3, output.rgb.begin() + destination);
+        }
+    }
+    return output;
 }
 
 ImageDifference compare_images(const Image& before, const Image& after, std::uint8_t tolerance) {

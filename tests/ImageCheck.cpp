@@ -1,4 +1,5 @@
 #include "Check.hpp"
+#include "ngm/File.hpp"
 #include "ngm/Image.hpp"
 
 #include <filesystem>
@@ -9,7 +10,7 @@
 int main(int argc, char** argv) {
     return ngm::check::run([&] {
         using ngm::check::require;
-        require(argc == 2, "expected isolated scratch directory");
+        require(argc == 3, "expected isolated scratch and PNG fixture directories");
         const auto path = std::filesystem::path(argv[1]) / "image.ppm";
         std::filesystem::create_directories(path.parent_path());
         const auto write = [&](const std::string& text) {
@@ -116,6 +117,73 @@ int main(int argc, char** argv) {
         reject_image(bmp.substr(0, 61));
         reject_image(bmp + 'x');
         reject_image("not an image");
+        const auto fixture_bytes = [&](const char* name) {
+            return ngm::read_regular_file(std::filesystem::path(argv[2]) / name, 65536);
+        };
+        const ngm::Image expected{2, 2, {10, 32, 255, 0, 128, 13, 1, 2, 3, 250, 100, 50}};
+        for(const auto* name :
+            {"rgb8.png", "rgba8.png", "rgb8-interlaced.png", "rgba8-interlaced.png", "ignored-ancillary.png"}) {
+            require(ngm::compare_images(ngm::decode_image(fixture_bytes(name)), expected, 0).differing_pixels == 0,
+                    "independent RGB/RGBA8 PNG fixtures preserve exact channels");
+        }
+        const auto encoded = ngm::encode_png(expected);
+        require(ngm::decode_image(encoded).rgb == expected.rgb, "PNG encoder preserves known RGB samples");
+        std::ofstream(path.parent_path() / "encoded.png", std::ios::binary) << encoded;
+        for(const auto* name : {"transparent.png", "transparent-key.png", "bad-ancillary-crc.png", "gray8.png",
+                                "rgb16.png", "animated.png", "inflated-too-large.png", "oversized-dimensions.png"}) {
+            reject_image(fixture_bytes(name));
+        }
+        auto corrupted = fixture_bytes("rgb8.png");
+        corrupted[corrupted.size() - 1] ^= 1;
+        reject_image(corrupted);
+        reject_image(encoded + "trailing");
+        reject_image(encoded.substr(0, encoded.size() - 12));
+        reject_image(encoded.substr(0, 30));
+        require(ngm::preview_image(expected, {0, 0, 2, 2}, 384).rgb == expected.rgb,
+                "preview never upscales small sources");
+        require(ngm::preview_image(expected, {1, 0, 1, 2}, 384).rgb ==
+                    std::vector<std::uint8_t>{0, 128, 13, 250, 100, 50},
+                "region extracts requested columns without interpolation");
+        const auto reduced = ngm::preview_image(expected, {0, 0, 2, 2}, 1);
+        require(reduced.width == 1 && reduced.height == 1 && reduced.rgb == std::vector<std::uint8_t>{10, 32, 255},
+                "nearest-neighbor preview selects the declared top-left sample");
+        const ngm::Image wide_image{5, 2, std::vector<std::uint8_t>(30, 17)};
+        const auto aspect = ngm::preview_image(wide_image, {0, 0, 5, 2}, 3);
+        require(aspect.width == 3 && aspect.height == 1, "aspect ratio rounds down with minimum one pixel");
+        ngm::Image ramp{5, 4, {}};
+        for(std::uint8_t y = 0; y < 4; ++y) {
+            for(std::uint8_t x = 0; x < 5; ++x) {
+                ramp.rgb.insert(ramp.rgb.end(), 3, static_cast<std::uint8_t>(10 * y + x));
+            }
+        }
+        const auto uneven = ngm::preview_image(ramp, {0, 0, 5, 4}, 3);
+        require(uneven.width == 3 && uneven.height == 2 &&
+                    uneven.rgb ==
+                        std::vector<std::uint8_t>{0, 0, 0, 1, 1, 1, 3, 3, 3, 20, 20, 20, 21, 21, 21, 23, 23, 23},
+                "nonintegral downsampling floors source coordinates on both axes");
+        require(ngm::preview_image(ramp, {1, 1, 4, 3}, 2).rgb == std::vector<std::uint8_t>{11, 11, 11, 13, 13, 13},
+                "downsampling selects coordinates relative to the requested crop origin");
+        for(const auto region :
+            {ngm::ImageRegion{0, 0, 0, 2}, {0, 0, 3, 2}, {2, 0, 1, 1}, {1, 1, 2, 2}, {0xffffffffU, 0, 1, 1}}) {
+            bool invalid = false;
+            try {
+                (void)ngm::preview_image(expected, region, 384);
+            } catch(const std::invalid_argument&) {
+                invalid = true;
+            }
+            require(invalid, "invalid and overflowing crop rejected");
+        }
+        for(const auto edge : {0U, 385U, 0xffffffffU}) {
+            bool invalid = false;
+            try {
+                (void)ngm::preview_image(expected, {0, 0, 2, 2}, edge);
+            } catch(const std::invalid_argument&) {
+                invalid = true;
+            }
+            require(invalid, "preview edge bounds enforced by core");
+        }
+        const ngm::Image large_image{384, 384, std::vector<std::uint8_t>(384 * 384 * 3, 127)};
+        require(ngm::encode_png(large_image).size() < 512 * 1024, "maximum preview PNG fits declared byte budget");
         std::filesystem::remove(path);
         require(mkfifo(path.c_str(), 0600) == 0, "create FIFO image stand-in");
         rejected = false;

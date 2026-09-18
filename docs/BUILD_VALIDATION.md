@@ -534,3 +534,43 @@ reproduces comparisons and checks source/SPIR-V/provenance links;
 and explicitly pinned reports/audit in `artifacts/nsight-repair-evidence`.
 The hardware runs used the frozen server preceding the final description-only
 correction. R-007 and R-015 remain in progress for the remaining visual workflows.
+
+## PNG and bounded previews at 0.2.5
+
+The seventh source submodule, LodePNG, is pinned at
+`ed6fe5825c6a4fbb7f58ab35a4231c7543cd452a` and compiled into a static archive.
+No upstream codec tools/examples/tests or disk helpers are built; no additional
+zlib library is discovered. Source markers and the existing ELF/archive audit
+cover the new dependency. Exact selected options are in DEPENDENCIES.md.
+
+The GCC Debug aggregate passes **20/20 CPU checks in 182.70 seconds**, log
+`build/capture-acceptance/check-0.2.5-aggregate.log`, including real ELF linkage,
+missing-source errors, hardware-target isolation, image parsing, artifact
+inspection, protocol behavior, and the 384×384 maximum preview response.
+The initial focused build found a missing fastmcpp header include path in the
+MCP test target after adding base64 payload verification; declaring its actual
+fastmcpp dependency fixes that build. The corrected focused image, inspection,
+and MCP checks pass (`check-0.2.5-focused-corrected.log`) before the aggregate.
+This was a CPU build correction, not a failed Nsight integration.
+
+Fresh-context implementation review finds no blocker. Independent evidence
+review suggests a nonintegral varied-pixel downsampling regression, now added.
+The updated `ngm_image_check_run` passes on GCC Debug and Clang Debug in 0.01
+seconds each (`check-0.2.5-image-review.log` and
+`check-0.2.5-clang-image-review-offline.log`). The full aggregate predates only
+that added image-test case and subsequent documentation. Clang configuration
+and the final focused build/test run succeed in a network namespace with no
+network access, using the already initialized sources; this is not a fresh
+full-project source-installation qualification. Logs are under
+`build/capture-acceptance/`, including `configure-0.2.5-clang-offline.log`.
+
+The opt-in `ngm_retained_image_integration` separately passes 18 retained sources
+and 36 full/cropped previews, using actual MCP image content. Independent Pillow
+decoding verifies every PNG payload, source/pixel hash, sampling coordinate, and
+original-image comparison, plus both exact Nsight producer profiles and current
+pins. The root also visually inspected a returned repaired preview. No GPU,
+Nsight process, new capture, or new Codex client run was involved. The complete
+report/source/transcript/preview/audit snapshot is explicitly pinned as
+`bundle-f9e131446027c6dd2a10f64c5d4a1d2b` in `artifacts/nsight-repair-evidence`.
+[IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md) records invocation, format, sampling,
+and evidence limitations. R-007/R-015 remain in progress.

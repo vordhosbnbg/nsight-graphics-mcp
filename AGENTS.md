@@ -111,7 +111,9 @@ extraction on both releases. Its capability/gap/next-action matrix is in
 docs/INSPECTION.md. R-007 remains active. At **0.2.4**, bounded artifact image comparison brings the
 surface to 17 tools. The basic shader source edit/build/recapture case passes on
 both releases, with exact repaired/reference RGB equality and retained pins; see
-docs/SHADER_REPAIR.md. Descriptor array mapping, generic deeper queries, previews,
+docs/SHADER_REPAIR.md. At **0.2.5**, PNG comparison and bounded P6/PNG/BMP
+image previews bring the surface to 18 tools; docs/IMAGE_PREVIEWS.md records
+retained-file validation. Descriptor array mapping, generic deeper queries,
 and all other visual defect repairs remain unfinished.
 Actual GPU replay times out on both releases. These results are
 separate from the historical 0.1.0 Codex capability query. Exact versions,
@@ -219,8 +221,8 @@ Recheck its availability when evaluating new documented integration options.
   selected reproducible build input. Pin and record the tested source revisions.
 - The explicitly enabled NGFX fixture uses fingerprinted headers from the matching
   separately installed Nsight toolchain, as documented in `docs/SDK_CONTROL.md`.
-  This optional GPU-toolchain source exception does not change the six vendored
-  submodules or the SDK-free default build; do not download SDK sources at build time.
+  This optional GPU-toolchain source exception does not change the vendored
+  submodule policy or the SDK-free default build; do not download SDK sources at build time.
 - Statically link vendored dependency code and audit the produced binaries, not
   just CMake flags. Document required OS/compiler-runtime, desktop, Vulkan-loader,
   and GPU-driver dependencies, including libraries loaded at runtime. This follows

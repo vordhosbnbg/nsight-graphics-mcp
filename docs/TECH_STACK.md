@@ -18,6 +18,14 @@ tool compares retained P6/BMP images. A source-isolated basic shader edit, rebui
 and fresh capture passes on both releases with exact reference equality;
 [SHADER_REPAIR.md](SHADER_REPAIR.md) records evidence and the remaining scope.
 
+At **0.2.5**, `artifact_preview_image` adds PNG image content with bounded
+crop/downsampling and retained source identities (18 tools). PNG screenshots also
+join P6/BMP original-image comparison. LodePNG was selected as a pinned static
+C++ codec with no additional source dependencies, avoiding a bespoke PNG decoder
+or a runtime image-conversion subprocess. Only its memory codec is built;
+color metadata is deliberately not interpreted. Its exact revision and allocation
+limits are recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
+
 ## Confirmed context
 
 - The first target is Vulkan graphics and compute on Linux with NVIDIA Nsight

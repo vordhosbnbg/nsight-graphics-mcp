@@ -109,7 +109,8 @@ are recorded separately in [INSPECTION.md](INSPECTION.md). Separate advanced qua
 bindless, indirect, and a combined pass-defect pair on both releases. The pinned
 matrix is `bundle-cb069965dca0cc90e2b672194195beb5`; exact scope and unrun variants
 are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). R-006's investigation is complete;
-R-007 still owns typed deeper queries, previews, and the remaining source repairs.
+R-007 still owns typed deeper queries and the remaining source repairs.
+Bounded image previews are implemented at 0.2.5; see [IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md).
 At 0.2.4, bounded image comparison and the basic shader repair pass on both
 releases; see [SHADER_REPAIR.md](SHADER_REPAIR.md).
 NVIDIA's [release notes](https://docs.nvidia.com/nsight-graphics/ReleaseNotes/index.html#deprecations)

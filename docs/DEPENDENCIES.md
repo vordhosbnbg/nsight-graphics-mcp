@@ -1,6 +1,7 @@
 # Source dependencies and runtime boundary
 
-R-013 source pins, selected and built on 2026-09-17. Gitlinks are authoritative;
+Initial R-013 source pins were selected and built on 2026-09-17; R-007 adds
+LodePNG at 0.2.5 on 2026-09-18. Gitlinks are authoritative;
 tags below describe the selected revisions, not moving update policies.
 All vendored sources are unmodified submodules under `external/`. The optional
 NGFX SDK is separately installed toolchain source, described below.
@@ -13,6 +14,7 @@ NGFX SDK is separately installed toolchain source, described below.
 | `external/glslang` | [KhronosGroup/glslang](https://github.com/KhronosGroup/glslang), 16.4.0 | `168d452a4f460d24b588fed08477a81c44ee27a1` | Static compiler libraries plus source-built `glslang` executable. |
 | `external/vulkan-headers` | [KhronosGroup/Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers), vulkan-sdk-1.4.350.1 | `8864cdc896bbc2a9b6eb36b3218fc9ef57908d77` | Vulkan C headers; no loader or driver binary. |
 | `external/volk` | [zeux/volk](https://github.com/zeux/volk), vulkan-sdk-1.4.350.1 | `3ca312a4f38baa63d8006b6905abbeeb89c8087d` | Static Vulkan entry-point loader, using the pinned headers. |
+| `external/lodepng` | [lvandeve/lodepng](https://github.com/lvandeve/lodepng), header version 20260119 | `ed6fe5825c6a4fbb7f58ab35a4231c7543cd452a` | Static C++ PNG decoder/encoder with included deflate/zlib implementation; no transitive sources. |
 
 The fastmcpp revision includes local-target support and an option to disable its
 CLI. JSON/httplib match the versions requested by its fallback configuration.
@@ -46,6 +48,16 @@ Vulkan-Headers and volk use matching SDK tags. volk's system Vulkan discovery is
 disabled; it links to `Vulkan::Headers` from the local tree. R-005 selects the
 system XCB library for X11/Xwayland presentation as a desktop runtime exception.
 
+LodePNG supplies PNG screenshot decoding and bounded preview encoding. Only its
+`lodepng.cpp` is compiled; disk helpers, ancillary metadata decoding, tools,
+examples, and upstream tests are disabled. The codec's built-in deflate/zlib code
+is compiled into `ngm_lodepng`, with no system zlib lookup or download. A per-codec
+allocation limit of 128 MiB complements first-party input/dimension/chunk bounds;
+this is not a claim that total process memory is limited to 128 MiB. All consumers
+share the same public compile definitions. `ngm_core` links the static archive,
+and the ELF/archive audit includes it. The PNG profile and color/alpha limits are
+in [IMAGE_COMPARISON.md](IMAGE_COMPARISON.md) and [IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md).
+
 ## Acquisition and configuration
 
 ```sh
@@ -53,7 +65,7 @@ git submodule update --init --recursive
 git submodule status --recursive
 ```
 
-The six selected revisions have no nested submodules. Required transitive sources
+The seven selected revisions have no nested submodules. Required transitive sources
 are explicit top-level submodules. There are no project package-manager inputs or
 network FetchContent fallbacks. Missing markers are checked before configuring any
 dependency, and FetchContent is forced into disconnected mode as an additional
@@ -62,7 +74,7 @@ see [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 
 Dependency licenses remain in their source trees: fastmcpp's Apache-2.0 license,
 JSON/httplib/volk MIT licenses, glslang's collected notices in `LICENSE.txt`, and
-Vulkan-Headers' `LICENSE.md`/`LICENSES/`. Consult those exact files when distributing
+Vulkan-Headers' `LICENSE.md`/`LICENSES/`, and LodePNG's zlib license in `LICENSE`. Consult those exact files when distributing
 the corresponding sources or compiled code.
 
 ## Actual linkage and external runtimes

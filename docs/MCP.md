@@ -8,7 +8,9 @@ Vulkan export profiles. The separate `capture_cpp` tool retains generated API
 source, metadata, and binary resource files through artifact access. Typed deep
 state/resource extraction and profiling remain pending. At 0.2.4, the seventeenth tool,
 `artifact_compare_images`, supports the independently prepared basic shader repair
-qualified in [SHADER_REPAIR.md](SHADER_REPAIR.md); broader diagnosis/fix coverage remains pending. A capture submission returns job and artifact IDs; it does not
+qualified in [SHADER_REPAIR.md](SHADER_REPAIR.md); broader diagnosis/fix coverage remains pending. At 0.2.5 the eighteenth tool,
+`artifact_preview_image`, returns bounded PNG image content for retained
+P6/PNG/BMP sources; see [IMAGE_PREVIEWS.md](IMAGE_PREVIEWS.md). A capture submission returns job and artifact IDs; it does not
 assert that capture or replay succeeded.
 
 `capabilities` accepts `{}` or omitted `arguments`. It reports the product version,
@@ -46,7 +48,8 @@ and the equivalent mechanism in
 | `artifact_info` | Required `artifact_id`; returns retention state, bounded provenance, required outputs, file count, or an expiration explanation. |
 | `artifact_files` | Required `artifact_id`; optional `offset` (0–4096) and `limit` (default/max 100); returns inventoried relative paths/sizes with `next_offset`. |
 | `artifact_read` | Required `artifact_id` and `path`; optional `max_bytes` (default/max 65536, minimum 1). Returns a complete UTF-8 text file, or metadata and `local_path` for a larger file. NUL or malformed UTF-8 is a tool error. |
-| `artifact_compare_images` | Required `reference` and `candidate`, each containing `artifact_id` and inventoried `path`; optional integer `channel_tolerance` (0–255, default 0). Compares bounded P6/BMP RGB8 images, returning hashes, source statuses, and pixel/channel errors. Imports and readable failed artifacts are allowed; workload equivalence and repair are not inferred. See IMAGE_COMPARISON.md. |
+| `artifact_compare_images` | Required `reference` and `candidate`, each containing `artifact_id` and inventoried `path`; optional integer `channel_tolerance` (0–255, default 0). Compares bounded P6/PNG/BMP RGB8 images, returning hashes, source statuses, and pixel/channel errors. Imports and readable failed artifacts are allowed; workload equivalence and repair are not inferred. See IMAGE_COMPARISON.md. |
+| `artifact_preview_image` | Required `artifact_id` and inventoried `path`; optional `max_edge` (1–384, default 384) and `region` with required integer `x`, `y`, `width`, `height`. Returns text/structured source and sampling metadata plus base64 `image/png` MCP image content. P6, opaque RGB/RGBA8 PNG, and supported BMP; same 16 MiB input cap. Crops must be in bounds; nearest-neighbor downsampling never enlarges. See IMAGE_PREVIEWS.md. |
 | `artifact_pin` | Required `artifact_id` and boolean `pinned`; persists protection across server restarts. Quarantined evidence cannot be unpinned before cleanup is confirmed. |
 | `artifact_usage` | Empty arguments; reports managed bytes, protected subsets, configured size limit, and quota exhaustion. |
 | `artifact_prune` | Empty arguments; applies configured limits to unpinned, unused completed bundles. Returns at most 100 expired IDs/errors with total counts, `truncated`, and usage. |
@@ -124,7 +127,8 @@ an overlapping source does not create a store inside that source. The artifact
 core repeats its containment and no-follow checks at import time. Job diagnostics
 are bounded to their advertised schema; inspect retained report/log files for the
 full evidence. Raw captures/images
-remain disk files; MCP image previews are not implemented in this slice.
+remain disk files; `artifact_preview_image` returns a bounded derived PNG preview
+while preserving the original file and its identity.
 
 ## Build and run
 
