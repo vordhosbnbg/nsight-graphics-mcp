@@ -826,3 +826,43 @@ The final reviewed compact snapshot is pinned as
 `artifacts/nsight-state-repair-evidence`, with 1,779 payload files and 79 pinned
 referenced bundles. Post-publication verification passed all manifest payload
 hashes, current implementation hashes, and referenced pins.
+
+## Advanced source repairs at 0.2.10
+
+The existing source-repair harness now qualifies standalone/combined resource
+selection and indirect-parameter repairs. Each of two isolated source archives
+of commit `8d0be10` is built normally, edited at one prescribed C++ line and
+rebuilt; the same faulty scenario is recaptured. Original/repaired fixture builds
+report0.2.9, server/harness0.2.10. Independent GLSL/source and SPIR-V instruction
+correspondence preserve distinct actual hashes when debug-path strings differ.
+See [ADVANCED_REPAIR.md](ADVANCED_REPAIR.md) for exact diagnosis scope and receipts.
+
+The eight new runs pass on matching Nsight2026.3.1.0/build38722833 and
+2026.2.0.0/build37991608: 24 fresh captures and24 independent application baselines,
+all exact capture/application matches and exact repaired/reference RGB equality.
+Inputs are seed42/192x128/frame2 on RTX3080Ti/driver615.71.09,
+KDE Wayland/Xwayland/XCB, GCC16.2.1 Debug. The matrix records workload features,
+implicated scene/post draw, both shader stages, observed executable/build identity,
+owned-process cleanup, persistent pins and comparison after restart.
+
+The GCC Debug CPU aggregate passes **22/22** in **189.54 seconds**, retained in
+`build/advanced-repair-validation/check-0.2.10.log`. Eight final-harness preflight
+checks reject mismatched repair kinds/pairs, additional source edits and reused
+executables before application execution. Seven exact-input CPU resource helper
+experiments and independent reruns pass ASan/UBSan; seven altered-database checks
+reject before helper initialization. These experiments are not generic product
+resource access or GPU replay. I-024 retains their initial compilation failure.
+
+No new default CTest or hardware registration was added. The same opt-in
+`ngm_source_repair_integration` target accepts the additional pairs documented in
+ADVANCED_REPAIR.md; the CMake `_run` default remains the combined postpass pair.
+
+Four prior-profile regressions on 2026.3 also pass, bringing this final matrix to
+12 runs, 36 fresh captures and 36 independent application baselines. Fresh-context
+acceptance review and the separate root audit pass the full matrix and all eight
+negative preflights. The complete 2,165-file qualification snapshot is pinned as
+`bundle-1e6ebc236bc4232d22303d0be4ca3583` in
+`artifacts/nsight-advanced-repair-evidence`, referencing 91 pinned bundles.
+Post-publication payload/implementation hash and reference/pin verification passes.
+R-007/R-015 remain in progress; this does not qualify generic resource access or
+standalone GPU replay.

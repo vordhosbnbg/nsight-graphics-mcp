@@ -167,3 +167,11 @@ The same harness now also accepts `reference binding-error` and
 Basic cases require one scene draw; the original postpass cases keep their
 feature/draw requirements. [STATE_REPAIR.md](STATE_REPAIR.md) records the new
 diagnoses, two-release repair evidence, and postpass regression results.
+
+## Advanced source-repair extension at 0.2.10
+
+[ADVANCED_REPAIR.md](ADVANCED_REPAIR.md) records the standalone/combined
+resource-selection and indirect-parameter repairs. The harness now tracks feature
+flags independently, selects the scene draw for these defects even in multipass
+cases, and checks both vertex and fragment modules. All nine visual scenarios
+have verified source repairs across the separate shader/C++ harnesses.

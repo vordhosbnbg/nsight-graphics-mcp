@@ -138,6 +138,12 @@ pixels. Five of nine visual defects now have verified source repairs. The four
 resource-selection/indirect-parameter cases and generic bounded resource access
 remain unfinished; see `docs/STATE_REPAIR.md`. The MCP surface remains 20 tools.
 
+At 0.2.10, standalone/combined resource-selection and indirect-parameter source
+repairs pass on both releases, with 24 fresh captures and 24 application baselines.
+All nine visual defect scenarios now have verified source repairs. Generic bounded
+product resource access remains unfinished; fixed-input helper experiments are
+not that API. See `docs/ADVANCED_REPAIR.md`. R-007/R-015 remain in progress.
+
 Local baseline, inspected on 2026-09-17:
 
 - Nsight Graphics **2026.3.1.0**, installed under

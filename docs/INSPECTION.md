@@ -531,3 +531,13 @@ to the secondary uniform buffer; application-source tint semantics are labelled
 separately. These source repairs preserve faulty scenario names and produce exact
 reference pixels. Generic resource access, frame-time palette-byte extraction,
 and arbitrary executed-state reconstruction are not established by those checks.
+
+## Advanced source repairs at 0.2.10
+
+[ADVANCED_REPAIR.md](ADVANCED_REPAIR.md) records captured selection pushes, indirect
+parameter bytes and matched shader modules for the remaining four defect cases,
+followed by independent source edits/builds and two-release recapture verification.
+Seven exact-input helper experiments extract 33 resources; an independent reviewer
+reproduces the reads. This completes source-repair scenario coverage, but does not
+implement generic bounded product resource access, reconstruct arbitrary executed
+state, hydrate new descriptor-array mappings or retrieve intermediate pixels.

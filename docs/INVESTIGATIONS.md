@@ -991,3 +991,27 @@ only if a different generated helper changes its resource-access contract.
   The final four binding/pipeline runs and both postpass regressions all passed
   with the corrected harness (18 fresh captures); [STATE_REPAIR.md](STATE_REPAIR.md)
   records the final report bundles.
+
+### I-024 — Fixed resource experiment used implicit JSON string comparisons
+
+- **Context:** 2026-09-18, development product0.2.10, GCC16.2.1, pinned JSON
+  dependency; diagnosis capture `bundle-9854d553e16d9c48997d1f2f7224577b` from
+  Nsight2026.3.1.0/build38722833, retained and pinned in
+  `artifacts/nsight-advanced-repair-evidence`.
+- **Reproduction:** `build/advanced-repair-validation/diagnosis/`
+  `extraction-bindless-reference/build.argv.json` records compilation of the
+  fixed-input worker and unchanged generated ReadOnlyDatabase/DataScope helpers.
+- **Expected/observed:** Expected a compiled worker to read source-referenced
+  resources. Compilation exited1: the pinned JSON configuration has no matching
+  `std::string == json` overload for fingerprint and source-line comparisons.
+  The worker was never executed; no resource extraction or GPU work occurred.
+- **Evidence/retention:** The failed directory preserves source, exact helper/data
+  inventory and snapshots, compiler arguments/result, and full diagnostic log.
+  It is included in pinned advanced repair qualification snapshot
+  `bundle-1e6ebc236bc4232d22303d0be4ca3583` in the same store.
+- **Correction/revisit:** Use explicit `get<std::string>()` at both comparisons
+  and compile in a separate output directory. Revisit compiler compatibility if
+  the explicit typed comparisons still fail; this error establishes no Nsight
+  data limitation.
+  The corrected seven workers and independent reruns passed with empty
+  sanitizer diagnostics, extracting 33 source-referenced resources.

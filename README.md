@@ -50,6 +50,11 @@ At **0.2.9**, binding and pipeline-state source repairs also pass on both releas
 See [STATE_REPAIR.md](docs/STATE_REPAIR.md). Five of nine defect scenarios now have
 verified source repairs; the four resource-selection/indirect-parameter cases and
 generic bounded resource access remain unfinished. The surface remains 20 tools.
+At **0.2.10**, the four remaining standalone/combined resource-selection and
+indirect-parameter source repairs pass on both releases: 24 fresh captures and
+24 application readbacks, with exact repaired/reference pixels. All nine defect
+scenarios now have verified source repairs; generic bounded resource access and
+full release qualification remain unfinished. See [ADVANCED_REPAIR.md](docs/ADVANCED_REPAIR.md).
 Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),

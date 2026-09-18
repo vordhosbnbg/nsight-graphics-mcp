@@ -113,7 +113,9 @@ struct RepairCase {
     std::string before_line;
     std::string after_line;
     bool multipass = false;
-    bool combined = false;
+    bool bindless = false;
+    bool indirect = false;
+    bool post_repair = false;
 };
 
 RepairCase repair_case(const std::string& reference, const std::string& fault) {
@@ -122,7 +124,11 @@ RepairCase repair_case(const std::string& reference, const std::string& fault) {
         return {"post-channel-order",
                 "    result.channel_order = scenario == \"pass-output-error\" || scenario == \"combined-pass-error\" ? "
                 "1u : 0u;",
-                "    result.channel_order = 0u;", true, reference == "combined-reference"};
+                "    result.channel_order = 0u;",
+                true,
+                reference == "combined-reference",
+                reference == "combined-reference",
+                true};
     }
     if(reference == "reference" && fault == "binding-error") {
         return {"scene-descriptor-selection",
@@ -132,6 +138,28 @@ RepairCase repair_case(const std::string& reference, const std::string& fault) {
     if(reference == "reference" && fault == "pipeline-error") {
         return {"scene-color-write-mask", "            attachment.colorWriteMask &= ~VK_COLOR_COMPONENT_R_BIT;",
                 "            attachment.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;"};
+    }
+    if((reference == "bindless-reference" && fault == "resource-selection-error") ||
+       (reference == "combined-reference" && fault == "combined-resource-error")) {
+        const bool combined = reference == "combined-reference";
+        return {"scene-resource-selection",
+                "    result.resource_xor = scenario == \"resource-selection-error\" || scenario == "
+                "\"combined-resource-error\" ? 1u : 0u;",
+                "    result.resource_xor = 0u;",
+                combined,
+                true,
+                combined};
+    }
+    if((reference == "indirect-reference" && fault == "indirect-parameter-error") ||
+       (reference == "combined-reference" && fault == "combined-indirect-error")) {
+        const bool combined = reference == "combined-reference";
+        return {"scene-indirect-instance-count",
+                "        result.indirect && scenario != \"indirect-parameter-error\" && scenario != "
+                "\"combined-indirect-error\" ? 2u : 1u;",
+                "        result.indirect ? 2u : 1u;",
+                combined,
+                combined,
+                true};
     }
     throw std::invalid_argument("Unqualified source-repair scenario pair");
 }
@@ -307,8 +335,8 @@ int main(int argc, char** argv) {
                 require(observed_workload.at("offscreen_render_target") == selected_case.multipass &&
                             observed_workload.at("post_processing") == selected_case.multipass &&
                             observed_workload.at("render_pass_count") == (selected_case.multipass ? 2 : 1) &&
-                            observed_workload.at("bindless_storage_buffers") == selected_case.combined &&
-                            observed_workload.at("indirect_draw") == selected_case.combined,
+                            observed_workload.at("bindless_storage_buffers") == selected_case.bindless &&
+                            observed_workload.at("indirect_draw") == selected_case.indirect,
                         "requested standalone or combined workload features are actually reported");
                 require(baselines.back().report.at("result").at("application").at("build") ==
                             (case_index == 2 ? repaired_identity : original_identity),
@@ -391,7 +419,7 @@ int main(int argc, char** argv) {
                             "fresh source query resolves every requested draw completely");
                     require(
                         draw_page.at("draws").at(0).at("function") ==
-                                (selected_case.combined ? "VulkanReplay_CmdDrawIndirect" : "VulkanReplay_CmdDraw") &&
+                                (selected_case.indirect ? "VulkanReplay_CmdDrawIndirect" : "VulkanReplay_CmdDraw") &&
                             (!selected_case.multipass ||
                              draw_page.at("draws").at(1).at("function") == "VulkanReplay_CmdDraw"),
                         "generated calls preserve the requested scene draw mode and postpass");
@@ -401,31 +429,42 @@ int main(int argc, char** argv) {
                         session.tool("artifact_read", {{"artifact_id", capture_id}, {"path", setup_path}});
                     require(setup.at("status") == "text", "fresh shader debug-name source retrievable");
                     const auto setup_text = setup.at("text").get<std::string>();
-                    const auto& implicated_draw = draw_page.at("draws").back();
+                    const auto& implicated_draw =
+                        selected_case.post_repair ? draw_page.at("draws").back() : draw_page.at("draws").front();
                     require(implicated_draw.at("association_status") == "resolved_source_relationship",
                             "qualified implicated draw pipeline association");
                     bool named_fragment = false;
+                    bool named_vertex = false;
                     for(const auto& stage : implicated_draw.at("pipeline").at("stages")) {
-                        if(stage.at("stage") != "VK_SHADER_STAGE_FRAGMENT_BIT")
-                            continue;
                         const auto module = stage.at("module").get<std::string>();
-                        const auto marker = "uint64_t(" + module + "),\n    /* pObjectName = */ \"fixture." +
-                                            (selected_case.multipass ? "post" : "scene") + ".frag.spv\"";
-                        named_fragment = setup_text.find(marker) != std::string::npos;
+                        const auto named = [&](const std::string& shader) {
+                            return setup_text.find("uint64_t(" + module + "),\n    /* pObjectName = */ \"fixture." +
+                                                   shader + ".spv\"") != std::string::npos;
+                        };
+                        if(stage.at("stage") == "VK_SHADER_STAGE_FRAGMENT_BIT") {
+                            named_fragment = named(selected_case.post_repair ? "post.frag"
+                                                   : selected_case.bindless  ? "bindless.frag"
+                                                                             : "scene.frag");
+                        } else if(stage.at("stage") == "VK_SHADER_STAGE_VERTEX_BIT") {
+                            named_vertex = named(selected_case.post_repair ? "post.vert"
+                                                 : selected_case.indirect  ? "indirect.vert"
+                                                                           : "scene.vert");
+                        }
                     }
-                    require(named_fragment, "implicated fragment module name belongs to this fresh capture");
+                    require(named_fragment && named_vertex,
+                            "implicated fragment and vertex module names belong to this fresh capture");
                     if(selected_case.multipass) {
                         require(read.at("text").get<std::string>().find("\"post.present\"") != std::string::npos,
                                 "postpass label belongs to this fresh capture");
                     }
                     const auto& span = implicated_draw.at("source");
-                    capture[selected_case.multipass ? "post_draw_source" : "scene_draw_source"] =
+                    capture[selected_case.post_repair ? "post_draw_source" : "scene_draw_source"] =
                         session.tool("capture_cpp_source", {{"capture_id", capture_id},
                                                             {"source_path", span.at("path")},
                                                             {"start_line", span.at("start_line")},
                                                             {"max_lines", 3}});
                     const auto& excerpt =
-                        capture.at(selected_case.multipass ? "post_draw_source" : "scene_draw_source");
+                        capture.at(selected_case.post_repair ? "post_draw_source" : "scene_draw_source");
                     require(excerpt.at("source").at("path") == span.at("path") &&
                                 excerpt.at("source").at("sha256").get<std::string>() ==
                                     ngm::sha256_file(store_root / "bundles" / capture_id /
