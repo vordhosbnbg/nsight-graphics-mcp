@@ -1,0 +1,694 @@
+[
+  {
+    "capture_id": "bundle-938942909c8c6fffa39c4f414a09d757",
+    "scenario": "combined-reference",
+    "project": "raw/cpp/CppCaptures/fixture__2026_09_18__10_45_47",
+    "producer": "2026.3.1.0",
+    "build": "38722833",
+    "files": {
+      "ReadOnlyDatabase.cpp": {
+        "sha256": "c0297095e1a7e728688b6288dc8a7dcf455c54ad0af4c2e5f8ba6ce05bbfd687",
+        "bytes": 23261
+      },
+      "ReadOnlyDatabase.h": {
+        "sha256": "b3c8689f67cdfe2ef0b529f90953bd0ceb17589b8444c98e34f26dd15281c7da",
+        "bytes": 12780
+      },
+      "DataScope.cpp": {
+        "sha256": "dc1ec0e3738e4f1650d90625fd2ee304be187afe5ac3d43b2a88b666618ce1b4",
+        "bytes": 2798
+      },
+      "DataScope.h": {
+        "sha256": "cd79e92f6b783b1f0b884cc1ba5fb0740a8cbf027f9eca52b731636dc8d32ab0",
+        "bytes": 2952
+      },
+      "DllCommon.h": {
+        "sha256": "de074900baba02ca4ee46580d5b7bfee87f7902c544fef7eb06c0f107f27a0e6",
+        "bytes": 332
+      },
+      "VulkanStructHydrator.cpp": {
+        "sha256": "1e68e3163910a896250b1290c9aaf7e6cd27079bb0a649724de55e667edf534a",
+        "bytes": 5696
+      },
+      "include/VulkanStructHydrator.h": {
+        "sha256": "34a9c79394a6dae41e785202aeaceb927e614966389002648a70b7e62d064c3d",
+        "bytes": 3496
+      },
+      "VulkanReplay.cpp": {
+        "sha256": "a4e0f9ddbb097b8bc131a55eb574e9306b74222a84ed5f67365bc3ad39a46bfa",
+        "bytes": 927047
+      },
+      "Resources00.cpp": {
+        "sha256": "8a7d47b1169219d157d30e3b4b1b828ae70519f18610c190f18dbcbb6a8ce820",
+        "bytes": 75490
+      },
+      "FrameSetup00.cpp": {
+        "sha256": "15f5fe25bfb6cb76c8f2eaae8bd65aae9311eb1e3d1083d41ea1b276e87aa8d8",
+        "bytes": 17515
+      },
+      "CommandList00.cpp": {
+        "sha256": "58d575524f6b4c695295800d3f4646483dca5c02a08d8c1b417297bda300d1d3",
+        "bytes": 10138
+      },
+      "data.bin": {
+        "sha256": "8c099d1a37c209810cbd091f8475f2fe6a035189333ac31c8619b57c8570c96f",
+        "bytes": 706564
+      },
+      "data.bin.rec": {
+        "sha256": "e0cd78c7f83d1f7fa42ace3d7e3d03b537c114e4fd24432650533b153edfd52a",
+        "bytes": 416
+      },
+      "metadata.json": {
+        "sha256": "a19391168677b6542fd9bfb26ff6699e856f62fe44e0d880902671cfc0d186ff",
+        "bytes": 7084
+      }
+    },
+    "registrations": [
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_32",
+        "id": 32,
+        "source": "Resources00.cpp",
+        "line": 481,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_32), 32ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_34",
+        "id": 34,
+        "source": "Resources00.cpp",
+        "line": 501,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_34), 34ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_42",
+        "id": 42,
+        "source": "Resources00.cpp",
+        "line": 521,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_42), 42ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE",
+        "symbol": "VkImage_uid_25",
+        "id": 25,
+        "source": "Resources00.cpp",
+        "line": 553,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE, uint64_t(VkImage_uid_25), 25ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_SAMPLER",
+        "symbol": "VkSampler_uid_29",
+        "id": 29,
+        "source": "Resources00.cpp",
+        "line": 579,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_SAMPLER, uint64_t(VkSampler_uid_29), 29ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_13",
+        "id": 13,
+        "source": "Resources00.cpp",
+        "line": 743,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_13), 13ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_27",
+        "id": 27,
+        "source": "Resources00.cpp",
+        "line": 768,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_27), 27ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_39",
+        "id": 39,
+        "source": "Resources00.cpp",
+        "line": 852,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_39), 39ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_40",
+        "id": 40,
+        "source": "Resources00.cpp",
+        "line": 866,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_40), 40ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_47",
+        "id": 47,
+        "source": "FrameSetup00.cpp",
+        "line": 352,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_47), 47ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_53",
+        "id": 53,
+        "source": "FrameSetup00.cpp",
+        "line": 359,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_53), 53ull));"
+      }
+    ],
+    "updates": [
+      {
+        "write_count": 2,
+        "handle": 16,
+        "output_bytes": 176,
+        "source": "FrameSetup00.cpp",
+        "line": 342,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 2u, Serialization::DATABASE_HANDLE(16), 176ull, 0, nullptr));"
+      },
+      {
+        "write_count": 1,
+        "handle": 17,
+        "output_bytes": 88,
+        "source": "FrameSetup00.cpp",
+        "line": 346,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 1u, Serialization::DATABASE_HANDLE(17), 88ull, 0, nullptr));"
+      }
+    ]
+  },
+  {
+    "capture_id": "bundle-09954164fb3b3f94c059bc32925cfe94",
+    "scenario": "combined-pass-error",
+    "project": "raw/cpp/CppCaptures/fixture__2026_09_18__10_46_07",
+    "producer": "2026.3.1.0",
+    "build": "38722833",
+    "files": {
+      "ReadOnlyDatabase.cpp": {
+        "sha256": "c0297095e1a7e728688b6288dc8a7dcf455c54ad0af4c2e5f8ba6ce05bbfd687",
+        "bytes": 23261
+      },
+      "ReadOnlyDatabase.h": {
+        "sha256": "b3c8689f67cdfe2ef0b529f90953bd0ceb17589b8444c98e34f26dd15281c7da",
+        "bytes": 12780
+      },
+      "DataScope.cpp": {
+        "sha256": "dc1ec0e3738e4f1650d90625fd2ee304be187afe5ac3d43b2a88b666618ce1b4",
+        "bytes": 2798
+      },
+      "DataScope.h": {
+        "sha256": "cd79e92f6b783b1f0b884cc1ba5fb0740a8cbf027f9eca52b731636dc8d32ab0",
+        "bytes": 2952
+      },
+      "DllCommon.h": {
+        "sha256": "de074900baba02ca4ee46580d5b7bfee87f7902c544fef7eb06c0f107f27a0e6",
+        "bytes": 332
+      },
+      "VulkanStructHydrator.cpp": {
+        "sha256": "1e68e3163910a896250b1290c9aaf7e6cd27079bb0a649724de55e667edf534a",
+        "bytes": 5696
+      },
+      "include/VulkanStructHydrator.h": {
+        "sha256": "34a9c79394a6dae41e785202aeaceb927e614966389002648a70b7e62d064c3d",
+        "bytes": 3496
+      },
+      "VulkanReplay.cpp": {
+        "sha256": "a4e0f9ddbb097b8bc131a55eb574e9306b74222a84ed5f67365bc3ad39a46bfa",
+        "bytes": 927047
+      },
+      "Resources00.cpp": {
+        "sha256": "8a7d47b1169219d157d30e3b4b1b828ae70519f18610c190f18dbcbb6a8ce820",
+        "bytes": 75490
+      },
+      "FrameSetup00.cpp": {
+        "sha256": "15f5fe25bfb6cb76c8f2eaae8bd65aae9311eb1e3d1083d41ea1b276e87aa8d8",
+        "bytes": 17515
+      },
+      "CommandList00.cpp": {
+        "sha256": "58d575524f6b4c695295800d3f4646483dca5c02a08d8c1b417297bda300d1d3",
+        "bytes": 10138
+      },
+      "data.bin": {
+        "sha256": "5a63820993433c544386b2ea26877ac506dcf19c07608f47162ce188b65fbdd3",
+        "bytes": 706564
+      },
+      "data.bin.rec": {
+        "sha256": "e0cd78c7f83d1f7fa42ace3d7e3d03b537c114e4fd24432650533b153edfd52a",
+        "bytes": 416
+      },
+      "metadata.json": {
+        "sha256": "dea397b7b343cfbd8fdf14c4f428ef281e0971580751ddf33ac670d1bbb6040a",
+        "bytes": 7084
+      }
+    },
+    "registrations": [
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_32",
+        "id": 32,
+        "source": "Resources00.cpp",
+        "line": 481,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_32), 32ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_34",
+        "id": 34,
+        "source": "Resources00.cpp",
+        "line": 501,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_34), 34ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_42",
+        "id": 42,
+        "source": "Resources00.cpp",
+        "line": 521,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_42), 42ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE",
+        "symbol": "VkImage_uid_25",
+        "id": 25,
+        "source": "Resources00.cpp",
+        "line": 553,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE, uint64_t(VkImage_uid_25), 25ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_SAMPLER",
+        "symbol": "VkSampler_uid_29",
+        "id": 29,
+        "source": "Resources00.cpp",
+        "line": 579,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_SAMPLER, uint64_t(VkSampler_uid_29), 29ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_13",
+        "id": 13,
+        "source": "Resources00.cpp",
+        "line": 743,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_13), 13ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_27",
+        "id": 27,
+        "source": "Resources00.cpp",
+        "line": 768,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_27), 27ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_39",
+        "id": 39,
+        "source": "Resources00.cpp",
+        "line": 852,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_39), 39ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_40",
+        "id": 40,
+        "source": "Resources00.cpp",
+        "line": 866,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_40), 40ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_47",
+        "id": 47,
+        "source": "FrameSetup00.cpp",
+        "line": 352,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_47), 47ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_53",
+        "id": 53,
+        "source": "FrameSetup00.cpp",
+        "line": 359,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_53), 53ull));"
+      }
+    ],
+    "updates": [
+      {
+        "write_count": 2,
+        "handle": 16,
+        "output_bytes": 176,
+        "source": "FrameSetup00.cpp",
+        "line": 342,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 2u, Serialization::DATABASE_HANDLE(16), 176ull, 0, nullptr));"
+      },
+      {
+        "write_count": 1,
+        "handle": 17,
+        "output_bytes": 88,
+        "source": "FrameSetup00.cpp",
+        "line": 346,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 1u, Serialization::DATABASE_HANDLE(17), 88ull, 0, nullptr));"
+      }
+    ]
+  },
+  {
+    "capture_id": "bundle-3fde28d339612fff727a76c6711c869e",
+    "scenario": "combined-reference",
+    "project": "raw/cpp/CppCaptures/fixture__2026_09_18__10_46_52",
+    "producer": "2026.2.0.0",
+    "build": "37991608",
+    "files": {
+      "ReadOnlyDatabase.cpp": {
+        "sha256": "8a5dc3b886288f534babbcfb0e26844a1c0cc78fc98cf296e76c31edb4ea9227",
+        "bytes": 23276
+      },
+      "ReadOnlyDatabase.h": {
+        "sha256": "0d1c7a3011cfc0732505ad3fdfeb495a6541494162b1f6f45c41255d375f3f45",
+        "bytes": 12878
+      },
+      "DataScope.cpp": {
+        "sha256": "dc1ec0e3738e4f1650d90625fd2ee304be187afe5ac3d43b2a88b666618ce1b4",
+        "bytes": 2798
+      },
+      "DataScope.h": {
+        "sha256": "e6475c9a52effd068b7cf84fd80c4f42c280e8d2c8b1bc20891ea266e9ddb974",
+        "bytes": 2991
+      },
+      "DllCommon.h": {
+        "sha256": "de074900baba02ca4ee46580d5b7bfee87f7902c544fef7eb06c0f107f27a0e6",
+        "bytes": 332
+      },
+      "VulkanStructHydrator.cpp": {
+        "sha256": "1e68e3163910a896250b1290c9aaf7e6cd27079bb0a649724de55e667edf534a",
+        "bytes": 5696
+      },
+      "include/VulkanStructHydrator.h": {
+        "sha256": "34a9c79394a6dae41e785202aeaceb927e614966389002648a70b7e62d064c3d",
+        "bytes": 3496
+      },
+      "VulkanReplay.cpp": {
+        "sha256": "b33dc3531bb47139ed27a695eb5fc064999b1a149f64b26cb3bfbb78a79c5a67",
+        "bytes": 926998
+      },
+      "Resources00.cpp": {
+        "sha256": "d7424cd0446deb4955e789563af8bfc1a5edec6721e0f2c1d81eeaa338ba8c34",
+        "bytes": 75490
+      },
+      "FrameSetup00.cpp": {
+        "sha256": "18ee2deb8d6cdd92e074050d95b7cf32e02aee17218faf250ba6ecd3b3476181",
+        "bytes": 17515
+      },
+      "CommandList00.cpp": {
+        "sha256": "f4141495ca909fa3d45b3ea52be678a0313f8259b407fc647c5884404a97a431",
+        "bytes": 10138
+      },
+      "data.bin": {
+        "sha256": "e9cd01966a130c2e82919fb2dcfedf0126a63ff24827d2d29378ec89000a54e5",
+        "bytes": 706564
+      },
+      "data.bin.rec": {
+        "sha256": "e0cd78c7f83d1f7fa42ace3d7e3d03b537c114e4fd24432650533b153edfd52a",
+        "bytes": 416
+      },
+      "metadata.json": {
+        "sha256": "51fd5e0406eb0dbfeacf7e3ded8749354a7a7da0b6cb52d5a975df3752f6b3ba",
+        "bytes": 7317
+      }
+    },
+    "registrations": [
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_32",
+        "id": 32,
+        "source": "Resources00.cpp",
+        "line": 481,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_32), 32ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_34",
+        "id": 34,
+        "source": "Resources00.cpp",
+        "line": 501,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_34), 34ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_42",
+        "id": 42,
+        "source": "Resources00.cpp",
+        "line": 521,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_42), 42ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE",
+        "symbol": "VkImage_uid_25",
+        "id": 25,
+        "source": "Resources00.cpp",
+        "line": 553,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE, uint64_t(VkImage_uid_25), 25ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_SAMPLER",
+        "symbol": "VkSampler_uid_29",
+        "id": 29,
+        "source": "Resources00.cpp",
+        "line": 579,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_SAMPLER, uint64_t(VkSampler_uid_29), 29ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_13",
+        "id": 13,
+        "source": "Resources00.cpp",
+        "line": 743,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_13), 13ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_27",
+        "id": 27,
+        "source": "Resources00.cpp",
+        "line": 768,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_27), 27ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_39",
+        "id": 39,
+        "source": "Resources00.cpp",
+        "line": 852,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_39), 39ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_40",
+        "id": 40,
+        "source": "Resources00.cpp",
+        "line": 866,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_40), 40ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_47",
+        "id": 47,
+        "source": "FrameSetup00.cpp",
+        "line": 352,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_47), 47ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_53",
+        "id": 53,
+        "source": "FrameSetup00.cpp",
+        "line": 359,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_53), 53ull));"
+      }
+    ],
+    "updates": [
+      {
+        "write_count": 2,
+        "handle": 16,
+        "output_bytes": 176,
+        "source": "FrameSetup00.cpp",
+        "line": 342,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 2u, Serialization::DATABASE_HANDLE(16), 176ull, 0, nullptr));"
+      },
+      {
+        "write_count": 1,
+        "handle": 17,
+        "output_bytes": 88,
+        "source": "FrameSetup00.cpp",
+        "line": 346,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 1u, Serialization::DATABASE_HANDLE(17), 88ull, 0, nullptr));"
+      }
+    ]
+  },
+  {
+    "capture_id": "bundle-2ae0cba81613f143fc7c6db08bfda437",
+    "scenario": "combined-pass-error",
+    "project": "raw/cpp/CppCaptures/fixture__2026_09_18__10_47_12",
+    "producer": "2026.2.0.0",
+    "build": "37991608",
+    "files": {
+      "ReadOnlyDatabase.cpp": {
+        "sha256": "8a5dc3b886288f534babbcfb0e26844a1c0cc78fc98cf296e76c31edb4ea9227",
+        "bytes": 23276
+      },
+      "ReadOnlyDatabase.h": {
+        "sha256": "0d1c7a3011cfc0732505ad3fdfeb495a6541494162b1f6f45c41255d375f3f45",
+        "bytes": 12878
+      },
+      "DataScope.cpp": {
+        "sha256": "dc1ec0e3738e4f1650d90625fd2ee304be187afe5ac3d43b2a88b666618ce1b4",
+        "bytes": 2798
+      },
+      "DataScope.h": {
+        "sha256": "e6475c9a52effd068b7cf84fd80c4f42c280e8d2c8b1bc20891ea266e9ddb974",
+        "bytes": 2991
+      },
+      "DllCommon.h": {
+        "sha256": "de074900baba02ca4ee46580d5b7bfee87f7902c544fef7eb06c0f107f27a0e6",
+        "bytes": 332
+      },
+      "VulkanStructHydrator.cpp": {
+        "sha256": "1e68e3163910a896250b1290c9aaf7e6cd27079bb0a649724de55e667edf534a",
+        "bytes": 5696
+      },
+      "include/VulkanStructHydrator.h": {
+        "sha256": "34a9c79394a6dae41e785202aeaceb927e614966389002648a70b7e62d064c3d",
+        "bytes": 3496
+      },
+      "VulkanReplay.cpp": {
+        "sha256": "b33dc3531bb47139ed27a695eb5fc064999b1a149f64b26cb3bfbb78a79c5a67",
+        "bytes": 926998
+      },
+      "Resources00.cpp": {
+        "sha256": "d7424cd0446deb4955e789563af8bfc1a5edec6721e0f2c1d81eeaa338ba8c34",
+        "bytes": 75490
+      },
+      "FrameSetup00.cpp": {
+        "sha256": "18ee2deb8d6cdd92e074050d95b7cf32e02aee17218faf250ba6ecd3b3476181",
+        "bytes": 17515
+      },
+      "CommandList00.cpp": {
+        "sha256": "f4141495ca909fa3d45b3ea52be678a0313f8259b407fc647c5884404a97a431",
+        "bytes": 10138
+      },
+      "data.bin": {
+        "sha256": "c3551cbb1892ecca1ba9a9b405a52ba20330ea544d0e3f07b4296831a335fa16",
+        "bytes": 706564
+      },
+      "data.bin.rec": {
+        "sha256": "e0cd78c7f83d1f7fa42ace3d7e3d03b537c114e4fd24432650533b153edfd52a",
+        "bytes": 416
+      },
+      "metadata.json": {
+        "sha256": "5699671d2195365f0c95228558e8d25af39273af1c2b104d1c3eefd021ff5485",
+        "bytes": 7318
+      }
+    },
+    "registrations": [
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_32",
+        "id": 32,
+        "source": "Resources00.cpp",
+        "line": 481,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_32), 32ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_34",
+        "id": 34,
+        "source": "Resources00.cpp",
+        "line": 501,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_34), 34ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_BUFFER",
+        "symbol": "VkBuffer_uid_42",
+        "id": 42,
+        "source": "Resources00.cpp",
+        "line": 521,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_BUFFER, uint64_t(VkBuffer_uid_42), 42ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE",
+        "symbol": "VkImage_uid_25",
+        "id": 25,
+        "source": "Resources00.cpp",
+        "line": 553,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE, uint64_t(VkImage_uid_25), 25ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_SAMPLER",
+        "symbol": "VkSampler_uid_29",
+        "id": 29,
+        "source": "Resources00.cpp",
+        "line": 579,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_SAMPLER, uint64_t(VkSampler_uid_29), 29ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_13",
+        "id": 13,
+        "source": "Resources00.cpp",
+        "line": 743,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_13), 13ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_IMAGE_VIEW",
+        "symbol": "VkImageView_uid_27",
+        "id": 27,
+        "source": "Resources00.cpp",
+        "line": 768,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_IMAGE_VIEW, uint64_t(VkImageView_uid_27), 27ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_39",
+        "id": 39,
+        "source": "Resources00.cpp",
+        "line": 852,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_39), 39ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_DESCRIPTOR_SET",
+        "symbol": "VkDescriptorSet_uid_40",
+        "id": 40,
+        "source": "Resources00.cpp",
+        "line": 866,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_DESCRIPTOR_SET, uint64_t(VkDescriptorSet_uid_40), 40ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_47",
+        "id": 47,
+        "source": "FrameSetup00.cpp",
+        "line": 352,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_47), 47ull));"
+      },
+      {
+        "type": "VK_OBJECT_TYPE_PIPELINE",
+        "symbol": "VkPipeline_uid_53",
+        "id": 53,
+        "source": "FrameSetup00.cpp",
+        "line": 359,
+        "text": "NV_VK_REPLAY(VulkanHelper_RegisterObject(VK_OBJECT_TYPE_PIPELINE, uint64_t(VkPipeline_uid_53), 53ull));"
+      }
+    ],
+    "updates": [
+      {
+        "write_count": 2,
+        "handle": 16,
+        "output_bytes": 176,
+        "source": "FrameSetup00.cpp",
+        "line": 342,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 2u, Serialization::DATABASE_HANDLE(16), 176ull, 0, nullptr));"
+      },
+      {
+        "write_count": 1,
+        "handle": 17,
+        "output_bytes": 88,
+        "source": "FrameSetup00.cpp",
+        "line": 346,
+        "text": "NV_VK_REPLAY(VulkanHelper_UpdateDescriptorSetsFromDatabase(VkDevice_uid_4, 1u, Serialization::DATABASE_HANDLE(17), 88ull, 0, nullptr));"
+      }
+    ]
+  }
+]

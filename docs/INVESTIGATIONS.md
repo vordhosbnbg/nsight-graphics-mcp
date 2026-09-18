@@ -771,7 +771,7 @@ in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md). This resolves the directory err
 
 ### I-017 — Opaque descriptor bytes invalidated a cross-capture comparison assumption
 
-Date: **2026-09-18**. State: **Resolved comparison error; descriptor semantics open**.
+Date: **2026-09-18**. State: **Resolved comparison error; fixed setup descriptor semantics qualified at 0.2.7**.
 Related items: R-006, R-007. The product 0.2.3 combined reference/fault C++ captures
 succeed on matching 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 tools,
 on the same RTX 3080 Ti / 615.71.09 / KDE Wayland-Xwayland / GCC 16.2.1 host.
@@ -812,6 +812,16 @@ array-element mapping until that path is actually qualified. Final snapshot
 `bundle-cb069965dca0cc90e2b672194195beb5` includes the same verified comparison
 with “postpass push constant” wording, clarifying that the update precedes its draw;
 the original comparison/failure snapshot remains pinned.
+
+Follow-up at **0.2.7**: the fixed-capture generated-helper runner now resolves
+all three setup descriptor writes in each of the four exact captures. Palette
+array slots 0/1 map to buffers32/34 at offset0/range16; the postpass write uses
+view27/sampler29 with shader-read-only layout. Those typed fields agree across
+reference/fault despite different serialized bytes. This resolves the setup-field
+ambiguity without explaining the opaque differences or claiming executed slot
+selection. See [DESCRIPTOR_HYDRATION.md](DESCRIPTOR_HYDRATION.md) and its pinned
+qualification record in BUILD_VALIDATION.md. Generic product extraction remains
+unfinished.
 
 ### I-018 — Generated-source qualification rejected the resource progress message
 
@@ -909,3 +919,25 @@ Current limitation:
 Revisit condition:
 Resolution: Leave open until supported by a linked successful follow-up.
 ```
+
+### I-021 — Descriptor probe attempted an unsupported BlobProxy conversion
+
+Date: **2026-09-18**. State: **Resolved probe compilation error**. Related: R-007.
+The first `ngm_descriptor_hydration_integration` run selected the pinned combined
+reference capture `bundle-938942909c8c6fffa39c4f414a09d757` from matching Nsight
+2026.3.1.0/build38722833. The runner copied its exact generated helper/database
+inputs and invoked GCC with ASan/UBSan to compile the native worker. Expected:
+compile and inspect two source-referenced descriptor-write blocks. Observed:
+compiler exit1 at `require(bool(resource), ...)`; NVIDIA's `BlobProxy` has no
+conversion to bool. No helper execution, resource read, or GPU operation occurred.
+
+The isolated failed run is
+`build/descriptor-hydration-validation/descriptor-hydration-3u6vjs`.
+Its worker source, exact compiler arguments, stderr, process cleanup result, and
+fingerprinted inputs are retained in explicitly pinned qualification bundle
+`bundle-93e2c3dd09c57553642b1afa873e8566` in `artifacts/nsight-repair-evidence`,
+under `raw/imported/failed-I021/`; see [BUILD_VALIDATION.md](BUILD_VALIDATION.md). Reproduce by compiling that retained
+worker against its identified helper closure. This was a first-party API-use
+error, not an unavailable Nsight capability. The corrected worker checks
+`resource.Get() != nullptr`; the subsequent four-capture run succeeds. Revisit
+only if a different generated helper changes its resource-access contract.

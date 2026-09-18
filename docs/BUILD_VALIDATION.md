@@ -635,3 +635,70 @@ failed probes, and check logs in explicitly pinned **`bundle-ce6ae6385721977dfd7
 in `artifacts/nsight-repair-evidence` (204 inventoried payload files; 5,436,164 total bundle bytes including management files). The copied input
 subsets are qualification evidence; original service capture bundles remain
 separately pinned. R-007/R-015 stay In Progress, and no pending item is marked Done.
+
+## Fixed descriptor helper qualification at 0.2.7
+
+The explicit `ngm_descriptor_hydration_integration` target builds and runs on
+GCC Debug with GCC **16.2.1 20260810**. It qualifies four previously pinned
+combined C++ captures: reference/postpass-fault on matching Nsight
+**2026.3.1.0/build38722833** and **2026.2.0.0/build37991608**. No fresh capture,
+Nsight invocation, desktop session, Vulkan call, or GPU replay was performed.
+The original capture host remains the RTX3080Ti/615.71.09/KDE Wayland-Xwayland
+configuration recorded in NSIGHT_VALIDATION.md.
+
+Executed commands:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_descriptor_hydration_integration
+build/linux-gcc-debug/tests/ngm_descriptor_hydration_integration \
+  artifacts/nsight-evidence build/descriptor-hydration-validation
+cmake --build --preset linux-gcc-debug --target ngm_check
+```
+
+Final run:
+`build/descriptor-hydration-validation/descriptor-hydration-GfKcCr`.
+All **four cases / eight update calls / twelve setup writes** pass exact-field
+checks. The helper maps palette array elements0/1 to source buffers32/34 at
+byte offset0/range16, and postpass set40 to view27/sampler29 in shader-read-only
+layout. Each capture's source registrations and callback types establish its own
+symbol identities. Both reference/fault pairs have different serialized resource
+hashes but identical inspected typed fields. The first preliminary successful run
+is `descriptor-hydration-R6mRgA`; final assertions additionally check exact field
+values and cross-capture typed equality, with compiler/core/header identities.
+
+Each final worker and its unchanged vendor helper translation units uses
+ASan/UBSan; supporting `ngm_core` is the ordinary Debug archive. All four runs have
+empty sanitizer stderr, exit0 and confirmed cleanup. Four separately copied,
+altered-database cases exit2 in `input_identity`, before helper initialization,
+with cleanup confirmed. This tests the exact-input gate, not malformed-input
+safety of NVIDIA's helper. Compiler version, binary identities, 111 core/header
+input records, copied helper/database/source bytes, source snapshots, argv and
+exit/cleanup records are retained. The actual Vulkan ABI sizes are64/24/24 bytes
+for write/buffer/image descriptor structs. Only count-one writes are exercised.
+
+The failed first generated-worker compilation is preserved as I-021. The corrected
+calling contract resolves I-017's uncertainty about these setup descriptor fields;
+it neither explains serialized byte differences nor qualifies executed shader
+selection, arbitrary event state, generic product extraction, or a source repair.
+The MCP surface remains **20 tools**. See
+[DESCRIPTOR_HYDRATION.md](DESCRIPTOR_HYDRATION.md) for the exact trust boundary.
+
+The final GCC Debug CPU aggregate passes **22/22 checks in 189.38 seconds**,
+including check isolation and binary linkage. Log:
+`build/capture-acceptance/check-0.2.7-final.log`. First-party worker syntax/warnings
+also pass with `-Wall -Wextra -Wpedantic -Werror`; scoped formatting and diff
+checks pass. Fresh-context implementation and independent evidence reviews find
+no blocker. The latter verifies 56 original generated files, all 111 build-input
+identity records, 28 typed callbacks, setup labels, negative/cleanup records,
+and original capture pins without executing helpers or opening the store.
+
+Complete qualification is explicitly pinned as
+**`bundle-93e2c3dd09c57553642b1afa873e8566`** in
+`artifacts/nsight-repair-evidence`: **261 inventoried payload files**, with total
+bundle usage **112,666,086 bytes** including the outer manifest and pin record.
+It retains the final and preliminary passes, I-021's failed build, exact input
+snapshots, compiler/worker/harness records, source and dependency identities,
+CPU/warning logs, and review notes. `raw/imported/qualification.json` identifies
+payload hashes and scope. Original four capture bundles remain separately pinned
+in `artifacts/nsight-evidence`; copied inputs are qualification evidence, not
+new service captures. R-007/R-015 remain active and no roadmap status changes.

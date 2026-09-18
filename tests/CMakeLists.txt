@@ -73,6 +73,17 @@ ngm_add_hardware_check(ngm_retained_cpp_integration SOURCES RetainedCppIntegrati
         "${NGM_CPP_CASES}" "${NGM_CAPTURE_VALIDATION_ROOT}")
 add_dependencies(ngm_retained_cpp_integration nsight-graphics-mcp)
 
+# Explicit trusted-capture experiment; never a default check or product tool.
+file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/descriptor-hydration/cases.json" descriptor_cases_sha256)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/descriptor-hydration/cases.json")
+ngm_add_hardware_check(ngm_descriptor_hydration_integration SOURCES DescriptorHydrationIntegration.cpp
+    LIBRARIES ngm_artifacts
+    ARGS "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")
+target_compile_definitions(ngm_descriptor_hydration_integration PRIVATE
+    NGM_SOURCE_ROOT="${PROJECT_SOURCE_DIR}" NGM_CXX_COMPILER="${CMAKE_CXX_COMPILER}"
+    NGM_CORE_ARCHIVE="$<TARGET_FILE:ngm_core>" NGM_DESCRIPTOR_CASES_SHA256="${descriptor_cases_sha256}")
+
 ngm_register_check(ngm_cli_check
     COMMAND "${CMAKE_COMMAND}"
         "-DSERVER=$<TARGET_FILE:nsight-graphics-mcp>"

@@ -36,6 +36,10 @@ Retained MCP queries pass for 36 generated projects and 48 draws on both release
 see [CPP_INSPECTION.md](docs/CPP_INSPECTION.md). The final 0.2.6 CPU suite passes
 22 checks. Generic resource extraction,
 executed GPU state, and the remaining visual diagnosis/repair cases remain unfinished.
+At **0.2.7**, an opt-in fixed-capture descriptor hydration experiment qualifies
+setup array-slot mappings on four retained combined captures; see
+[DESCRIPTOR_HYDRATION.md](docs/DESCRIPTOR_HYDRATION.md). The MCP surface remains
+20 tools; this experiment is not a generic product resource reader.
 Actual GPU replay
 timed out on both releases. See
 [NSIGHT_VALIDATION.md](docs/NSIGHT_VALIDATION.md),

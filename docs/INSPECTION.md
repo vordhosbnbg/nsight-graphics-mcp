@@ -449,11 +449,12 @@ value, set **before** the draw. The final qualification snapshot
 `raw/imported/combined-resource-comparison/report.json` and script.
 
 Of eleven inspected non-descriptor blocks, only that postpass value differs.
-Opaque serialized descriptor blocks 16/17 also differ, so additional descriptor
-state differences are not excluded. I-017 preserves the initial overstrong
-byte-comparison assertion and its correction. Descriptor mapping remains
-unresolved; validate a generated-helper interpretation contract before claiming
-array slot selection or exact descriptor offsets/ranges.
+At the original 0.2.3 investigation, opaque serialized descriptor blocks 16/17
+also differed and additional descriptor-state differences could not be excluded.
+I-017 preserves that uncertainty and the corrected byte-comparison assertion.
+The 0.2.7 fixed-capture helper qualification below resolves the setup array slots,
+offsets/ranges, and image layout for these four captures. It does not establish
+executed array selection or arbitrary event state; see DESCRIPTOR_HYDRATION.md.
 
 Independent BMP decoding finds **24,472 differing pixels**, maximum RGB8 channel
 error 97, mean 8.603407118055555. Corresponding reference/fault images match across
@@ -473,10 +474,10 @@ not a claim that every detailed-state capability or R-007 is implemented.
 | Events and object identity | Typed retained metadata/events/objects pass on 54 basic/advanced graphics captures; IDs remain capture-scoped. | Inventory exports lack argument/state joins. Use generated API source for demonstrated associations. |
 | Draw → pipeline → shaders | Basic and combined generated source records exact draw, pipeline, stage, module, and resource references; source is retrievable over MCP. | At 0.2.6, bounded source and literal draw/pipeline/shader queries pass on 36 retained captures (48 draws), with explicit unsupported coverage. No generic executed-state reconstruction; see CPP_INSPECTION.md. |
 | Shader contents/source correlation | Fixed-capture generated helpers extract SPIR-V exactly matching frozen compiler output; debug GLSL is retained. | Extraction is restricted to verified captures/helpers. Qualify bounded product access before advertising a generic extractor. |
-| Descriptor bindings | Generated layouts, bound sets, counts/types, and setup annotations identify basic resources and scene-to-post sampling. | Packed descriptor writes do not expose array-slot mapping or exact offsets/ranges through the implemented reader. Next probe must establish the generated StructHydrator calling contract; do not decode private formats or infer slots from comments. |
+| Descriptor bindings | Generated layouts, bound sets, counts/types, and setup annotations identify basic resources and scene-to-post sampling. | At 0.2.7, a fixed-capture generated StructHydrator experiment resolves setup slots and exact offsets/ranges for four combined captures (DESCRIPTOR_HYDRATION.md). A bounded general product reader remains unfinished; do not infer executed slot selection or arbitrary event state. |
 | Selected resource contents | Generated helper yields palette buffers, push constants, shader bytes, and indirect arguments with exact source references and temporal meaning. | Arbitrary after-event buffers/images remain unavailable from these exercised interfaces. Preserve that limit and revisit only with a documented export/helper path. |
 | Pass relationships | Generated render-pass/framebuffer/view/image links and barriers demonstrate offscreen scene → sampled postpass → presentation. | Initial attachment restoration is not post-draw output. R-007 can use final output and shader/control evidence; do not claim intermediate pixels. |
-| Bindless and indirect evidence | Combined source records descriptor-array features/layout, push ranges, indirect buffer/offset/count/stride; extracted indirect payload is (3,2,0,0). Standalone feature capture/source matrices pass too. | Bindless slot selection remains incomplete until descriptor interpretation is validated. Other defect variants need their own R-007 diagnosis/fix runs. |
+| Bindless and indirect evidence | Combined source records descriptor-array features/layout, push ranges, indirect buffer/offset/count/stride; extracted indirect payload is (3,2,0,0). Standalone feature capture/source matrices pass too. | The 0.2.7 fixed-capture helper experiment resolves setup array-slot mappings for the combined reference/postpass-fault pair on each release. Executed slot selection and other defect variants need their own R-007 diagnosis/fix evidence. |
 | Output comparison | Independently decoded Nsight screenshots distinguish correct/faulty output on both releases; basic references match application baselines. | Bounded comparison and the basic shader fix pass at 0.2.4. PNG input and P6/PNG/BMP previews pass retained-file checks at 0.2.5 (IMAGE_PREVIEWS.md). Other source fixes remain R-007 work. File equality in the MCP capture harness is separately labelled. |
 | Standalone GPU replay | Bounded replay failures with confirmed cleanup are retained in I-007/I-009/I-010/I-011. Metadata export and C++ generation succeed independently. | Replay execution remains unqualified. The next repair workflow uses fresh captured outputs; revisit replay when a documented prerequisite or tool behavior changes. |
 
@@ -496,3 +497,13 @@ captures, all successful with cleanup and persistent pins. Its complete report,
 exact invocation records, corrected resource comparison, and evidence IDs are
 pinned as **`bundle-cb069965dca0cc90e2b672194195beb5`**. Exact cases and remaining
 unrun variants are in [NSIGHT_VALIDATION.md](NSIGHT_VALIDATION.md).
+
+## Descriptor helper qualification at 0.2.7
+
+The separate opt-in runner in [DESCRIPTOR_HYDRATION.md](DESCRIPTOR_HYDRATION.md)
+uses unchanged generated helpers on four fingerprinted combined captures. It
+resolves palette array elements 0/1 and the postpass image/sampler setup write,
+including offsets/ranges and image layout. Typed fields agree across reference
+and postpass-fault captures despite different serialized bytes. This resolves
+I-017's uncertainty for those setup fields only. Generic product resource access,
+executed shader selection, and the remaining actual repairs stay unfinished.
