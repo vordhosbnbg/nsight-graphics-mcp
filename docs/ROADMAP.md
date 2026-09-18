@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008), performance analysis (R-009) and Streamable HTTP (R-004) remain pending.**
+Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; performance analysis (R-009) is next in progress and Streamable HTTP (R-004) remains pending.**
 Last updated: **2026-09-18**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -176,27 +176,10 @@ Item conventions:
 
 ## In Progress
 
-None.
-
-## Pending
-
-
-### R-008
-
-```text
-Status: Pending
-Area: analysis/capture/shaders/test
-Title: Diagnose incorrect Vulkan compute results
-Goal: Extend the evidence-based investigation workflow to compute dispatches after visual correctness is established.
-Scope: Deterministic compute scenarios in R-005 with known inputs and reference outputs, controlled numerical/indexing defects, dispatch and shader association, input/output resource inspection where supported, and capture boundaries for workloads without presentation.
-Acceptance: A supported compute scenario without presentation runs reproducibly, is captured using an explicit documented boundary strategy, and exposes enough evidence for Codex to localize its defect; numerical outputs are checked against an independent reference with declared tolerances; correct variants pass; application-readback evidence is distinguished from capture-derived evidence.
-Notes: Second workflow priority, following R-007 and outside the first release by round 6's decision. Reuses R-006's inspection boundary and extends it for compute; extends R-002's controls where application-side capture control is required, including no-presentation boundary validation. Access to arbitrary buffer contents and dispatch state must be proven rather than inferred from metadata availability.
-```
-
 ### R-009
 
 ```text
-Status: Pending
+Status: In Progress
 Area: profile/analysis/shaders/test
 Title: Analyze GPU and shader performance bottlenecks
 Goal: Add performance investigation after visual and compute correctness workflows are established.
@@ -204,6 +187,8 @@ Scope: Controlled performance workloads in the test app, Nsight GPU Trace collec
 Acceptance: A known inefficient workload yields usable profiling evidence; Codex can identify a bottleneck supported by the available metrics; a corrected variant preserves output and shows a repeatable measured change; reports include warmup/repetition policy, units, variability, and relevant clock/replay settings.
 Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path.
 ```
+
+## Pending
 
 ### R-004
 
@@ -220,6 +205,18 @@ Notes: Accepted later work in interview round 3, outside the first release. Depe
 ## Blocked
 
 ## Done
+
+### R-008
+
+```text
+Status: Done
+Area: analysis/capture/shaders/test
+Title: Diagnose incorrect Vulkan compute results
+Goal: Extend the evidence-based investigation workflow to compute dispatches after visual correctness is established.
+Scope: Deterministic compute scenarios in R-005 with known inputs and reference outputs, controlled numerical/indexing defects, dispatch and shader association, input/output resource inspection where supported, and capture boundaries for workloads without presentation.
+Acceptance: A supported compute scenario without presentation runs reproducibly, is captured using an explicit documented boundary strategy, and exposes enough evidence for Codex to localize its defect; numerical outputs are checked against an independent reference with declared tolerances; correct variants pass; application-readback evidence is distinguished from capture-derived evidence.
+Notes: Second workflow priority, following R-007 and outside the first release by round 6's decision. Reuses R-006's inspection boundary and extends it for compute; extends R-002's controls where application-side capture control is required, including no-presentation boundary validation. Access to arbitrary buffer contents and dispatch state must be proven rather than inferred from metadata availability. Work began after the 0.3.0 visual milestone. A privately reviewed deterministic C++ compute probe runs without presentation and passes independent integer readback checks with synchronization validation. The first real 2026.3 capture succeeds using the documented VK_EXT_frame_boundary delimiter and exports a dispatch inventory. The product fixture/runner now include three compute scenarios, all-frame readback validation and an explicit frame-boundary capture delimiter. The initial numerical matrix passes 12 launches/30 frames, and the real 2026.3 MCP matrix retrieves source/SPIR-V plus application readback for reference and two localized defects. Application evidence stays distinct from dispatch/object exports. The corrected 2026.2 boundary path is unsupported on the measured injected device (I-031); generated-source compute capture remains unqualified. Both actual GLSL repairs are recompiled and recaptured with unchanged scenario selections; all repaired outputs match the independent reference exactly. The 0.3.1 aggregate passes 25/25 CPU checks. Fresh-context acceptance review independently passes 1,143 assertions. Supporting evidence is published and pinned as bundle-1ed0b5e17d49e24b6333d6ae4b10ffc1 in artifacts/compute-evidence; all 1,127 payload hashes and restart pin state verify. Original numerical/MCP results retain their 0.3.0 development identities, while repair and unsupported MCP runs are 0.3.1. Completed 2026-09-18 at 0.3.1. See docs/COMPUTE.md and I-027 through I-031.
+```
 
 ### R-007
 

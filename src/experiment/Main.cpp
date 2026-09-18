@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
             std::cout
                 << "Usage: ngm-experiment --fixture PATH --output-root DIR --scenario NAME --seed N "
                    "--width N --height N --frame N [--shader-dir DIR] [--timeout-ms N] [--validation true|false]\n"
-                   "Runs a fresh windowed fixture in isolated configuration and retains a report.\n";
+                   "Runs a fresh graphics or compute fixture in isolated configuration and retains a report.\n";
             return 0;
         }
         std::map<std::string, std::string> values;

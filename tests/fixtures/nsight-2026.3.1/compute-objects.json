@@ -1,0 +1,121 @@
+[
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "Instance_1",
+        "type_name": "Instance",
+        "uid": 1
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "PhysicalDevice_2",
+        "type_name": "PhysicalDevice",
+        "uid": 2
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "Device_3",
+        "type_name": "Device",
+        "uid": 3
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "Queue_4",
+        "type_name": "Queue",
+        "uid": 4
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "DeviceMemory_6",
+        "type_name": "DeviceMemory",
+        "uid": 6
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "DeviceMemory_8",
+        "type_name": "DeviceMemory",
+        "uid": 8
+    },
+    {
+        "access_flags": 96,
+        "api": "Vulkan",
+        "object_name": "compute.input",
+        "type_name": "Buffer",
+        "uid": 5
+    },
+    {
+        "access_flags": 96,
+        "api": "Vulkan",
+        "object_name": "compute.output",
+        "type_name": "Buffer",
+        "uid": 7
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "compute.affine.shader",
+        "type_name": "ShaderModule",
+        "uid": 13
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "DescriptorSetLayout_9",
+        "type_name": "DescriptorSetLayout",
+        "uid": 9
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "PipelineLayout_12",
+        "type_name": "PipelineLayout",
+        "uid": 12
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "compute.affine.pipeline",
+        "type_name": "Pipeline",
+        "uid": 14
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "DescriptorPool_10",
+        "type_name": "DescriptorPool",
+        "uid": 10
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "CommandPool_15",
+        "type_name": "CommandPool",
+        "uid": 15
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "DescriptorSet_11",
+        "type_name": "DescriptorSet",
+        "uid": 11
+    },
+    {
+        "access_flags": 0,
+        "api": "Vulkan",
+        "object_name": "CommandBuffer_16",
+        "type_name": "CommandBuffer",
+        "uid": 16
+    },
+    {
+        "access_flags": 524288,
+        "api": "Vulkan",
+        "object_name": "Fence_17",
+        "type_name": "Fence",
+        "uid": 17
+    }
+]

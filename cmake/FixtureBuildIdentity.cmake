@@ -61,7 +61,7 @@ endif()
 
 # These are the first-party translation units linked into this executable from
 # ngm_core. Unused objects from that static archive are deliberately excluded.
-set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp src/fixture/SdkControl.cpp
+set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp src/fixture/Compute.cpp src/fixture/SdkControl.cpp
     src/core/Hash.cpp src/core/File.cpp src/core/Version.cpp)
 set(inputs ${translation_units}
     src/fixture/Fixture.hpp src/fixture/SdkControl.hpp include/ngm/Hash.hpp include/ngm/File.hpp include/ngm/Version.hpp

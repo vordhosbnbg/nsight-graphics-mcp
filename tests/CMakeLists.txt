@@ -35,6 +35,9 @@ ngm_add_check(ngm_experiment_check SOURCES ExperimentCheck.cpp LIBRARIES ngm_exp
 ngm_add_hardware_check(ngm_fixture_integration SOURCES FixtureIntegration.cpp LIBRARIES ngm_experiments
     ARGS "$<TARGET_FILE:ngm-vulkan-fixture>" "${PROJECT_SOURCE_DIR}/artifacts/fixture-validation")
 add_dependencies(ngm_fixture_integration ngm-vulkan-fixture)
+ngm_add_hardware_check(ngm_compute_integration SOURCES ComputeIntegration.cpp LIBRARIES ngm_experiments
+    ARGS "$<TARGET_FILE:ngm-vulkan-fixture>" "${CMAKE_CURRENT_BINARY_DIR}/compute-integration")
+add_dependencies(ngm_compute_integration ngm-vulkan-fixture)
 add_custom_target(ngm_fixture_validation_run
     COMMAND "$<TARGET_FILE:ngm_fixture_integration>" "$<TARGET_FILE:ngm-vulkan-fixture>"
         "${PROJECT_SOURCE_DIR}/artifacts/fixture-validation" --validation
@@ -45,6 +48,12 @@ set(NGM_CAPTURE_ARTIFACT_ROOT "${PROJECT_SOURCE_DIR}/artifacts/nsight-evidence" 
     "Managed evidence store for opt-in capture integration")
 set(NGM_CAPTURE_VALIDATION_ROOT "${PROJECT_SOURCE_DIR}/artifacts/capture-validation" CACHE PATH
     "Isolated reports for opt-in capture integration")
+ngm_add_hardware_check(ngm_compute_capture_integration SOURCES ComputeCaptureIntegration.cpp
+    LIBRARIES ngm_experiments ngm_capture
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>"
+        "${NGM_NSIGHT_ROOT}" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")
+add_dependencies(ngm_compute_capture_integration ngm-vulkan-fixture nsight-graphics-mcp)
+
 ngm_add_hardware_check(ngm_capture_integration SOURCES CaptureIntegration.cpp LIBRARIES ngm_experiments
     ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>"
         "${NGM_NSIGHT_ROOT}" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}")

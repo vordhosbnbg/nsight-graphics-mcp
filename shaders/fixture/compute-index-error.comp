@@ -1,0 +1,10 @@
+#version 450
+layout(local_size_x = 64) in;
+layout(set = 0, binding = 0, std430) readonly buffer Input { uint values[]; } source_data;
+layout(set = 0, binding = 1, std430) writeonly buffer Output { uint values[]; } destination;
+layout(push_constant) uniform Parameters { uint count; } parameters;
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if(index >= parameters.count) return;
+    destination.values[index] = source_data.values[(index + 1u) % parameters.count] * 3u + 7u;
+}

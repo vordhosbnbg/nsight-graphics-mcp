@@ -71,6 +71,13 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-008 completes at **0.3.1** with a source-available no-presentation compute
+workflow on Nsight 2026.3.1.0, independent numerical validation and two actual
+shader repairs. The extension boundary is unsupported on the measured 2026.2
+injection path. Application source/readback stays distinct from Nsight dispatch
+and object inventories. See [docs/COMPUTE.md](docs/COMPUTE.md) for the pinned
+acceptance evidence. Performance and HTTP are subsequent roadmap work.
+
 The repository now implements the **0.3.0 visual first-release group**
 (R-010/R-002/R-006/R-007/R-015/R-014), following the build/basic-fixture group at
 0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
@@ -96,9 +103,9 @@ docs/NSIGHT_VALIDATION.md and docs/INVESTIGATIONS.md. Qualification snapshots an
 referenced evidence are explicitly pinned. General executed event state and
 executed descriptor selection remain unavailable. Fixed-input descriptor hydration
 experiments are not a generic product API. Standalone GPU replay timed out on both
-releases and remains unqualified. Compute correctness, performance analysis and
-Streamable HTTP remain pending roadmap work. Update these instructions as the
-project develops.
+releases and remains unqualified. Compute correctness is qualified within the
+R-008 scope above; performance analysis is next in progress and Streamable HTTP
+remains pending. Update these instructions as the project develops.
 
 Local baseline, inspected on 2026-09-17:
 

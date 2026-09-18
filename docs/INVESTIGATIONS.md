@@ -1074,3 +1074,137 @@ only if a different generated helper changes its resource-access contract.
 - **Revisit:** If support for imported or historical probe captures is accepted,
   define and validate their provenance contract explicitly before allowing typed
   capture queries. This failure establishes no limitation in the reader helpers.
+
+### I-027 — Compute probe used output extensions rejected by the adapter
+
+- **Context:** R-008 investigation on 0.3.0, GCC 16.2.1 Debug, matching Nsight
+  2026.3.1.0/build 38722833. The private C++ `ProbeRunner.cpp` uses the existing
+  Nsight adapter and process supervisor, with a deterministic no-presentation
+  Vulkan compute application. No product interface changed.
+- **Reproduction:** `probe-runner graphics NSIGHT_ROOT compute-index-error.spv
+  NEW_DIRECTORY 120`, using the recorded absolute arguments in
+  `build/compute-investigation/graphics-index-error-2026.3/request.json` and the
+  following `graphics-index-error-2026.3-v2` attempt.
+- **Expected/observed:** The first runner requested `capture.ngfx-bincap`; the
+  adapter requires `.ngfx-capture` and returned `invalid_input` before launching
+  the application. The corrected second run captured successfully with
+  `--delimiter-vk-frame-boundary-ext`, and metadata/functions/objects/logs exported.
+  Its screenshot request used `.image`, which the adapter rejected before launch
+  because that export requires `.png`. Neither refusal establishes an Nsight
+  compute or screenshot limitation.
+- **Correction:** Preserve both exact runner revisions/binaries and reports;
+  use the adapter's validated output suffixes. The third runner uses `.png`.
+  GPU/application cleanup for the actual capture and exports was confirmed.
+- **Evidence/retention:** Working evidence and versioned runner sources/binaries
+  are retained under `build/compute-investigation`; managed pinning is pending
+  publication of this investigation snapshot. These paths alone are not pins.
+- **Revisit:** If the adapter's output contract changes, rerun its CPU checks and
+  the corresponding integration. Inspect a correctly formed export before making
+  a claim about evidence availability for a no-presentation workload.
+
+### I-028 — C++ capture activity does not expose the probe's frame boundary
+
+- **Context:** 0.3.0 R-008 private compute probe, Nsight 2026.3.1.0/build 38722833,
+  RTX 3080 Ti / driver 615.71.09, existing KDE Wayland/Xwayland session. The same
+  probe successfully creates a graphics capture using `VK_EXT_frame_boundary`.
+- **Reproduction:** `probe-runner cpp NSIGHT_ROOT compute-index-error.spv
+  NEW_DIRECTORY 120`; exact arguments and process results are in
+  `build/compute-investigation/cpp-index-error-2026.3/`. This invokes documented
+  `ngfx --activity=Generate C++ Capture --wait-frames=2` through the existing adapter.
+- **Expected/observed:** A generated compute project would permit shader and
+  serialized-resource inspection. Instead the target reports
+  `VK_EXT_frame_boundary extension/feature unavailable`, exits before dispatch,
+  and ngfx fails to connect (exit 1). Cleanup is confirmed; no generated project
+  is accepted. This is a capability observation for this activity/profile, not
+  proof that every C++ capture route or future release lacks compute support.
+- **Boundary:** The documented graphics-capture delimiter option cannot simply
+  be applied to the separate C++ activity. No unsupported option, hidden present,
+  private API or reverse-engineered capture decoder is substituted. For the
+  measured no-presentation graphics path, metadata inventories supply dispatch
+  records and named objects but no shader bytes or per-event resource contents.
+  Source-available application observations/readback must remain separately
+  labeled if used for diagnosis.
+- **Evidence/retention:** Working sources, binary identities, application failure,
+  exact tool help, stdout/stderr and report are under `build/compute-investigation`;
+  managed pinning is pending publication of the investigation snapshot.
+- **Revisit:** A documented non-presentation C++ activity delimiter or a documented
+  shader/resource export for graphics captures, or a new qualified tool release,
+  would justify repeating this probe. This attempt alone does not close R-008.
+
+### I-029 — No-presentation compute capture has no exported screenshot
+
+- **Context:** R-008 private reference probe, product 0.3.0, Nsight
+  2026.3.1.0/build 38722833, RTX 3080 Ti / driver 615.71.09.
+- **Reproduction:** The corrected `probe-runner graphics` invocation in
+  `build/compute-investigation/graphics-reference-2026.3/request.json`, followed
+  by matching `ngfx-replay --metadata-screenshot OUTPUT.png CAPTURE`.
+- **Expected/observed:** Capture and metadata/functions/objects/logs exports
+  succeed. The correctly named screenshot export exits 1, produces no PNG and
+  emits no stdout/stderr diagnostic. Owned-process cleanup is confirmed. This
+  buffer-only workload creates no image or presentation surface; the observation
+  establishes only that this run did not supply a screenshot.
+- **Evidence/retention:** Exact request, tool observations, process reports and
+  logs remain in the working directory above; managed snapshot pinning is pending.
+- **Revisit:** A documented screenshot contract for buffer-only captures, a
+  different qualified release, or an image-producing compute workload. Numerical
+  application readback is a separate evidence origin, not an Nsight screenshot.
+
+### I-030 — Non-END annotations split the measured compute capture interval
+
+- **Context:** R-008 production fixture integration, uncommitted 0.3.0 build,
+  Nsight 2026.3.1.0/build 38722833, RTX 3080 Ti / driver 615.71.09.
+- **Reproduction:** Exact native capture invocation/report is retained in
+  `build/compute-investigation/product-reference-capture-2026.3.json`; delimiter
+  `vk_frame_boundary`, capture ordinal 2, compute-reference, seed 42, 33x35,
+  application last frame 120. Fixture annotates its compute submission with
+  flags 0, then its empty end submission with FRAME_END for the same frame ID.
+- **Expected/observed:** Intended interval includes dispatch, completed numerical
+  readback, and the ending submission. Capture succeeds, with one dispatch, but
+  the target terminates before frame-1 readback; only frame-0 readback is retained.
+  The observed delimiter behavior counts the non-END annotation too. Exported
+  metadata does not contain an authoritative application-frame join, so the
+  retained readback cannot be asserted to represent that captured dispatch.
+- **Correction:** Use one annotation per application frame, solely on the empty
+  ending submission after publishing readback. Verify actual retained frames and
+  dispatch inventories again; do not infer correlation from equal numeric IDs.
+- **Evidence/retention:** Complete pinned bundle
+  `bundle-3241af7d69c2309b17cccc95631d2a3d` in `artifacts/compute-evidence` retains
+  the capture, reports, inventories, setup, shader identities and readback. The
+  source/build identity names the exact implementation before this correction.
+- **Revisit:** A changed documented delimiter contract or tool version warrants
+  retesting multi-submission annotations. This is an interval qualification
+  failure, not a failed capture or a general Vulkan extension limitation.
+
+### I-031 — 2026.2 graphics injection does not expose the compute boundary
+
+- **Context:** Corrected one-END-per-frame compute fixture, uncommitted 0.3.0
+  build, Nsight 2026.2.0.0/build 37991608, RTX 3080 Ti / driver 615.71.09.
+- **Reproduction:** Native `ngm-capture` with the 2026.2 installation override,
+  `--delimiter vk_frame_boundary --capture-frame 2`, compute-reference, seed 42,
+  33x35, application last frame 120. Exact command and producer observations are
+  in the retained attempt report.
+- **Expected/observed:** CLI help advertises the delimiter, but the injected
+  application finds no Vulkan 1.3 compute device with both the boundary extension
+  and feature. It writes an unsupported result; capture exits 255 without an
+  output capture. Cleanup is confirmed. The corresponding corrected 2026.3 run
+  succeeds and retains application frames 0..2. Help support alone does not
+  establish this application's runtime prerequisite on 2026.2.
+- **Evidence/retention:** Failed pinned bundle
+  `bundle-4037f487c6d761910dd4b26028869468` in `artifacts/compute-evidence`;
+  successful corrected 2026.3 bundle
+  `bundle-1a3778da489d8ddd8f09e8099946db65` in the same store. Both preserve
+  executable/shader identities and tool/process observations.
+- **Revisit:** A documented way to expose the extension/feature in 2026.2, a
+  separately validated SDK compute boundary, or a changed tool/GPU/driver profile.
+  This does not invalidate the separately qualified 2026.2 visual workflows or
+  prove every non-presentation compute capture route unavailable.
+
+R-008 retention update (2026-09-18): working probe evidence cited by I-027,
+I-028 and I-029 is now included under `raw/imported/investigation` in complete,
+pinned `bundle-1ed0b5e17d49e24b6333d6ae4b10ffc1`, store
+`artifacts/compute-evidence`. All snapshot payload hashes and its pin after
+restart verify. I-030's exact earlier Compute.cpp is reconstructed and verified
+against the captured build-input hash in `investigation/I030-Compute.cpp`.
+I-031's additional real MCP unsupported result is retained in failed pinned
+`bundle-c9f0d80ba38641d2106f390558a4967c`; its report and transcript are in the
+snapshot. The native attempt pins above remain independent and protected.

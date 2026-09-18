@@ -94,5 +94,6 @@ General unknown applications can expose unsupported source forms or absent
 evidence; the server reports these limits rather than inferring missing state.
 
 All failed integration attempts and revisit conditions remain in
-[INVESTIGATIONS.md](INVESTIGATIONS.md). Compute correctness, performance analysis
-and Streamable HTTP remain accepted later work in [ROADMAP.md](ROADMAP.md).
+[INVESTIGATIONS.md](INVESTIGATIONS.md). The subsequent compute milestone is
+qualified in [COMPUTE.md](COMPUTE.md); performance analysis and Streamable HTTP
+remain unfinished work in [ROADMAP.md](ROADMAP.md).

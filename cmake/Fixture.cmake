@@ -7,7 +7,8 @@ function(ngm_configure_fixture target)
     # compiler continue to come from the pinned source dependencies.
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(NGM_XCB REQUIRED IMPORTED_TARGET xcb>=1.13)
-    target_sources(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src/fixture/Fixture.cpp")
+    target_sources(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src/fixture/Fixture.cpp"
+        "${PROJECT_SOURCE_DIR}/src/fixture/Compute.cpp")
     target_link_libraries(${target} PRIVATE PkgConfig::NGM_XCB nlohmann_json::nlohmann_json)
     target_compile_definitions(${target} PRIVATE VK_USE_PLATFORM_XCB_KHR)
 
@@ -41,7 +42,8 @@ function(ngm_configure_fixture target)
     add_dependencies(${target} ngm_fixture_identity)
 
     set(outputs)
-    foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag)
+    foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag
+            compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp)
         set(source "${PROJECT_SOURCE_DIR}/shaders/fixture/${name}")
         set(spirv "${shader_dir}/${name}.spv")
         ngm_compile_shader("${source}" "${spirv}")

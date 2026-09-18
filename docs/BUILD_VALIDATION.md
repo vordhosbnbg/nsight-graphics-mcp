@@ -1077,3 +1077,27 @@ is retained alongside the three successful query matrices. Independent acceptanc
 passes 1,332 input snapshots, 624 source references and 1,621 output-schema checks.
 R-007 and R-015 remain in progress for complete workflow acceptance; this patch
 completes the bounded resource-query slice, not the whole visual release.
+
+
+## 0.3.1 compute correctness
+
+R-008 passes implementation, fresh-context review/correction and independent
+acceptance. [COMPUTE.md](COMPUTE.md) records the exact source-available scope.
+The GCC 16.2.1 Debug aggregate passes 25/25 CPU checks, no skips, in 248.16 seconds.
+The optional resource workers were rebuilt at 0.3.1. The compute standalone
+matrix passes 12 fresh launches/30 frames with synchronization validation;
+three original MCP captures diagnose two defects, and actual GLSL edits plus
+source-built glslang recompilation produce three fresh captures with exact
+reference equality. Original numerical/MCP runs retain 0.3.0 development
+identities; repaired and explicit 2026.2 unsupported MCP runs use 0.3.1.
+
+The independent evidence audit passes 1,143 assertions over raw arrays,
+source/SPIR-V/producer/build identities and pins. Complete pinned snapshot
+`bundle-1ed0b5e17d49e24b6333d6ae4b10ffc1` in `artifacts/compute-evidence`
+contains 1,128 files. Publication verification recomputes all 1,127 payload hashes
+and verifies its persistent pin after server restart, alongside ten independently
+pinned native/MCP capture attempts. It includes the failed private investigations,
+actual repair/build records, executable baselines and audit script/results.
+Working publication records are `build/compute-qualification/publication.json`
+and `verification.json`. No second-release compute success, generic Nsight
+compute buffer/state inspection or standalone GPU replay success is claimed.

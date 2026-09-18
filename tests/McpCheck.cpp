@@ -624,6 +624,20 @@ void workflow_check(const std::string& server, const std::string& standin, const
                 std::find(sdk_command.begin(), sdk_command.end(), "--delimiter-present") == sdk_command.end(),
             "SDK delimiter reaches the real capture subprocess boundary through MCP");
     require(recorded_pid(record1) != recorded_pid(record2), "each capture launches a fresh process");
+    auto boundary_arguments = capture_arguments(scratch.path / "boundary-target.pid");
+    boundary_arguments["delimiter"] = "vk_frame_boundary";
+    const auto boundary = successful_call(client, "capture", boundary_arguments);
+    require(await_job(client, boundary["identity"]["job_id"])["state"] == "succeeded",
+            "extension boundary capture through MCP");
+    const auto boundary_report =
+        Json::parse(successful_call(client, "artifact_read",
+                                    {{"artifact_id", boundary["artifact_id"]}, {"path", "raw/report.json"}})["text"]
+                        .get<std::string>());
+    const auto boundary_args = boundary_report["capture"]["arguments"].get<std::vector<std::string>>();
+    require(boundary_report["sdk"]["status"] == "application_control_not_requested" &&
+                boundary_report["capture_settings"]["delimiter"] == "vk_frame_boundary" &&
+                std::count(boundary_args.begin(), boundary_args.end(), "--delimiter-vk-frame-boundary-ext") == 1,
+            "MCP preserves extension boundary independently of SDK control");
     const auto cpp_record = scratch.path / "cpp-target.pid";
     auto cpp_arguments = capture_arguments(cpp_record);
     cpp_arguments.erase("capture_frame");

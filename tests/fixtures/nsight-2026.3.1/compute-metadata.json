@@ -1,0 +1,21 @@
+{
+  "metadata_version": 1,
+  "nsight_version": "2026.3.1",
+  "nsight_version_build_id": "38722833",
+  "primary_api": "",
+  "primary_gpu": "",
+  "driver_vendor": "",
+  "driver_version": "",
+  "captured_frame": "2",
+  "graphics_apis": {
+    "Vulkan": [
+      "general"
+    ]
+  },
+  "graphics_features": {
+    "general": [
+      "Vulkan"
+    ]
+  },
+  "has_unsupported_operation": false
+}

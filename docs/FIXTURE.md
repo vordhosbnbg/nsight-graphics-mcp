@@ -1,12 +1,17 @@
 # Deterministic Vulkan experiments
 
-The fixture presents a real window using Vulkan 1.3 and `VK_KHR_xcb_surface`.
+The graphics fixture presents a real window using Vulkan 1.3 and `VK_KHR_xcb_surface`.
 On the development machine this is Xwayland within the existing KDE Wayland
 session. Its normal mode makes no NGFX SDK calls and produces **application
 readback**, distinct from Nsight capture evidence. R-002's optional SDK build and
 per-launch boundary controls pass the basic two-release matrix at 0.2.2; see
 [SDK_CONTROL.md](SDK_CONTROL.md) for the exact qualified workload and evidence.
 Source inspection remains separate work.
+
+R-008 adds three no-presentation compute scenarios and numerical readback; see
+[COMPUTE.md](COMPUTE.md). The shared shader bundle now includes seven graphics
+and three compute shaders. Rebuild earlier seven-shader override bundles before
+using them with the updated fixture. The graphics behavior below is unchanged.
 
 Build the normal GCC Debug preset, then launch an isolated experiment:
 

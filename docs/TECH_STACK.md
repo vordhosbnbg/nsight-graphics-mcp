@@ -1,6 +1,6 @@
 # Technology Stack Evaluation
 
-Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness, performance and HTTP remain pending.**
+Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness completes at 0.3.1 for the measured 2026.3 source-available path (COMPUTE.md); performance is next and HTTP remains pending.**
 Last updated: **2026-09-18**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python

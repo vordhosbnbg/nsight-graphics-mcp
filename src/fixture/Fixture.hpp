@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -17,6 +18,7 @@ struct Options {
     std::filesystem::path output;
     std::filesystem::path shader_directory;
     std::optional<std::uint32_t> sdk_first_boundary_frame;
+    bool compute_frame_boundary = false;
 };
 
 class Unsupported : public std::runtime_error {
@@ -26,4 +28,6 @@ public:
 
 Options parse_arguments(std::span<const char* const> arguments);
 void run(const Options& options);
+// Uses verified retained shader files; observations remain application evidence.
+void run_compute(const Options& options, nlohmann::json& result);
 } // namespace ngm::fixture

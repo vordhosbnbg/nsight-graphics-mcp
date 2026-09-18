@@ -326,12 +326,44 @@ Capture load_capture(ArtifactStore& store, const std::string& id, bool cpp = fal
                 number(operation, "output_bytes") == capture_file->second,
             "Capture file is absent, empty, or disagrees with its reported size");
     capture.metadata = parse_export(store, capture, "metadata", std::string(metadata_path), parse_nsight_metadata);
+    // The qualified no-presentation 2026.3 export leaves primary_api empty.
+    // Accept only its observed explicit Vulkan inventories, with the matching
+    // service delimiter and invocation. Missing/null or contradictory API fields
+    // remain unsupported; do not manufacture a primary_api value for callers.
+    bool frame_boundary_profile = false;
+    if(capture.metadata.primary_api == "" && std::string_view(capture.profile->cli_version) == "2026.3.1.0" &&
+       capture.metadata.graphics_apis == NsightMetadataStringLists{{"Vulkan", {"general"}}} &&
+       capture.metadata.graphics_features == NsightMetadataStringLists{{"general", {"Vulkan"}}} &&
+       capture.metadata.has_unsupported_operation == false) {
+        const auto settings = report.find("capture_settings");
+        if(settings != report.end() && settings->is_object() &&
+           settings->value("delimiter", Json()) == "vk_frame_boundary") {
+            require(*settings == member(manifest, "capture_settings"),
+                    "Frame-boundary capture settings differ from manifest");
+            const auto& arguments = member(operation, "arguments");
+            require(arguments.is_array() && arguments.size() <= 1024 &&
+                        std::all_of(arguments.begin(), arguments.end(),
+                                    [](const Json& argument) {
+                                        return argument.is_string() &&
+                                               !argument.get_ref<const std::string&>().empty() &&
+                                               argument.get_ref<const std::string&>().find('\0') == std::string::npos;
+                                    }),
+                    "Frame-boundary capture invocation must retain string arguments");
+            frame_boundary_profile =
+                std::count(arguments.begin(), arguments.end(), "--delimiter-vk-frame-boundary-ext") == 1 &&
+                std::count(arguments.begin(), arguments.end(), "--delimiter-present") == 0 &&
+                std::count(arguments.begin(), arguments.end(), "--delimiter-graphics-capture-api") == 0;
+        }
+    }
     if(capture.metadata.nsight_version != capture.profile->metadata_version ||
-       capture.metadata.nsight_version_build_id != capture.profile->build || capture.metadata.primary_api != "Vulkan") {
+       capture.metadata.nsight_version_build_id != capture.profile->build ||
+       (capture.metadata.primary_api != "Vulkan" && !frame_boundary_profile)) {
         fail(Error::UnsupportedProducer,
              "Same-bundle metadata must identify the same observed Vulkan version/build profile as capture and "
              "replay; inspect raw/exports/metadata.raw before validating a new producer/profile");
     }
+    capture.producer["api_identification"] =
+        frame_boundary_profile ? "graphics_apis_for_vk_frame_boundary" : "primary_api";
     capture.producer["metadata_nsight_version"] = *capture.metadata.nsight_version;
     capture.producer["metadata_nsight_version_build_id"] = *capture.metadata.nsight_version_build_id;
     return capture;

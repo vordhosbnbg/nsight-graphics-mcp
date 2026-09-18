@@ -320,8 +320,17 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
             capture.working_directory = request.working_directory;
             capture.capture_file = root / "raw/capture.ngfx-capture";
             capture.capture_frame = request.capture_frame;
-            capture.delimiter = request.delimiter == CaptureDelimiter::Present ? NsightDelimiter::Present
-                                                                               : NsightDelimiter::GraphicsCaptureApi;
+            switch(request.delimiter) {
+                case CaptureDelimiter::Present:
+                    capture.delimiter = NsightDelimiter::Present;
+                    break;
+                case CaptureDelimiter::GraphicsCaptureApi:
+                    capture.delimiter = NsightDelimiter::GraphicsCaptureApi;
+                    break;
+                case CaptureDelimiter::VulkanFrameBoundary:
+                    capture.delimiter = NsightDelimiter::VulkanFrameBoundary;
+                    break;
+            }
             completion.cleanup_confirmed = false;
             const auto captured = run_nsight_capture(installation, capture, context.stop);
             completion.cleanup_confirmed = !captured.launched || captured.process.cleanup_confirmed;
@@ -438,8 +447,10 @@ std::string_view capture_delimiter_name(CaptureDelimiter delimiter) {
             return "present";
         case CaptureDelimiter::GraphicsCaptureApi:
             return "graphics_capture_api";
+        case CaptureDelimiter::VulkanFrameBoundary:
+            return "vk_frame_boundary";
     }
-    throw std::invalid_argument("Capture delimiter must be present or graphics_capture_api");
+    throw std::invalid_argument("Capture delimiter must be present, graphics_capture_api or vk_frame_boundary");
 }
 
 CaptureDelimiter parse_capture_delimiter(std::string_view name) {
@@ -449,7 +460,10 @@ CaptureDelimiter parse_capture_delimiter(std::string_view name) {
     if(name == "graphics_capture_api") {
         return CaptureDelimiter::GraphicsCaptureApi;
     }
-    throw std::invalid_argument("Capture delimiter must be present or graphics_capture_api");
+    if(name == "vk_frame_boundary") {
+        return CaptureDelimiter::VulkanFrameBoundary;
+    }
+    throw std::invalid_argument("Capture delimiter must be present, graphics_capture_api or vk_frame_boundary");
 }
 
 CaptureService::CaptureService(CaptureServiceOptions options) :
@@ -512,8 +526,9 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
                       {"delimiter", delimiter},
                       {"timeout_ms", request.timeout.count()}}},
                     {"sdk",
-                     {{"status", request.delimiter == CaptureDelimiter::Present ? "application_control_not_requested"
-                                                                                : "application_control_requested"}}}};
+                     {{"status", request.delimiter == CaptureDelimiter::GraphicsCaptureApi
+                                     ? "application_control_requested"
+                                     : "application_control_not_requested"}}}};
     if(request.format == CaptureFormat::Cpp) {
         provenance["capture_settings"] = {
             {"format", "cpp"}, {"wait_frames", request.cpp_wait_frames}, {"timeout_ms", request.timeout.count()}};

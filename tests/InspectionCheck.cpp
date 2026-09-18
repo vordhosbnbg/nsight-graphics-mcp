@@ -160,6 +160,57 @@ void checks(const fs::path& fixtures, const fs::path& root) {
     ngm::InspectionService inspection(store);
     const Bundle baseline{read(fixtures / "reference-metadata.json"), read(fixtures / "reference-functions.json"),
                           read(fixtures / "reference-objects.json")};
+    Bundle compute{read(fixtures / "compute-metadata.json"), read(fixtures / "compute-functions.json"),
+                   read(fixtures / "compute-objects.json")};
+    compute.report_edit = [](Json& report) {
+        report["capture_settings"] = {{"delimiter", "vk_frame_boundary"}, {"capture_frame", 2}};
+        report["capture"]["arguments"] = {"--delimiter-vk-frame-boundary-ext"};
+    };
+    const auto compute_id = publish(store, compute);
+    const auto compute_meta = inspection.metadata(compute_id);
+    require(compute_meta["metadata"]["primary_api"] == "" &&
+                compute_meta["producer"]["api_identification"] == "graphics_apis_for_vk_frame_boundary",
+            "observed no-presentation API identification preserves the empty primary field");
+    const auto compute_events = inspection.events(compute_id);
+    require(compute_events["total"] == 16 && inspection.objects(compute_id)["total"] == 17,
+            "observed compute inventories are available through the qualified profile");
+    for(unsigned mode = 0; mode < 8; ++mode) {
+        auto bad = compute;
+        auto meta = Json::parse(bad.metadata);
+        if(mode == 0)
+            meta.erase("primary_api");
+        if(mode == 1)
+            meta["primary_api"] = "OpenGL";
+        if(mode == 2)
+            meta["graphics_apis"]["OpenGL"] = {"general"};
+        if(mode == 3)
+            meta.erase("graphics_features");
+        if(mode == 4)
+            meta["has_unsupported_operation"] = true;
+        if(mode == 5)
+            bad.report_edit = [](Json& report) { report["capture_settings"] = {{"delimiter", "present"}}; };
+        if(mode == 6)
+            bad.report_edit = [](Json& report) {
+                report["capture_settings"] = {{"delimiter", "vk_frame_boundary"}};
+                report["capture"]["arguments"] = {"--delimiter-present"};
+            };
+        if(mode == 7)
+            meta["primary_api"] = nullptr;
+        bad.metadata = meta.dump();
+        rejected(mode == 7 ? Error::InvalidExport : Error::UnsupportedProducer,
+                 [&] { inspection.metadata(publish(store, bad)); });
+    }
+    for(const auto& invalid : {Json(nullptr), Json::object(), Json(""), Json(std::string("bad\0arg", 7))}) {
+        auto malformed = compute;
+        malformed.report_edit = [invalid](Json& report) {
+            report["capture_settings"] = {{"delimiter", "vk_frame_boundary"}};
+            report["capture"]["arguments"] = Json::array({"--delimiter-vk-frame-boundary-ext", invalid});
+        };
+        rejected(Error::InvalidReport, [&] { inspection.metadata(publish(store, malformed)); });
+    }
+    auto conflict = compute;
+    conflict.manifest_edit = [](Json& manifest) { manifest["capture_settings"]["delimiter"] = "present"; };
+    rejected(Error::InvalidReport, [&] { inspection.metadata(publish(store, conflict)); });
     const auto id = publish(store, baseline);
     const auto metadata = inspection.metadata(id);
     bounded_result(metadata);

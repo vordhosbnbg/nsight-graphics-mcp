@@ -149,6 +149,22 @@ int main(int argc, char** argv) {
             }
             require(pids.size() == 2, "two capture requests actually launch two distinct target processes");
             require(data_path_observations == 2, "both targets receive system driver data-directory defaults");
+            auto boundary_request = request;
+            boundary_request.delimiter = ngm::CaptureDelimiter::VulkanFrameBoundary;
+            const auto boundary = service.capture(boundary_request);
+            require(completed(service, boundary).state == ngm::JobState::succeeded, "frame-boundary capture succeeds");
+            const auto report =
+                nlohmann::json::parse(service.artifacts().read(boundary.artifact_id, "raw/report.json"));
+            require(report["capture_settings"]["delimiter"] == "vk_frame_boundary" &&
+                        report["sdk"]["status"] == "application_control_not_requested",
+                    "extension boundary is independent of NGFX SDK");
+            const auto args = report["capture"]["arguments"].get<std::vector<std::string>>();
+            require(std::count(args.begin(), args.end(), "--delimiter-vk-frame-boundary-ext") == 1 &&
+                        std::count(args.begin(), args.end(), "--delimiter-present") == 0 &&
+                        std::count(args.begin(), args.end(), "--delimiter-graphics-capture-api") == 0,
+                    "frame-boundary delimiter is the sole delimiter passed to the capture executable");
+            require(ngm::parse_capture_delimiter("vk_frame_boundary") == boundary_request.delimiter,
+                    "native delimiter parser accepts the explicit extension boundary");
         }
         {
             ngm::CaptureService service(options);

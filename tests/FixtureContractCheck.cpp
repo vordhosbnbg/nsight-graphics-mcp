@@ -82,7 +82,8 @@ Case make_case(const fs::path& executable, const fs::path& root, const std::stri
 void copy_bundle(const fs::path& source, const fs::path& destination) {
     fs::copy_file(source / "provenance.json", destination / "provenance.json");
     for(const auto* name :
-        {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag"}) {
+        {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag",
+         "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp"}) {
         fs::copy_file(source / name, destination / name);
         fs::copy_file(source / (std::string(name) + ".spv"), destination / (std::string(name) + ".spv"));
     }
@@ -134,13 +135,33 @@ int main(int argc, char** argv) {
         const auto built_shaders = fs::absolute(argv[2]);
         Scratch scratch(argv[3]);
 
+        for(const auto* scenario : {"compute-reference", "compute-index-error", "compute-arithmetic-error"}) {
+            auto compute = make_case(executable, scratch.path, std::string("compute provenance ") + scenario);
+            copy_bundle(built_shaders, compute.shaders);
+            set_argument(compute, "--scenario", scenario);
+            std::ofstream(compute.shaders / (std::string(scenario) + ".comp.spv")) << "tampered";
+            require_failure(compute, 1, "SHA-256 mismatch");
+        }
+        auto too_many = make_case(executable, scratch.path, "compute element bound");
+        set_argument(too_many, "--scenario", "compute-reference");
+        set_argument(too_many, "--width", "4096");
+        require_failure(too_many, 2, "element count", false);
+        auto bad_boundary = make_case(executable, scratch.path, "graphics extension boundary");
+        bad_boundary.process.arguments.insert(bad_boundary.process.arguments.end(),
+                                              {"--compute-boundary", "vk_frame_boundary"});
+        require_failure(bad_boundary, 2, "compute boundaries require", false);
+        auto mixed_control = make_case(executable, scratch.path, "compute SDK boundary");
+        set_argument(mixed_control, "--scenario", "compute-reference");
+        mixed_control.process.arguments.insert(mixed_control.process.arguments.end(),
+                                               {"--sdk-first-boundary-frame", "0"});
+        require_failure(mixed_control, 2, "SDK control is graphics-only", false);
         auto display = make_case(executable, scratch.path, "missing display");
         copy_bundle(built_shaders, display.shaders);
         require_failure(display, 3, "DISPLAY is unset");
         const auto rejected = Json::parse(ngm::read_regular_file(display.output / "result.json", 1024 * 1024));
         require(rejected.at("application").at("executable_sha256") == ngm::sha256_file(executable),
                 "standalone result identifies the running executable even when display prerequisites fail");
-        require(rejected.at("application").at("build").at("compile_commands").size() == 6,
+        require(rejected.at("application").at("build").at("compile_commands").size() == 7,
                 "application identity contains actual fixture/core compiler commands");
         require(rejected.at("provenance").at("kind") == "shader_bundle",
                 "shader provenance has a distinct identity kind");
@@ -163,7 +184,7 @@ int main(int argc, char** argv) {
                     sdk_report.at("application_context").at("application").at("build").at("nsight_sdk") ==
                         sdk_report.at("sdk_build") &&
                     sdk_report.at("application_context").at("inputs").at("scenario") == "reference" &&
-                    sdk_report.at("application_context").at("shader_bundle").at("shaders").size() == 7,
+                    sdk_report.at("application_context").at("shader_bundle").at("shaders").size() == 10,
                 "SDK report preserves build/workload/shader context before initialization or capture termination");
 
         for(const auto* value : {"-1", "1", "600", "4294967296", "1x"}) {
@@ -202,7 +223,7 @@ int main(int argc, char** argv) {
                         (bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"})
                                   : Json::array()),
                     "only bindless scenarios require the exact descriptor-indexing features");
-            require(record.at("provenance").at("shaders").size() == 7,
+            require(record.at("provenance").at("shaders").size() == 10,
                     "advanced artifacts retained before display check");
             require(record.at("device_support").empty(), "no device support claimed before a display was opened");
         }

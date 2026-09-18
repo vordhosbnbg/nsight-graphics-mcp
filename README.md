@@ -12,6 +12,13 @@ installation walkthrough passes **25 CPU checks** and a fresh shader repair;
 [ROADMAP.md](docs/ROADMAP.md) records the completed group and later work.
 The 0.3.0 GCC Debug aggregate also passes all 25 checks.
 
+Version **0.3.1** adds the qualified source-available compute workflow: deterministic
+no-presentation scenarios, explicit frame boundaries, application numerical
+readback and verified shader repairs. The compute capture path is qualified on
+Nsight 2026.3; the measured 2026.2 path lacks its required extension/feature.
+[COMPUTE.md](docs/COMPUTE.md) records evidence origins, exact limits and validation.
+The 0.3.1 GCC Debug aggregate passes all 25 CPU checks.
+
 Start with [INSTALL.md](docs/INSTALL.md) for the source-build-to-repair walkthrough.
 [VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md) consolidates capability/repair evidence
 and exact limits; [BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) preserves versioned
@@ -21,7 +28,7 @@ The server provides asynchronous captures, managed/pinned evidence, metadata/eve
 object queries, generated-source draw/pipeline/shader relationships, and optional
 confined serialized-resource readers. Those relationships and bytes do not establish
 arbitrary executed GPU state. Standalone GPU replay remains unqualified after
-recorded timeouts. Compute correctness, performance profiling and HTTP are later work.
+recorded timeouts. General uninstrumented compute state inspection remains unqualified; performance profiling and HTTP are later work.
 
 ## Build on Linux
 

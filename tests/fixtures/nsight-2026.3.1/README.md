@@ -92,3 +92,13 @@ event 14 and `vkCmdDraw` at event 15. The 2026.3.1 producer additionally emits
 `indirect_index: 0` on event 15; 2026.2.0 omits that member. Retain its presence
 and unsigned value without inferring parent/child links, arguments, buffer
 contents, or command expansion semantics. Both object arrays contain 34 entries.
+
+Compute files are sanitized from the no-presentation reference probe in
+`build/compute-investigation/graphics-reference-2026.3`, Nsight 2026.3.1.0 /
+build 38722833, captured with VK_EXT_frame_boundary on RTX 3080 Ti / 615.71.09.
+Metadata removes process/environment/host context; inventory fields are unchanged.
+The empty primary_api is retained literally; graphics_apis identifies Vulkan.
+Raw metadata SHA-256: `ebfa8296c9c60cd908893949730bfcbf80d5b0eb248c99f05c01c481b9fd0a01`.
+The original probe evidence is retained in pinned snapshot
+`bundle-1ed0b5e17d49e24b6333d6ae4b10ffc1` in `artifacts/compute-evidence`,
+under `raw/imported/investigation/graphics-reference-2026.3`.

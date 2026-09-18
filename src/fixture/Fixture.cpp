@@ -31,7 +31,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 14> scenarios{"reference",
+constexpr std::array<std::string_view, 17> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -44,9 +44,20 @@ constexpr std::array<std::string_view, 14> scenarios{"reference",
                                                      "combined-reference",
                                                      "combined-pass-error",
                                                      "combined-resource-error",
-                                                     "combined-indirect-error"};
-constexpr std::array<std::string_view, 7> shader_sources{
-    "scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag"};
+                                                     "combined-indirect-error",
+                                                     "compute-reference",
+                                                     "compute-index-error",
+                                                     "compute-arithmetic-error"};
+constexpr std::array<std::string_view, 10> shader_sources{"scene.vert",
+                                                          "scene.frag",
+                                                          "shader-error.frag",
+                                                          "indirect.vert",
+                                                          "bindless.frag",
+                                                          "post.vert",
+                                                          "post.frag",
+                                                          "compute-reference.comp",
+                                                          "compute-index-error.comp",
+                                                          "compute-arithmetic-error.comp"};
 
 struct Workload {
     bool multipass = false;
@@ -236,7 +247,11 @@ Json retain_shaders(const Options& options) {
         const bool recognized = std::find(shader_sources.begin(), shader_sources.end(), source) != shader_sources.end();
         const bool vertex = recognized && std::string_view(source).ends_with(".vert");
         const bool fragment = recognized && std::string_view(source).ends_with(".frag");
-        if((!vertex && !fragment) || spirv != source + ".spv" || stage != (vertex ? "vertex" : "fragment")) {
+        const bool compute = recognized && std::string_view(source).ends_with(".comp");
+        if((!vertex && !fragment && !compute) || spirv != source + ".spv" ||
+           stage != (vertex    ? "vertex"
+                     : compute ? "compute"
+                               : "fragment")) {
             throw std::runtime_error(
                 "unexpected shader filename, stage, or source/SPIR-V pairing in fixture provenance");
         }
@@ -1595,6 +1610,10 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.frame = parse_uint(value, option);
         } else if(option == "--sdk-first-boundary-frame") {
             options.sdk_first_boundary_frame = parse_uint(value, option);
+        } else if(option == "--compute-boundary") {
+            if(value != "none" && value != "vk_frame_boundary")
+                throw std::invalid_argument("compute boundary must be none or vk_frame_boundary");
+            options.compute_frame_boundary = value == "vk_frame_boundary";
         } else if(option == "--output") {
             options.output = value;
         } else if(option == "--shader-dir") {
@@ -1625,6 +1644,11 @@ Options parse_arguments(std::span<const char* const> arguments) {
        (options.frame < 2 || *options.sdk_first_boundary_frame > options.frame - 2)) {
         throw std::invalid_argument("SDK first boundary must leave at least two subsequent application frames");
     }
+    const bool compute = options.scenario.starts_with("compute-");
+    if((seen.contains("--compute-boundary") && !compute) || (compute && options.sdk_first_boundary_frame))
+        throw std::invalid_argument("compute boundaries require a compute scenario; SDK control is graphics-only");
+    if(compute && options.width * options.height > 16384)
+        throw std::invalid_argument("compute element count (width * height) must not exceed 16384");
     options.shader_directory = std::filesystem::absolute(options.shader_directory);
     return options;
 }
@@ -1657,6 +1681,10 @@ void run(const Options& options) {
                                  {"build", Json::parse(build_identity_json)}};
         result["provenance"] = retain_shaders(options);
         result["provenance"]["kind"] = "shader_bundle";
+        if(options.scenario.starts_with("compute-")) {
+            run_compute(options, result);
+            return;
+        }
         sdk.initialize_before_vulkan({{"application", result.at("application")},
                                       {"inputs", result.at("inputs")},
                                       {"workload", result.at("workload")},

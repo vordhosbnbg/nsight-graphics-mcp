@@ -149,14 +149,17 @@ int main(int argc, char** argv) {
             {"shader_compiler", {{"version", "test-only"}, {"sha256", test_digest}, {"arguments", {"test-only"}}}},
             {"shaders", nlohmann::json::array()}};
         std::filesystem::create_directory(directory / "shaders");
-        for(const auto* name : {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag",
-                                "post.vert", "post.frag"}) {
+        for(const auto* name :
+            {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert",
+             "post.frag", "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp"}) {
             const std::string source = name;
             std::ofstream(directory / "shaders" / source) << "test";
             std::ofstream(directory / "shaders" / (source + ".spv")) << "test";
             result["provenance"]["shaders"].push_back({{"source", source},
                                                        {"spirv", source + ".spv"},
-                                                       {"stage", source.ends_with(".vert") ? "vertex" : "fragment"},
+                                                       {"stage", source.ends_with(".vert")   ? "vertex"
+                                                                 : source.ends_with(".comp") ? "compute"
+                                                                                             : "fragment"},
                                                        {"source_sha256", test_digest},
                                                        {"spirv_sha256", test_digest}});
         }
@@ -213,6 +216,94 @@ int main(int argc, char** argv) {
             } else {
                 std::ofstream(directory / "shaders/provenance.json") << manifest.dump();
             }
+        }
+        if(scenario.starts_with("compute-")) {
+            const uint32_t count = width * height;
+            const uint32_t seed = result["inputs"]["seed"];
+            const uint32_t frame = result["inputs"]["frame"];
+            result.erase("image");
+            result["desktop"]["backend"] = "none";
+            result["workload"] = {
+                {"kind", "compute_affine_uint32"}, {"presentation", false},
+                {"element_count", count},          {"boundary", "none"},
+                {"minimum_api_version", "1.3.0"},  {"required_device_extensions", nlohmann::json::array()}};
+            result["compute"] = {
+                {"evidence_origin", "application_observation"},
+                {"boundary_enabled", false},
+                {"entry_point", "main"},
+                {"local_size", {64, 1, 1}},
+                {"group_count", {(count + 63) / 64, 1, 1}},
+                {"push_constant_count", count},
+                {"pipeline_label", "compute.affine.pipeline"},
+                {"shader_label", "compute.affine.shader"},
+                {"dispatch_label", "compute.affine"},
+                {"shader_source", "shaders/" + scenario + ".comp"},
+                {"shader_spirv", "shaders/" + scenario + ".comp.spv"},
+                {"source_sha256", test_digest},
+                {"spirv_sha256", test_digest},
+                {"descriptor_bindings",
+                 nlohmann::json::array(
+                     {{{"set", 0}, {"binding", 0}, {"label", "compute.input"}, {"bytes", count * 4}},
+                      {{"set", 0}, {"binding", 1}, {"label", "compute.output"}, {"bytes", count * 4}}})}};
+            auto row = nlohmann::json{{"schema_version", 1},
+                                      {"evidence_origin", "application_readback"},
+                                      {"phase", "readback_before_frame_end"},
+                                      {"frame", frame},
+                                      {"frame_boundary_id", nullptr},
+                                      {"inputs", result["inputs"]},
+                                      {"compute", result["compute"]},
+                                      {"executable_sha256", result["application"]["executable_sha256"]},
+                                      {"input", nlohmann::json::array()},
+                                      {"output", nlohmann::json::array()}};
+            for(uint32_t i = 0; i < count; ++i) {
+                row["input"].push_back(uint32_t((i * 13u ^ seed) + frame * 7u));
+                row["output"].push_back(0u); // Execution evidence alone makes no correctness claim.
+            }
+            // Corruption occurs in the intermediate frame, while the final
+            // frame remains valid, to exercise validation of the entire run.
+            const auto name = "compute-frame-" + std::to_string(frame) + ".json";
+            for(uint32_t current = 0; current <= frame; ++current) {
+                auto observed = row;
+                observed["frame"] = current;
+                for(uint32_t i = 0; i < count; ++i)
+                    observed["input"][i] = uint32_t((i * 13u ^ seed) + current * 7u);
+                if(current == 0) {
+                    if(seed == 100)
+                        observed["output"].erase(observed["output"].begin());
+                    if(seed == 101)
+                        observed["output"][0] = -1;
+                    if(seed == 102)
+                        observed["output"][0] = 4294967296ULL;
+                    if(seed == 103)
+                        observed["frame"] = current + 1;
+                    if(seed == 104)
+                        observed["executable_sha256"] = test_digest;
+                    if(seed == 105)
+                        observed["input"][0] = 0;
+                    if(seed == 106)
+                        observed["compute"]["group_count"][0] = 1;
+                    if(seed == 107)
+                        observed["compute"]["shader_spirv"] = "../other.spv";
+                    if(seed == 110)
+                        observed["output"][0] = 0.5;
+                    if(seed == 111)
+                        observed["output"].push_back(0u);
+                    if(seed == 112)
+                        observed["evidence_origin"] = "nsight_export";
+                    if(seed == 113)
+                        continue;
+                }
+                const auto path = directory / ("compute-frame-" + std::to_string(current) + ".json");
+                if(current == 0 && seed == 114)
+                    std::ofstream(path) << "{invalid";
+                else
+                    std::ofstream(path) << observed.dump();
+            }
+            result["readback"] = {{"path", name}, {"sha256", ngm::sha256_file(directory / name)}};
+            if(seed == 108)
+                result["readback"]["sha256"] = test_digest;
+            if(seed == 109)
+                result["readback"]["path"] = "../outside.json";
         }
         std::ofstream(directory / "result.json") << result.dump();
         return 0;

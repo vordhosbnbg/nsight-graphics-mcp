@@ -51,7 +51,7 @@ and the equivalent mechanism in
 
 | Tool | Inputs and behavior |
 | --- | --- |
-| `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, or `graphics_capture_api`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. Returns `identity` and `artifact_id`. |
+| `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, `graphics_capture_api`, or `vk_frame_boundary`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. The extension delimiter requires application-enabled VK_EXT_frame_boundary and frame-end submissions; see COMPUTE.md for its measured 2026.3-only compute profile. Returns `identity` and `artifact_id`. |
 | `capture_cpp` | Required absolute `executable` and `working_directory`; optional `arguments`, `wait_frames` (default 2, range 2–1000000), `timeout_ms`, `pin`, and `application_output_option` with the same bounds as `capture`. Generates a C++ project in a fresh target. Read `derived/cpp-project.json` and its source paths through artifact tools. Does not accept `capture_frame` or `delimiter`; see CPP_CAPTURE.md. |
 | `capture_cpp_source` | Required `capture_id` and indexed `source_path`; optional `start_line` (default 1, range 1–4194304), `max_lines` (default 100, range 1–200). Returns numbered generated replay source lines, content hash and `next_line`; source cap 4 MiB, page cap 256 KiB. |
 | `capture_cpp_draws` | Required `capture_id`; optional `offset` (0–100000), `limit` (default 50, range 1–100), and `section` (`draws`, default; `unsupported_recordings`; `unsupported_objects`). Returns literal draw/pipeline/shader references and separate coverage totals for qualified generated source. Page selected sections with `next_offset`; no executed GPU-state or resource-byte claim. |
@@ -115,13 +115,15 @@ does not establish full event state, descriptor contents, shader inspection, or
 resource extraction. `application_output_option` appends that option and a fresh
 bundle-local output directory to the application argv. This optional convention
 labels its files as application-provided evidence, separate from Nsight exports.
+The `vk_frame_boundary` delimiter is independent of NGFX SDK control. The fixture's no-presentation compute path and its exact observed metadata profile are described in [COMPUTE.md](COMPUTE.md). The extension/feature must actually be exposed to the target; an advertised CLI flag alone does not establish that prerequisite.
+
 The service defaults to the documented present delimiter and one frame. Its
 optional `graphics_capture_api` delimiter selects the documented SDK boundary
 path described in [SDK_CONTROL.md](SDK_CONTROL.md), qualified for its recorded
 basic fixture workloads on the two matching tool/SDK pairs. Capture frame ordinals refer to the selected delimiters, not
 application frame indices. A timeout alone does not identify a missing delimiter
-as its cause; inspect the retained process logs and report. Compute without
-presentation is outside the current qualification.
+as its cause; inspect the retained process logs and report. Compute without presentation is qualified
+only for the source-available 2026.3 path documented in COMPUTE.md.
 
 Poll until the state is terminal **and** `worker_running` and
 `finalization_pending` are both false before reading finalized evidence. Check

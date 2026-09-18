@@ -1,5 +1,13 @@
 # Capture inspection evidence
 
+The 0.3.1 compute extension accepts one additional observed graphics metadata
+shape on Nsight 2026.3.1.0/build 38722833: an empty `primary_api` with explicit
+Vulkan API/feature inventories, no unsupported operation, and matching retained
+`vk_frame_boundary` settings and invocation. Missing/null API fields and
+contradictory provenance remain rejected. Returned metadata is not normalized.
+See [COMPUTE.md](COMPUTE.md) for real capture evidence, application-readback
+boundaries and the unsupported 2026.2 path.
+
 This R-006 slice parses metadata, event inventories, and object
 inventories from actual Nsight Graphics exports and exposes bounded queries over
 retained server capture bundles. At product **0.2.1**, capture and typed queries

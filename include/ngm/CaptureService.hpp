@@ -12,7 +12,7 @@
 
 namespace ngm {
 enum class CaptureFormat { Graphics, Cpp };
-enum class CaptureDelimiter { Present, GraphicsCaptureApi };
+enum class CaptureDelimiter { Present, GraphicsCaptureApi, VulkanFrameBoundary };
 std::string_view capture_delimiter_name(CaptureDelimiter delimiter);
 CaptureDelimiter parse_capture_delimiter(std::string_view name);
 

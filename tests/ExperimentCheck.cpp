@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
             options.scenario = scenario;
             const auto result = ngm::run_experiment(options);
             require(result.report.at("status") == "pass", "valid advanced input and feature metadata accepted");
-            require(result.report.at("result").at("provenance").at("shaders").size() == 7,
+            require(result.report.at("result").at("provenance").at("shaders").size() == 10,
                     "complete advanced shader bundle retained");
         }
         for(const auto* scenario : {"malformed-result",
@@ -76,6 +76,22 @@ int main(int argc, char** argv) {
             require(nlohmann::json::parse(saved) == result.report, "failure retained on disk");
             require(!std::filesystem::exists(result.directory / "report.json.tmp"),
                     "report published with no temporary left");
+        }
+        for(const auto* scenario : {"compute-reference", "compute-index-error", "compute-arithmetic-error"}) {
+            options.scenario = scenario;
+            options.seed = 42;
+            const auto result = ngm::run_experiment(options);
+            require(result.report.at("status") == "pass" && !result.report.contains("image") &&
+                        result.report.at("readback").at("correctness") == "not_evaluated",
+                    "bounded compute execution evidence is accepted without claiming numerical correctness: " +
+                        result.report.dump());
+        }
+        options.scenario = "compute-reference";
+        for(uint32_t seed = 100; seed <= 114; ++seed) {
+            options.seed = seed;
+            const auto result = ngm::run_experiment(options);
+            require(result.report.at("status") == "fail",
+                    "corrupt compute evidence rejected for mode " + std::to_string(seed));
         }
         options.scenario = "hang";
         options.timeout = std::chrono::milliseconds(50);

@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
             << "Usage: ngm-capture --artifact-root DIR --executable PATH --working-directory DIR\n"
                "  [--nsight-root DIR] [--argument TEXT ...] [--capture-frame N] [--timeout-ms N]\n"
                "  [--application-output-option NAME] [--provenance-json PATH] [--pin]\n"
-               "  [--delimiter present|graphics_capture_api]\n"
+               "  [--delimiter present|graphics_capture_api|vk_frame_boundary]\n"
                "  [--format graphics|cpp] [--wait-frames N (cpp only)]\n"
                "Launch a fresh application with documented Nsight CLI, export evidence, and retain a managed bundle.\n"
                "Arguments are subject to the documented adapter's safe-token limit. --pin protects retained "

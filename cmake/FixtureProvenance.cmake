@@ -58,9 +58,12 @@ string(JSON shader_compiler SET "${shader_compiler}" sha256 "\"${compiler_hash}\
 string(JSON manifest SET "${manifest}" shader_compiler "${shader_compiler}")
 set(shaders "[]")
 set(index 0)
-foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag)
+foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag
+            compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp)
     if(name MATCHES "\\.vert$")
         set(stage vertex)
+    elseif(name MATCHES "\\.comp$")
+        set(stage compute)
     else()
         set(stage fragment)
     endif()
