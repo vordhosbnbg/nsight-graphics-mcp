@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <map>
@@ -217,7 +218,8 @@ void validate_workload(const Json& result) {
 }
 
 void validate_metadata(const Json& result, const fs::path& directory) {
-    const bool compute = result.at("inputs").at("scenario").get<std::string>().starts_with("compute-");
+    const auto scenario = result.at("inputs").at("scenario").get<std::string>();
+    const bool compute = scenario.starts_with("compute-") || scenario.starts_with("performance-");
     if(!compute)
         validate_workload(result);
     const auto& gpu = result.at("gpu");
@@ -275,7 +277,7 @@ void validate_metadata(const Json& result, const fs::path& directory) {
     for(const auto& argument : compiler.at("arguments")) {
         require(argument.is_string(), "provenance.shader_compiler.arguments");
     }
-    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 10, "provenance.shaders");
+    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 12, "provenance.shaders");
     std::map<std::string, std::string> expected{{"scene.vert", "vertex"},
                                                 {"scene.frag", "fragment"},
                                                 {"shader-error.frag", "fragment"},
@@ -285,13 +287,19 @@ void validate_metadata(const Json& result, const fs::path& directory) {
                                                 {"post.frag", "fragment"},
                                                 {"compute-reference.comp", "compute"},
                                                 {"compute-index-error.comp", "compute"},
-                                                {"compute-arithmetic-error.comp", "compute"}};
+                                                {"compute-arithmetic-error.comp", "compute"},
+                                                {"performance-reference.comp", "compute"},
+                                                {"performance-underfilled.comp", "compute"}};
     for(const auto& shader : provenance.at("shaders")) {
         const auto source = shader.at("source").get<std::string>();
         require(expected.contains(source) && shader.at("stage") == expected.at(source) &&
                     shader.at("spirv") == source + ".spv",
                 "provenance.shaders.filename/stage");
         expected.erase(source);
+        if(source.starts_with("performance-"))
+            require(shader.at("compilation_profile") == "performance" &&
+                        shader.at("compiler_arguments") == Json({"-V", "--target-env", "vulkan1.3", "-g0"}),
+                    "performance.shader_compilation");
         for(const auto* kind : {"source", "spirv"}) {
             const auto& hash = shader.at(std::string(kind) + "_sha256");
             require(digest(hash), "provenance.shaders.sha256");
@@ -307,26 +315,31 @@ Json validate_compute_readback(const Json& result, const fs::path& directory) {
     const auto count = inputs.at("width").get<uint32_t>() * inputs.at("height").get<uint32_t>();
     require(count >= 1024 && count <= 16384, "compute.element_count");
     const auto scenario = inputs.at("scenario").get<std::string>();
-    require(scenario == "compute-reference" || scenario == "compute-index-error" ||
+    const bool performance = scenario == "performance-reference" || scenario == "performance-underfilled";
+    require(performance || scenario == "compute-reference" || scenario == "compute-index-error" ||
                 scenario == "compute-arithmetic-error",
             "compute.scenario");
     const auto frame = inputs.at("frame").get<uint32_t>();
     const auto name = "compute-frame-" + std::to_string(frame) + ".json";
     require(result.at("readback").at("path") == name, "readback.path");
     const auto& work = result.at("workload");
-    require(work.at("kind") == "compute_affine_uint32" && work.at("presentation") == false &&
-                work.at("element_count") == count && work.at("boundary") == "none" &&
-                work.at("minimum_api_version") == "1.3.0" && work.at("required_device_extensions") == Json::array(),
+    require(work.at("kind") == (performance ? "compute_xorshift_uint32" : "compute_affine_uint32") &&
+                work.at("presentation") == false && work.at("element_count") == count &&
+                work.at("boundary") == "none" && work.at("minimum_api_version") == "1.3.0" &&
+                work.at("required_device_extensions") == Json::array(),
             "compute.workload");
     const auto& compute = result.at("compute");
+    const auto local_size = performance ? compute.at("local_size").at(0).get<uint32_t>() : 64u;
+    require(local_size == 1 || local_size == 64, "compute.local_size");
     require(compute.at("evidence_origin") == "application_observation" && compute.at("boundary_enabled") == false &&
-                compute.at("entry_point") == "main" && compute.at("local_size") == Json({64, 1, 1}) &&
-                compute.at("group_count") == Json({(count + 63) / 64, 1, 1}) &&
+                compute.at("entry_point") == "main" && compute.at("local_size") == Json({local_size, 1, 1}) &&
+                compute.at("group_count") == Json({(count + local_size - 1) / local_size, 1, 1}) &&
                 compute.at("push_constant_count") == count,
             "compute.dispatch");
-    require(compute.at("pipeline_label") == "compute.affine.pipeline" &&
-                compute.at("shader_label") == "compute.affine.shader" &&
-                compute.at("dispatch_label") == "compute.affine",
+    require(compute.at("pipeline_label") ==
+                    (performance ? "performance.xorshift.pipeline" : "compute.affine.pipeline") &&
+                compute.at("shader_label") == (performance ? "performance.xorshift.shader" : "compute.affine.shader") &&
+                compute.at("dispatch_label") == (performance ? "performance.xorshift" : "compute.affine"),
             "compute.labels");
     require(compute.at("descriptor_bindings") ==
                 Json::array({{{"set", 0}, {"binding", 0}, {"label", "compute.input"}, {"bytes", count * 4}},
@@ -337,6 +350,26 @@ Json validate_compute_readback(const Json& result, const fs::path& directory) {
         require(compute.at(std::string("shader_") + kind) == path &&
                     compute.at(std::string(kind) + "_sha256") == sha256_file(directory / path),
                 "compute.shader_identity");
+    }
+    uint32_t warmup = 0, bits = 0;
+    double period = 0;
+    if(performance) {
+        const auto& timing = result.at("performance");
+        require(inputs.at("warmup").is_number_unsigned() && inputs.at("warmup") <= 100 &&
+                    inputs.at("warmup") <= frame && timing.at("warmup_submits") == inputs.at("warmup"),
+                "performance.warmup");
+        warmup = inputs.at("warmup").get<uint32_t>();
+        require(timing.at("timestamp_valid_bits").is_number_unsigned() && timing.at("timestamp_valid_bits") >= 36 &&
+                    timing.at("timestamp_valid_bits") <= 64 && timing.at("timestamp_period_ns").is_number(),
+                "performance.timestamp_properties");
+        bits = timing.at("timestamp_valid_bits").get<uint32_t>();
+        period = timing.at("timestamp_period_ns").get<double>();
+        require(std::isfinite(period) && period > 0 && timing.at("evidence_origin") == "application_timestamps" &&
+                    timing.at("iterations") == 2048 && timing.at("measured_submits") == frame + 1 - warmup &&
+                    timing.at("unit") == "ns" && timing.at("input_policy") == "identical input on every submit" &&
+                    timing.at("clock_control") == "not_requested" && timing.at("replay") == "none" &&
+                    timing.at("measurements").is_array() && timing.at("measurements").size() == frame + 1 - warmup,
+                "performance.policy");
     }
     Json frames = Json::array();
     std::string hash;
@@ -364,7 +397,30 @@ Json validate_compute_readback(const Json& result, const fs::path& directory) {
         // the expected defect or correct output in application-observation evidence.
         const auto seed = inputs.at("seed").get<uint32_t>();
         for(uint32_t i = 0; i < count; ++i)
-            require(row.at("input")[i] == uint32_t((i * 13u ^ seed) + current * 7u), "readback.input_pattern");
+            require(row.at("input")[i] == uint32_t((i * 13u ^ seed) + (performance ? 0u : current * 7u)),
+                    "readback.input_pattern");
+        if(performance) {
+            const auto& timing = row.at("timing");
+            for(const auto* key : {"timestamp_start", "timestamp_end", "elapsed_ticks", "host_submission_ns"})
+                require(timing.at(key).is_number_unsigned(), "performance.timestamp_value");
+            require(static_cast<long double>(timing.at("host_submission_ns").get<uint64_t>()) <
+                        std::ldexp(static_cast<long double>(period), bits),
+                    "performance.timestamp_wrap_bound");
+            const uint64_t mask = bits == 64 ? UINT64_MAX : (uint64_t{1} << bits) - 1;
+            require(timing.at("timestamp_start").get<uint64_t>() <= mask &&
+                        timing.at("timestamp_end").get<uint64_t>() <= mask,
+                    "performance.timestamp_valid_bits");
+            const auto elapsed =
+                (timing.at("timestamp_end").get<uint64_t>() - timing.at("timestamp_start").get<uint64_t>()) & mask;
+            const auto expected = static_cast<double>(elapsed) * period;
+            require(elapsed > 0 && timing.at("elapsed_ticks") == elapsed && timing.at("gpu_ns").is_number() &&
+                        std::isfinite(expected) && timing.at("gpu_ns").get<double>() == expected &&
+                        timing.at("frame") == current && timing.at("warmup") == (current < warmup),
+                    "performance.timestamp_conversion");
+            if(current >= warmup)
+                require(result.at("performance").at("measurements").at(current - warmup) == timing,
+                        "performance.measured_frame_identity");
+        }
         frames.push_back({{"path", "output/" + frame_name}, {"sha256", hash}, {"frame", current}});
     }
     return {{"path", "output/" + name}, {"sha256", hash},   {"element_count", count},
@@ -380,6 +436,12 @@ ExperimentResult run_experiment(const ExperimentOptions& options, std::stop_toke
         throw std::invalid_argument("Experiment requires fixture, output root, scenario, dimensions 32..4096, "
                                     "frame 0..600 and timeout 1..600000 ms");
     }
+    const bool performance = options.scenario.starts_with("performance-");
+    if(performance != options.warmup.has_value() ||
+       (options.warmup && (*options.warmup > 100 || *options.warmup > options.frame)) ||
+       (performance && options.width * options.height > 16384))
+        throw std::invalid_argument(
+            "Performance experiments require warmup 0..100, at least one measured frame and <=16384 elements");
     const auto fixture = fs::canonical(options.fixture);
     const auto root = fs::absolute(options.output_root);
     ExperimentResult result{allocate(root), Json::object()};
@@ -401,6 +463,8 @@ ExperimentResult run_experiment(const ExperimentOptions& options, std::stop_toke
           {"width", options.width},
           {"height", options.height},
           {"frame", options.frame}}}};
+    if(options.warmup)
+        report["inputs"]["warmup"] = *options.warmup;
     try {
         fs::create_directories(result.directory / "logs");
         fs::create_directories(result.directory / "config");
@@ -427,6 +491,8 @@ ExperimentResult run_experiment(const ExperimentOptions& options, std::stop_toke
                              "--height",   std::to_string(options.height),
                              "--frame",    std::to_string(options.frame),
                              "--output",   (result.directory / "output").string()};
+        if(options.warmup)
+            process.arguments.insert(process.arguments.end(), {"--warmup", std::to_string(*options.warmup)});
         if(!options.shader_directory.empty()) {
             process.arguments.insert(process.arguments.end(),
                                      {"--shader-dir", fs::canonical(options.shader_directory).string()});
@@ -467,7 +533,7 @@ ExperimentResult run_experiment(const ExperimentOptions& options, std::stop_toke
             }
             validate_metadata(exported, result.directory / "output");
             report["result"] = exported;
-            if(options.scenario.starts_with("compute-")) {
+            if(options.scenario.starts_with("compute-") || performance) {
                 report["readback"] = validate_compute_readback(exported, result.directory / "output");
             } else {
                 const auto image_path = result.directory / "output/image.ppm";

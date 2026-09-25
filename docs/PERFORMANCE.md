@@ -3,8 +3,9 @@
 R-009 remains **In Progress**. The 0.3.4 service slice adds asynchronous GPU Trace
 submission and bounded retained metric queries, bringing the shared stdio/HTTP
 surface to 25 tools. The 0.3.3 pure export parsers underpin these queries.
-Product performance workload integration, repeated comparison and source-repair
-acceptance remain unfinished.
+Version 0.3.5 integrates performance scenarios and repeated application-timestamp
+validation into the fixture/experiment runner. Repeated Nsight comparisons and
+source-repair acceptance remain unfinished.
 
 ## Profiling service
 
@@ -238,3 +239,96 @@ snapshot, CPU logs and independent reviews. Publication/restart receipts are in
 `build/profile-service-publication`; the snapshot's documents predate this
 publication reference. Imported snapshot contents remain archival evidence;
 profile tools use the original service-produced bundles listed above.
+
+## Integrated performance fixture — 0.3.5
+
+The ordinary `ngm-vulkan-fixture` now includes `performance-underfilled` and
+`performance-reference`. They use 1- and 64-invocation workgroups for the same
+2,048-iteration uint32 transform. The fixture derives dispatch size from the
+retained SPIR-V literal LocalSize so a shader repair can keep the same scenario.
+Width × height is bounded at 16,384. Explicit `--warmup` selects excluded submits;
+the existing zero-based `--frame` selects the last submit. Every frame retains
+input/output arrays, including warmup. The seed-derived input is identical across
+frames, unlike the correctness fixture's frame-varying affine inputs.
+
+The twelve-shader bundle records per-shader compilation profile and arguments.
+Only the two performance shaders use `-g0` without `-Od`; the diagnostic shaders
+retain `-g -Od`. Source, bytecode, compiler and executable identities are retained
+independently. Older override bundles must be rebuilt to supply the complete
+inventory and per-shader compilation metadata. See [FIXTURE.md](FIXTURE.md).
+
+Application timestamps retain their own evidence origin, raw counters, valid
+bits, nanosecond period, elapsed ticks and converted nanoseconds. The fixture and
+runner reject invalid counter bits and ambiguous wrap intervals. The measured
+GPU interval brackets dispatch and can include scheduling/pipeline overhead;
+it excludes host readback. Every dispatch is followed by a fence wait, JSON
+readback serialization and hashing, so this is an isolated-dispatch workload,
+not continuous throughput. No GPU clock or profiling permission changes occur.
+
+The opt-in C++ hardware runner is separate from CPU CTest:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_performance_integration_run
+```
+
+It first runs both variants with synchronization validation at 33×35 elements,
+seed UINT32_MAX, one warmup and two measured submits. It then disables validation
+for four fresh launches per variant in alternating order, at 128×128, seed 42,
+30 warmup and 40 measured submits. A wide-integer CPU oracle independently checks
+every output element of every frame with zero tolerance. Build/GPU and per-variant
+shader identities must remain stable across the launch group. The report records
+per-launch duration statistics, first/second-half medians, across-launch ranges
+and paired median ratios. `status: pass` means successful numerical/timing
+validation; `comparison_status` separately reports observed range separation or
+an inconclusive comparison. Neither outcome substitutes for actual source repair
+or Nsight profiling acceptance, which remain subsequent R-009 work.
+
+The final 0.3.5 batch is
+`build/linux-gcc-debug/tests/performance-integration/run-97579-35035408232136`.
+It passes ten fresh launches and **566 frames**, with all elements matching the
+independent oracle exactly. The 320 measurement samples (eight launches × 40)
+exclude warmup; the two validation launches contribute four additional timed
+samples. Hardware is RTX 3080 Ti / driver 615.71.09, Vulkan 1.4.351, 64-bit
+timestamps, GCC 16.2.1 Debug host code and source-built glslang 16.4.0 performance
+shaders. The existing KDE Wayland/Xwayland desktop remains active. No repository
+CPU checks ran concurrently with this final batch.
+
+| Final application-timestamp evidence | One-thread workgroups | 64-thread workgroups |
+| --- | --- | --- |
+| Median dispatch duration, range across four launches | 638.256–638.816 µs | 50.576–50.832 µs |
+| Full observed range across 160 measured submits | 636.800–3321.376 µs | 50.016–230.976 µs |
+| Per-launch mean duration range | 638.278–1230.104 µs | 50.691–88.194 µs |
+
+Paired launch-median ratios are **12.561–12.620**. This is a measured difference
+between known variants on this machine, not a fixed speedup guarantee. Variability
+is material: two one-thread launches have second-half medians near 1681 µs versus
+first-half medians near 638 µs, and some 64-thread submits reach 231 µs. The data
+do not establish stationary clock/load conditions. The active desktop, uncontrolled
+clocks and readback cadence remain interpretation limits; no particular cause for
+the spikes is established. Full samples and first/second-half summaries are kept.
+
+At this slice, GCC Debug passes **29/29 CPU checks** (284.71 seconds). The final
+36–64-bit/upper-bit validation correction then passes the focused
+`ngm_performance_evidence_check` (15.29 seconds) and the final real batch above.
+The aggregate predates that narrow correction and was not repeated afterward.
+The initial GPU batch ran partly alongside CPU checks and is superseded by the
+final batch; its numbers are not the qualification table above. These application
+measurements remain distinct from the earlier Nsight service probes.
+
+Fresh-context acceptance independently verifies all **566 frames / 9,181,970
+output elements**, input generation, timestamp conversions, warmup exclusion,
+compiler/shader/executable identities, synchronization-validation records and
+reported statistics. Its 7,774 assertions and 1,018 hash checks pass with no
+fixture-slice blocker. The review explicitly preserves the variability above.
+The verifier and results are in `build/performance-fixture-review/acceptance`.
+A separate actual `ngm-experiment` CLI smoke run with `--warmup 0 --frame 0`
+also passes its execution/evidence contract; it is outside the ten-run table.
+
+The final fixture snapshot is complete and explicitly pinned as
+**`bundle-a5fbe932759bd51e5785cbc361b26b3a`** in
+`artifacts/performance-evidence`. All **990 payload hashes** verify, and a fresh
+server confirms the persisted pin. It retains all ten final launches, the
+zero-warmup CLI smoke run, source/binaries, CPU/build logs and independent reviews.
+Receipts are in `build/performance-fixture-publication`; the snapshot's documents
+predate their own publication reference. The superseded initial GPU batch is not
+part of this qualification snapshot.

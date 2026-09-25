@@ -7,7 +7,13 @@ get_filename_component(directory "${OUTPUT}" DIRECTORY)
 file(MAKE_DIRECTORY "${directory}")
 # A failed compile must not leave an older successful output available.
 file(REMOVE "${OUTPUT}" "${OUTPUT}.tmp")
-execute_process(COMMAND "${COMPILER}" -V --target-env vulkan1.3 -g -Od
+set(flags -V --target-env vulkan1.3 -g -Od)
+if(DEFINED PROFILE AND PROFILE STREQUAL "performance")
+    set(flags -V --target-env vulkan1.3 -g0)
+elseif(DEFINED PROFILE AND NOT PROFILE STREQUAL "diagnostic")
+    message(FATAL_ERROR "Unknown shader profile: ${PROFILE}")
+endif()
+execute_process(COMMAND "${COMPILER}" ${flags}
         -o "${OUTPUT}.tmp" "${SOURCE}"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 60)
 if(NOT result STREQUAL "0" OR NOT EXISTS "${OUTPUT}.tmp")

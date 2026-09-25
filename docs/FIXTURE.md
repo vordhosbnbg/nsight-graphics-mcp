@@ -10,8 +10,9 @@ Source inspection remains separate work.
 
 R-008 adds three no-presentation compute scenarios and numerical readback; see
 [COMPUTE.md](COMPUTE.md). The shared shader bundle now includes seven graphics
-and three compute shaders. Rebuild earlier seven-shader override bundles before
-using them with the updated fixture. The graphics behavior below is unchanged.
+three correctness compute shaders, and (at 0.3.5) two performance compute shaders.
+Override bundles must contain all twelve shader pairs and their per-shader
+compilation profile/arguments; rebuild older bundles before use. The graphics behavior below is unchanged.
 
 Build the normal GCC Debug preset, then launch an isolated experiment:
 
@@ -28,13 +29,50 @@ presents frames zero through the selected frame. Dimensions are 32..4096; frames
 are 0..600; the seed is an unsigned 32-bit integer. Basic scenarios are `reference`,
 `shader-error`, `binding-error`, and `pipeline-error`. Advanced selections are listed
 below. The runner defaults to a 30-second process deadline; `--timeout-ms` accepts 1..600000. An optional
-`--shader-dir` selects a complete, hash-verified diagnostic shader bundle.
+`--shader-dir` selects a complete, hash-verified shader bundle with separate diagnostic/performance compilation profiles.
 
 The standalone fixture accepts the same workload options, with `--output` naming
 a new directory instead of the runner's `--output-root`. It can run independently
 of both the MCP server and experiment runner. Missing display/device prerequisites
 fail explicitly. Requested API features and readback-capable UNORM swapchain
 formats are checked; the fixture does not silently render a different workload.
+
+## Performance compute workloads
+
+At 0.3.5, `performance-underfilled` and `performance-reference` execute the same
+uint32 xorshift/add transform for 2,048 iterations per element. Their shader
+workgroups contain one and 64 invocations respectively; dispatch size is derived
+from the retained SPIR-V's literal LocalSize, so an actual local-size source repair
+does not require changing the selected scenario. Other workgroup sizes or
+unqualified SPIR-V execution-mode forms are explicitly unsupported.
+
+Both scenarios have no presentation or frame-boundary extension. Width × height
+must be at most 16,384. They require explicit `--warmup 0..100` and `--frame` at
+least as large as warmup; frames 0 through the selected frame execute, leaving
+`frame + 1 - warmup` measured submits. The same seed-derived input is restored
+before every dispatch. Every frame, including warmup, retains numerical readback.
+The source-built glslang uses `-V --target-env vulkan1.3 -g0` for these two shaders;
+the other ten retain diagnostic `-g -Od`. Each manifest entry records its exact
+profile/arguments. Global compiler arguments are explicitly scoped as diagnostic
+defaults; per-shader arguments are authoritative.
+
+Vulkan timestamps bracket dispatch at TOP_OF_PIPE/BOTTOM_OF_PIPE. Results retain
+raw counters, valid bits, period in nanoseconds, elapsed ticks and nanoseconds.
+The host submission/wait interval bounds possible counter wraparound; an ambiguous
+interval is rejected. Queue timestamp support with 36–64 valid bits is required,
+and values outside that bit range are rejected, following
+[Khronos queue-family properties](https://docs.vulkan.org/refpages/latest/refpages/source/VkQueueFamilyProperties.html).
+The timing scope follows [vkCmdWriteTimestamp](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdWriteTimestamp.html). The runner validates
+all frame identities/conversions and excludes warmup from the measured array.
+Execution success does not itself establish numerical correctness or speedup.
+
+Each dispatch is fence-waited, read back, serialized to JSON and hashed before the
+next. Timings exclude those host operations, but the resulting submission cadence
+can affect clock behavior. This measures isolated dispatches, not continuous GPU
+throughput. No clocks, profiling permissions or other machine settings are changed.
+The separate C++ performance integration harness uses independent numerical
+oracles and alternating fresh launches; [PERFORMANCE.md](PERFORMANCE.md) records
+its measured scope and remaining R-009 acceptance work.
 
 ## Advanced workloads
 
@@ -92,12 +130,15 @@ Each runner invocation creates a unique `run-*` directory containing:
   snapshot that is both hashed and executed. A concurrent rebuild of the original
   executable cannot change the binary selected by an allocated run.
 - `logs/stdout.log` and `logs/stderr.log`, separated from the runner's output.
-- `output/image.ppm`, the selected pre-presentation RGB8 readback, and `result.json`.
+- `output/result.json`; graphics also retains `image.ppm` for the selected
+  pre-presentation RGB8 readback. Compute/performance runs retain one
+  `compute-frame-N.json` numerical readback per frame.
 - `output/shaders/`, with retained GLSL source, SPIR-V, and shader-bundle provenance.
   The complete inventory is `scene.vert`, `scene.frag`, `shader-error.frag`,
-  `indirect.vert`, `bindless.frag`, `post.vert`, and `post.frag`, each with its SPIR-V.
-  Overrides must include and hash all seven sources/binaries, even for a basic run;
-  an older three-shader bundle is explicitly rejected.
+  `indirect.vert`, `bindless.frag`, `post.vert`, `post.frag`,
+  `compute-reference.comp`, `compute-index-error.comp`, `compute-arithmetic-error.comp`,
+  `performance-reference.comp`, and `performance-underfilled.comp`, each with its
+  SPIR-V. Overrides must include and hash all twelve source/binary pairs.
 - `report.json`, with explicit outcome, inputs, environment, executable/shader
   identities, GPU/driver/UUID, desktop backend, timing, and owned-process cleanup.
 

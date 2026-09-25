@@ -32,9 +32,15 @@ ngm_first_party(ngm_experiment_standin)
 ngm_add_check(ngm_experiment_check SOURCES ExperimentCheck.cpp LIBRARIES ngm_experiments
     ARGS "$<TARGET_FILE:ngm_experiment_standin>" "${CMAKE_CURRENT_BINARY_DIR}/experiment-check"
     DEPENDS ngm_experiment_standin)
+ngm_add_check(ngm_performance_evidence_check SOURCES PerformanceEvidenceCheck.cpp LIBRARIES ngm_experiments
+    ARGS "$<TARGET_FILE:ngm_experiment_standin>" "${CMAKE_CURRENT_BINARY_DIR}/performance-evidence-check"
+    DEPENDS ngm_experiment_standin)
 ngm_add_hardware_check(ngm_fixture_integration SOURCES FixtureIntegration.cpp LIBRARIES ngm_experiments
     ARGS "$<TARGET_FILE:ngm-vulkan-fixture>" "${PROJECT_SOURCE_DIR}/artifacts/fixture-validation")
 add_dependencies(ngm_fixture_integration ngm-vulkan-fixture)
+ngm_add_hardware_check(ngm_performance_integration SOURCES PerformanceIntegration.cpp LIBRARIES ngm_experiments
+    ARGS "$<TARGET_FILE:ngm-vulkan-fixture>" "${CMAKE_CURRENT_BINARY_DIR}/performance-integration")
+add_dependencies(ngm_performance_integration ngm-vulkan-fixture)
 ngm_add_hardware_check(ngm_compute_integration SOURCES ComputeIntegration.cpp LIBRARIES ngm_experiments
     ARGS "$<TARGET_FILE:ngm-vulkan-fixture>" "${CMAKE_CURRENT_BINARY_DIR}/compute-integration")
 add_dependencies(ngm_compute_integration ngm-vulkan-fixture)

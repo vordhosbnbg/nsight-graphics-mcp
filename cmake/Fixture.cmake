@@ -43,7 +43,8 @@ function(ngm_configure_fixture target)
 
     set(outputs)
     foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag
-            compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp)
+            compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp
+            performance-reference.comp performance-underfilled.comp)
         set(source "${PROJECT_SOURCE_DIR}/shaders/fixture/${name}")
         set(spirv "${shader_dir}/${name}.spv")
         ngm_compile_shader("${source}" "${spirv}")

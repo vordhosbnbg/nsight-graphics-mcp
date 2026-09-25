@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -48,6 +49,14 @@ struct Compute {
     VkQueue queue{};
     uint32_t family{};
     bool boundary{};
+    bool performance{};
+    uint32_t local_size = 64;
+    uint32_t timestamp_bits{};
+    VkQueryPool queries{};
+    std::array<uint64_t, 2> timestamps{};
+    uint64_t elapsed_ticks{};
+    double gpu_ns{};
+    uint64_t host_submission_ns{};
     bool outstanding{};
     VkPhysicalDeviceProperties properties{};
     struct Buffer {
@@ -72,6 +81,8 @@ struct Compute {
         if(outstanding)
             return;
         if(device) {
+            if(queries)
+                vkDestroyQueryPool(device, queries, nullptr);
             if(fence)
                 vkDestroyFence(device, fence, nullptr);
             if(pool)
@@ -188,9 +199,10 @@ struct Compute {
             std::vector<VkQueueFamilyProperties> qs(qn);
             vkGetPhysicalDeviceQueueFamilyProperties(candidate, &qn, qs.data());
             for(uint32_t i = 0; i < qn; ++i)
-                if(qs[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+                if((qs[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && (!performance || qs[i].timestampValidBits > 0)) {
                     physical = candidate;
                     family = i;
+                    timestamp_bits = qs[i].timestampValidBits;
                     properties = p;
                     break;
                 }
@@ -201,6 +213,9 @@ struct Compute {
             throw Unsupported(require_boundary
                                   ? "No Vulkan 1.3 compute queue with VK_EXT_frame_boundary extension/feature"
                                   : "No Vulkan 1.3 compute queue");
+        if(performance && (timestamp_bits < 36 || timestamp_bits > 64 ||
+                           !std::isfinite(properties.limits.timestampPeriod) || properties.limits.timestampPeriod <= 0))
+            throw Unsupported("Performance workload requires a queue with valid Vulkan timestamps");
         check(vkEnumerateDeviceExtensionProperties(physical, nullptr, &n, nullptr), "device extensions");
         std::vector<VkExtensionProperties> extensions(n);
         check(vkEnumerateDeviceExtensionProperties(physical, nullptr, &n, extensions.data()), "device extensions");
@@ -281,11 +296,33 @@ struct Compute {
         std::ifstream in(shader, std::ios::binary);
         in.exceptions(std::ios::failbit | std::ios::badbit);
         in.read(reinterpret_cast<char*>(code.data()), bytes);
+        if(performance) {
+            if(code.size() < 5 || code[0] != 0x07230203)
+                throw std::runtime_error("Invalid performance SPIR-V header");
+            unsigned modes = 0;
+            for(std::size_t offset = 5; offset < code.size();) {
+                const auto length = code[offset] >> 16, opcode = code[offset] & 0xffff;
+                if(length == 0 || length > code.size() - offset)
+                    throw std::runtime_error("Malformed performance SPIR-V instruction");
+                // OpExecutionMode LocalSize, as emitted by the pinned compiler.
+                if(opcode == 16 && length >= 3 && code[offset + 2] == 17) {
+                    if(length != 6 || (code[offset + 3] != 1 && code[offset + 3] != 64) || code[offset + 4] != 1 ||
+                       code[offset + 5] != 1)
+                        throw Unsupported("Performance shader needs literal LocalSize 1 or 64 by 1 by 1");
+                    local_size = code[offset + 3];
+                    ++modes;
+                }
+                offset += length;
+            }
+            if(modes != 1)
+                throw Unsupported("Performance shader needs exactly one literal LocalSize mode");
+        }
         auto sm = info<VkShaderModuleCreateInfo>(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
         sm.codeSize = bytes;
         sm.pCode = code.data();
         check(vkCreateShaderModule(device, &sm, nullptr, &module), "module");
-        name(VK_OBJECT_TYPE_SHADER_MODULE, reinterpret_cast<uint64_t>(module), "compute.affine.shader");
+        name(VK_OBJECT_TYPE_SHADER_MODULE, reinterpret_cast<uint64_t>(module),
+             performance ? "performance.xorshift.shader" : "compute.affine.shader");
         auto pc = info<VkComputePipelineCreateInfo>(VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO);
         pc.layout = layout;
         pc.stage = info<VkPipelineShaderStageCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
@@ -293,7 +330,8 @@ struct Compute {
         pc.stage.module = module;
         pc.stage.pName = "main";
         check(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pc, nullptr, &pipeline), "pipeline");
-        name(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(pipeline), "compute.affine.pipeline");
+        name(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<uint64_t>(pipeline),
+             performance ? "performance.xorshift.pipeline" : "compute.affine.pipeline");
         auto cp = info<VkCommandPoolCreateInfo>(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
         cp.queueFamilyIndex = family;
         check(vkCreateCommandPool(device, &cp, nullptr, &pool), "command pool");
@@ -304,6 +342,12 @@ struct Compute {
         check(vkAllocateCommandBuffers(device, &ca, &command), "command buffer");
         auto fc = info<VkFenceCreateInfo>(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
         check(vkCreateFence(device, &fc, nullptr, &fence), "fence");
+        if(performance) {
+            auto query = info<VkQueryPoolCreateInfo>(VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO);
+            query.queryType = VK_QUERY_TYPE_TIMESTAMP;
+            query.queryCount = 2;
+            check(vkCreateQueryPool(device, &query, nullptr, &queries), "timestamp query pool");
+        }
     }
     void finish_frame(uint32_t frame) {
         if(!boundary)
@@ -323,7 +367,7 @@ struct Compute {
     }
     void frame(uint32_t frame) {
         for(uint32_t i = 0; i < count; ++i) {
-            input.mapped[i] = (i * 13u ^ seed) + frame * 7u;
+            input.mapped[i] = (i * 13u ^ seed) + (performance ? 0u : frame * 7u);
             output.mapped[i] = 0xdeadbeefu;
         }
         check(vkResetCommandPool(device, pool, 0), "reset pool");
@@ -332,7 +376,7 @@ struct Compute {
         check(vkBeginCommandBuffer(command, &begin), "begin");
         if(vkCmdBeginDebugUtilsLabelEXT) {
             auto label = info<VkDebugUtilsLabelEXT>(VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT);
-            label.pLabelName = "compute.affine";
+            label.pLabelName = performance ? "performance.xorshift" : "compute.affine";
             vkCmdBeginDebugUtilsLabelEXT(command, &label);
         }
         auto host = info<VkMemoryBarrier>(VK_STRUCTURE_TYPE_MEMORY_BARRIER);
@@ -343,7 +387,13 @@ struct Compute {
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &descriptor, 0, nullptr);
         vkCmdPushConstants(command, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 4, &count);
-        vkCmdDispatch(command, (count + 63) / 64, 1, 1);
+        if(performance) {
+            vkCmdResetQueryPool(command, queries, 0, 2);
+            vkCmdWriteTimestamp(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, queries, 0);
+        }
+        vkCmdDispatch(command, (count + local_size - 1) / local_size, 1, 1);
+        if(performance)
+            vkCmdWriteTimestamp(command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queries, 1);
         auto read = info<VkMemoryBarrier>(VK_STRUCTURE_TYPE_MEMORY_BARRIER);
         read.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         read.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
@@ -356,6 +406,7 @@ struct Compute {
         // Nsight delimiter also counts a non-END annotation, which would split
         // dispatch and readback into different capture intervals.
         auto submit = info<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
+        const auto submitted_at = std::chrono::steady_clock::now();
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &command;
         check(vkResetFences(device, 1, &fence), "reset fence");
@@ -363,6 +414,24 @@ struct Compute {
         check(vkQueueSubmit(queue, 1, &submit, fence), "submit");
         check(vkWaitForFences(device, 1, &fence, VK_TRUE, 5000000000ull), "wait");
         outstanding = false;
+        if(performance) {
+            host_submission_ns =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - submitted_at)
+                    .count();
+            if(static_cast<long double>(host_submission_ns) >=
+               std::ldexp(static_cast<long double>(properties.limits.timestampPeriod), timestamp_bits))
+                throw std::runtime_error("Timestamp interval may contain multiple counter wraps");
+            check(vkGetQueryPoolResults(device, queries, 0, 2, sizeof(timestamps), timestamps.data(), sizeof(uint64_t),
+                                        VK_QUERY_RESULT_64_BIT),
+                  "timestamp results");
+            const uint64_t mask = timestamp_bits == 64 ? UINT64_MAX : (uint64_t{1} << timestamp_bits) - 1;
+            if(timestamps[0] > mask || timestamps[1] > mask)
+                throw std::runtime_error("Timestamp has bits outside the queue's valid range");
+            elapsed_ticks = (timestamps[1] - timestamps[0]) & mask;
+            gpu_ns = static_cast<double>(elapsed_ticks) * properties.limits.timestampPeriod;
+            if(!std::isfinite(gpu_ns) || gpu_ns <= 0)
+                throw std::runtime_error("Invalid measured GPU duration");
+        }
     }
 };
 std::string version(uint32_t value) {
@@ -381,11 +450,12 @@ std::string uuid(const uint8_t* bytes) {
 } // namespace
 
 void run_compute(const Options& options, nlohmann::json& result) {
+    const bool performance = options.scenario.starts_with("performance-");
     const auto count = options.width * options.height;
     const auto source = options.scenario + ".comp";
     const auto shader_path = options.output / "shaders" / (source + ".spv");
     result["desktop"]["backend"] = "none";
-    result["workload"] = {{"kind", "compute_affine_uint32"},
+    result["workload"] = {{"kind", performance ? "compute_xorshift_uint32" : "compute_affine_uint32"},
                           {"presentation", false},
                           {"element_count", count},
                           {"minimum_api_version", "1.3.0"},
@@ -393,6 +463,7 @@ void run_compute(const Options& options, nlohmann::json& result) {
                           {"required_device_extensions",
                            options.compute_frame_boundary ? Json({"VK_EXT_frame_boundary"}) : Json::array()}};
     Compute compute(count, options.seed);
+    compute.performance = performance;
     compute.initialize(shader_path, options.compute_frame_boundary);
     auto driver = info<VkPhysicalDeviceDriverProperties>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES);
     auto ids = info<VkPhysicalDeviceIDProperties>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES);
@@ -419,16 +490,31 @@ void run_compute(const Options& options, nlohmann::json& result) {
         {"shader_spirv", "shaders/" + source + ".spv"},
         {"source_sha256", ngm::sha256_file(options.output / "shaders" / source)},
         {"spirv_sha256", ngm::sha256_file(shader_path)},
-        {"pipeline_label", "compute.affine.pipeline"},
-        {"shader_label", "compute.affine.shader"},
-        {"dispatch_label", "compute.affine"},
-        {"local_size", {64, 1, 1}},
-        {"group_count", {(count + 63) / 64, 1, 1}},
+        {"pipeline_label", performance ? "performance.xorshift.pipeline" : "compute.affine.pipeline"},
+        {"shader_label", performance ? "performance.xorshift.shader" : "compute.affine.shader"},
+        {"dispatch_label", performance ? "performance.xorshift" : "compute.affine"},
+        {"local_size", {compute.local_size, 1, 1}},
+        {"group_count", {(count + compute.local_size - 1) / compute.local_size, 1, 1}},
         {"push_constant_count", count},
         {"descriptor_bindings",
          Json::array({{{"set", 0}, {"binding", 0}, {"label", "compute.input"}, {"bytes", count * 4}},
                       {{"set", 0}, {"binding", 1}, {"label", "compute.output"}, {"bytes", count * 4}}})},
         {"boundary_enabled", compute.boundary}};
+    if(performance) {
+        result["performance"] = {{"evidence_origin", "application_timestamps"},
+                                 {"warmup_submits", *options.warmup},
+                                 {"measured_submits", options.frame + 1 - *options.warmup},
+                                 {"iterations", 2048},
+                                 {"input_policy", "identical input on every submit"},
+                                 {"timestamp_valid_bits", compute.timestamp_bits},
+                                 {"timestamp_period_ns", p.limits.timestampPeriod},
+                                 {"unit", "ns"},
+                                 {"scope", "Vulkan TOP_OF_PIPE before dispatch and BOTTOM_OF_PIPE after dispatch; "
+                                           "includes scheduling/pipeline overhead, excludes host readback and waits"},
+                                 {"clock_control", "not_requested"},
+                                 {"replay", "none"},
+                                 {"measurements", Json::array()}};
+    }
     // This setup can survive capture-driven target termination. It records
     // application observations, never an inferred join to Nsight event IDs.
     result["status"] = "running";
@@ -446,10 +532,23 @@ void run_compute(const Options& options, nlohmann::json& result) {
                  {"executable_sha256", result.at("application").at("executable_sha256")},
                  {"input", std::vector<uint32_t>(compute.input.mapped, compute.input.mapped + count)},
                  {"output", std::vector<uint32_t>(compute.output.mapped, compute.output.mapped + count)}};
+        if(performance) {
+            const Json timing{{"frame", frame},
+                              {"warmup", frame < *options.warmup},
+                              {"timestamp_start", compute.timestamps[0]},
+                              {"timestamp_end", compute.timestamps[1]},
+                              {"elapsed_ticks", compute.elapsed_ticks},
+                              {"host_submission_ns", compute.host_submission_ns},
+                              {"gpu_ns", compute.gpu_ns}};
+            row["timing"] = timing;
+            if(frame >= *options.warmup)
+                result["performance"]["measurements"].push_back(timing);
+        }
         save(options.output / name, row);
         result["readback"] = {{"path", name}, {"sha256", ngm::sha256_file(options.output / name)}};
         compute.finish_frame(frame);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if(!performance)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     // Pass means execution completed; correctness is evaluated by an independent
     // harness oracle. Deliberately faulty variants also complete execution.

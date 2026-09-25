@@ -31,7 +31,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 17> scenarios{"reference",
+constexpr std::array<std::string_view, 19> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -47,8 +47,10 @@ constexpr std::array<std::string_view, 17> scenarios{"reference",
                                                      "combined-indirect-error",
                                                      "compute-reference",
                                                      "compute-index-error",
-                                                     "compute-arithmetic-error"};
-constexpr std::array<std::string_view, 10> shader_sources{"scene.vert",
+                                                     "compute-arithmetic-error",
+                                                     "performance-reference",
+                                                     "performance-underfilled"};
+constexpr std::array<std::string_view, 12> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
                                                           "indirect.vert",
@@ -57,7 +59,9 @@ constexpr std::array<std::string_view, 10> shader_sources{"scene.vert",
                                                           "post.frag",
                                                           "compute-reference.comp",
                                                           "compute-index-error.comp",
-                                                          "compute-arithmetic-error.comp"};
+                                                          "compute-arithmetic-error.comp",
+                                                          "performance-reference.comp",
+                                                          "performance-underfilled.comp"};
 
 struct Workload {
     bool multipass = false;
@@ -255,6 +259,12 @@ Json retain_shaders(const Options& options) {
             throw std::runtime_error(
                 "unexpected shader filename, stage, or source/SPIR-V pairing in fixture provenance");
         }
+        const bool performance_shader = source.starts_with("performance-");
+        const Json expected_flags = performance_shader ? Json({"-V", "--target-env", "vulkan1.3", "-g0"})
+                                                       : Json({"-V", "--target-env", "vulkan1.3", "-g", "-Od"});
+        if(shader.value("compilation_profile", "") != (performance_shader ? "performance" : "diagnostic") ||
+           shader.value("compiler_arguments", Json()) != expected_flags)
+            throw std::runtime_error("shader requires explicit matching compilation profile and arguments");
         for(const auto* kind : {"source", "spirv"}) {
             const auto name = checked_filename(shader, kind);
             if(!filenames.insert(name).second) {
@@ -1610,6 +1620,8 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.frame = parse_uint(value, option);
         } else if(option == "--sdk-first-boundary-frame") {
             options.sdk_first_boundary_frame = parse_uint(value, option);
+        } else if(option == "--warmup") {
+            options.warmup = parse_uint(value, option);
         } else if(option == "--compute-boundary") {
             if(value != "none" && value != "vk_frame_boundary")
                 throw std::invalid_argument("compute boundary must be none or vk_frame_boundary");
@@ -1644,7 +1656,13 @@ Options parse_arguments(std::span<const char* const> arguments) {
        (options.frame < 2 || *options.sdk_first_boundary_frame > options.frame - 2)) {
         throw std::invalid_argument("SDK first boundary must leave at least two subsequent application frames");
     }
-    const bool compute = options.scenario.starts_with("compute-");
+    const bool performance = options.scenario.starts_with("performance-");
+    const bool compute = options.scenario.starts_with("compute-") || performance;
+    if(performance != options.warmup.has_value() ||
+       (options.warmup && (*options.warmup > 100 || *options.warmup > options.frame)) ||
+       (performance && options.compute_frame_boundary))
+        throw std::invalid_argument("performance scenarios require --warmup 0..100, at least one measured frame and no "
+                                    "frame-boundary extension");
     if((seen.contains("--compute-boundary") && !compute) || (compute && options.sdk_first_boundary_frame))
         throw std::invalid_argument("compute boundaries require a compute scenario; SDK control is graphics-only");
     if(compute && options.width * options.height > 16384)
@@ -1681,7 +1699,9 @@ void run(const Options& options) {
                                  {"build", Json::parse(build_identity_json)}};
         result["provenance"] = retain_shaders(options);
         result["provenance"]["kind"] = "shader_bundle";
-        if(options.scenario.starts_with("compute-")) {
+        if(options.warmup)
+            result["inputs"]["warmup"] = *options.warmup;
+        if(options.scenario.starts_with("compute-") || options.scenario.starts_with("performance-")) {
             run_compute(options, result);
             return;
         }

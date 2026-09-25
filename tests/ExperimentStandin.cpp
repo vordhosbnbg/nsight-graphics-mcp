@@ -151,7 +151,8 @@ int main(int argc, char** argv) {
         std::filesystem::create_directory(directory / "shaders");
         for(const auto* name :
             {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert",
-             "post.frag", "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp"}) {
+             "post.frag", "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp",
+             "performance-reference.comp", "performance-underfilled.comp"}) {
             const std::string source = name;
             std::ofstream(directory / "shaders" / source) << "test";
             std::ofstream(directory / "shaders" / (source + ".spv")) << "test";
@@ -162,6 +163,14 @@ int main(int argc, char** argv) {
                                                                                              : "fragment"},
                                                        {"source_sha256", test_digest},
                                                        {"spirv_sha256", test_digest}});
+            result["provenance"]["shaders"].back()["compilation_profile"] = "diagnostic";
+            result["provenance"]["shaders"].back()["compiler_arguments"] = {"-V", "--target-env", "vulkan1.3", "-g",
+                                                                            "-Od"};
+            if(source.starts_with("performance-")) {
+                result["provenance"]["shaders"].back()["compilation_profile"] = "performance";
+                result["provenance"]["shaders"].back()["compiler_arguments"] = {"-V", "--target-env", "vulkan1.3",
+                                                                                "-g0"};
+            }
         }
         if(scenario == "wrong-inputs") {
             result["inputs"]["seed"] = 99;
@@ -217,16 +226,21 @@ int main(int argc, char** argv) {
                 std::ofstream(directory / "shaders/provenance.json") << manifest.dump();
             }
         }
-        if(scenario.starts_with("compute-")) {
+        const bool performance = scenario.starts_with("performance-");
+        if(performance)
+            result["inputs"]["warmup"] = std::stoul(values.at("--warmup"));
+        if(scenario.starts_with("compute-") || performance) {
             const uint32_t count = width * height;
             const uint32_t seed = result["inputs"]["seed"];
             const uint32_t frame = result["inputs"]["frame"];
             result.erase("image");
             result["desktop"]["backend"] = "none";
-            result["workload"] = {
-                {"kind", "compute_affine_uint32"}, {"presentation", false},
-                {"element_count", count},          {"boundary", "none"},
-                {"minimum_api_version", "1.3.0"},  {"required_device_extensions", nlohmann::json::array()}};
+            result["workload"] = {{"kind", performance ? "compute_xorshift_uint32" : "compute_affine_uint32"},
+                                  {"presentation", false},
+                                  {"element_count", count},
+                                  {"boundary", "none"},
+                                  {"minimum_api_version", "1.3.0"},
+                                  {"required_device_extensions", nlohmann::json::array()}};
             result["compute"] = {
                 {"evidence_origin", "application_observation"},
                 {"boundary_enabled", false},
@@ -234,9 +248,9 @@ int main(int argc, char** argv) {
                 {"local_size", {64, 1, 1}},
                 {"group_count", {(count + 63) / 64, 1, 1}},
                 {"push_constant_count", count},
-                {"pipeline_label", "compute.affine.pipeline"},
-                {"shader_label", "compute.affine.shader"},
-                {"dispatch_label", "compute.affine"},
+                {"pipeline_label", performance ? "performance.xorshift.pipeline" : "compute.affine.pipeline"},
+                {"shader_label", performance ? "performance.xorshift.shader" : "compute.affine.shader"},
+                {"dispatch_label", performance ? "performance.xorshift" : "compute.affine"},
                 {"shader_source", "shaders/" + scenario + ".comp"},
                 {"shader_spirv", "shaders/" + scenario + ".comp.spv"},
                 {"source_sha256", test_digest},
@@ -245,6 +259,20 @@ int main(int argc, char** argv) {
                  nlohmann::json::array(
                      {{{"set", 0}, {"binding", 0}, {"label", "compute.input"}, {"bytes", count * 4}},
                       {{"set", 0}, {"binding", 1}, {"label", "compute.output"}, {"bytes", count * 4}}})}};
+            const uint32_t warmup = performance ? result["inputs"]["warmup"].get<uint32_t>() : 0;
+            if(performance)
+                result["performance"] = {{"evidence_origin", "application_timestamps"},
+                                         {"warmup_submits", warmup},
+                                         {"measured_submits", frame + 1 - warmup},
+                                         {"iterations", 2048},
+                                         {"input_policy", "identical input on every submit"},
+                                         {"timestamp_valid_bits", 36},
+                                         {"timestamp_period_ns", 2.0},
+                                         {"unit", "ns"},
+                                         {"scope", "CPU synthetic timestamps"},
+                                         {"clock_control", "not_requested"},
+                                         {"replay", "none"},
+                                         {"measurements", Json::array()}};
             auto row = nlohmann::json{{"schema_version", 1},
                                       {"evidence_origin", "application_readback"},
                                       {"phase", "readback_before_frame_end"},
@@ -266,7 +294,37 @@ int main(int argc, char** argv) {
                 auto observed = row;
                 observed["frame"] = current;
                 for(uint32_t i = 0; i < count; ++i)
-                    observed["input"][i] = uint32_t((i * 13u ^ seed) + current * 7u);
+                    observed["input"][i] = uint32_t((i * 13u ^ seed) + (performance ? 0u : current * 7u));
+                if(performance) {
+                    observed["timing"] = {
+                        {"frame", current},          {"warmup", current < warmup}, {"timestamp_start", 68719476730ULL},
+                        {"timestamp_end", 4u},       {"elapsed_ticks", 10u},       {"gpu_ns", 20.0},
+                        {"host_submission_ns", 400u}};
+                    if(current >= warmup)
+                        result["performance"]["measurements"].push_back(observed["timing"]);
+                    if(current == 0) {
+                        if(seed == 200)
+                            observed["timing"]["elapsed_ticks"] = 11u;
+                        if(seed == 201)
+                            observed["timing"]["warmup"] = false;
+                        if(seed == 202)
+                            observed["timing"]["timestamp_start"] = 68719476730.0;
+                        if(seed == 203)
+                            observed["timing"]["gpu_ns"] = 19.0;
+                        if(seed == 204)
+                            result["performance"]["timestamp_valid_bits"] = 0u;
+                        if(seed == 205)
+                            observed["timing"]["host_submission_ns"] = 137438953472ULL;
+                        if(seed == 206)
+                            result["performance"]["iterations"] = 1;
+                        if(seed == 207)
+                            result["performance"]["timestamp_period_ns"] = -2.0;
+                        if(seed == 209)
+                            observed["timing"]["timestamp_start"] = 137438953466ULL;
+                        if(seed == 208)
+                            result["performance"]["replay"] = "unknown";
+                    }
+                }
                 if(current == 0) {
                     if(seed == 100)
                         observed["output"].erase(observed["output"].begin());

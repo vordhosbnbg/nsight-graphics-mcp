@@ -18,6 +18,7 @@ struct Options {
     std::filesystem::path output;
     std::filesystem::path shader_directory;
     std::optional<std::uint32_t> sdk_first_boundary_frame;
+    std::optional<std::uint32_t> warmup;
     bool compute_frame_boundary = false;
 };
 

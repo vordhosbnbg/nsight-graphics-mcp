@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <stop_token>
 #include <string>
 
@@ -18,6 +19,7 @@ struct ExperimentOptions {
     std::uint32_t height = 0;
     std::uint32_t frame = 0;
     std::chrono::milliseconds timeout{30000};
+    std::optional<std::uint32_t> warmup;
     bool validation = false;
 };
 

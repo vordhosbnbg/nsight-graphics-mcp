@@ -1,0 +1,17 @@
+#version 460
+layout(local_size_x = 64) in;
+layout(set=0,binding=0,std430) readonly buffer Input { uint values[]; } source;
+layout(set=0,binding=1,std430) writeonly buffer Output { uint values[]; } destination;
+layout(push_constant) uniform Parameters { uint count; } p;
+void main() {
+    uint i=gl_GlobalInvocationID.x;
+    if(i>=p.count) return;
+    uint value=source.values[i];
+    for(uint iteration=0; iteration<2048; ++iteration) {
+        value ^= value << 13;
+        value ^= value >> 17;
+        value ^= value << 5;
+        value += iteration;
+    }
+    destination.values[i]=value;
+}

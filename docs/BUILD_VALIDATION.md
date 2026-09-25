@@ -1191,3 +1191,37 @@ slice blocker. The complete service snapshot is pinned as
 `bundle-9de7695e0225eb604775a6fe52c5a4dd` in `artifacts/performance-evidence`;
 all 124 payload hashes and the pin after restart verify. Publication receipts are
 in `build/profile-service-publication`.
+
+## Integrated performance fixture slice — 0.3.5
+
+The C++ fixture/experiment runner adds two performance scenarios with separate
+shader compilation profiles, explicit warmup, all-frame numerical readback and
+bounded Vulkan timestamp evidence. GCC 16.2.1 Debug passes **29/29 CPU checks**
+(284.71 seconds). Following the final timestamp valid-bit correction, the focused
+`ngm_performance_evidence_check` passes again (15.29 seconds); the aggregate was
+not repeated for that narrow correction. Static fixture/measurement review finds
+no outstanding blocker after provenance, timestamp and identity corrections.
+
+The final opt-in `ngm_performance_integration_run` passes ten launches/566 frames,
+with independent zero-tolerance numerical checks, two clean synchronization-
+validation launches, and eight measurement launches after 30 warmup submits each.
+The 320 measured submits compare local-size-1 and local-size-64 variants in
+alternating order across four repetitions. Shader/executable/GPU identities
+remain stable across the group. Observed median ranges are 638.256–638.816 µs
+and 50.576–50.832 µs; substantial within-run tails/drift are retained and documented
+in [PERFORMANCE.md](PERFORMANCE.md), rather than interpreted as constant clocks
+or universal speedup. No profiling access or clock changes are involved.
+
+Final evidence is under
+`build/linux-gcc-debug/tests/performance-integration/run-97579-35035408232136`;
+logs are `build/performance-fixture-{aggregate,final-build,final-validation}.log`.
+The earlier batch under `build/performance-fixture-validation` is superseded.
+This establishes the integrated workload and application evidence, not an actual
+source repair or new-fixture Nsight acceptance. Those remain R-009 work.
+
+Fresh-context acceptance independently verifies 9,181,970 outputs across all 566
+frames, timing conversions, build/shader identities, validation and statistics,
+with no fixture-slice blocker. The final snapshot is pinned as
+`bundle-a5fbe932759bd51e5785cbc361b26b3a` in `artifacts/performance-evidence`;
+all 990 payload hashes and persistent pin after restart verify. Receipts are in
+`build/performance-fixture-publication`.

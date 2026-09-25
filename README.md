@@ -25,8 +25,9 @@ capability/artifact calls verify interoperability. See [HTTP.md](docs/HTTP.md).
 
 Version **0.3.4** adds asynchronous GPU Trace profiling and bounded retained metric
 queries over the 0.3.3 export parsers. [PERFORMANCE.md](docs/PERFORMANCE.md)
-distinguishes the implemented service from unfinished product workload,
-repeatable comparison and source-repair acceptance.
+distinguishes the implemented service from unfinished repeatable Nsight comparison
+and source-repair acceptance. Version **0.3.5** integrates performance fixture
+scenarios with explicit warmup, retained timestamps and repeated numerical validation.
 
 Start with [INSTALL.md](docs/INSTALL.md) for the source-build-to-repair walkthrough.
 [VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md) consolidates capability/repair evidence
@@ -127,6 +128,7 @@ uses explicit failures rather than `assert`, so Release checks remain effective.
 | `ngm_resource_reference_check` | Literal resource references, declaration conflicts, source spans and unsupported forms. |
 | `ngm_resource_read_check` | Qualified worker supervision, leased input snapshots, bounded byte results, failures and publication retention. |
 | `ngm_cpp_inspection_check` | C++ bundle provenance/index completeness, source pagination, coverage, limits, and leases. |
+| `ngm_performance_evidence_check` | Performance timing/warmup contracts, counter wrap, intermediate corruption and invalid policy using CPU stand-ins. |
 | `ngm_profile_workflow_check` | Profiling jobs, malformed/unsupported exports, shared GPU queue, timeout/cancellation cleanup, retained provenance, pagination and actual MCP calls with CPU stand-ins. |
 | `ngm_inspection_check` | Retained capture provenance, producer profiles, pagination, response bounds, and leased artifact image comparisons. |
 | `ngm_capture_validation_check` | Hardware-harness timeout/cancellation classification and valid empty logs exports. |

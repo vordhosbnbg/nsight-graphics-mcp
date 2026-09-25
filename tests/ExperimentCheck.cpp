@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
             options.scenario = scenario;
             const auto result = ngm::run_experiment(options);
             require(result.report.at("status") == "pass", "valid advanced input and feature metadata accepted");
-            require(result.report.at("result").at("provenance").at("shaders").size() == 10,
+            require(result.report.at("result").at("provenance").at("shaders").size() == 12,
                     "complete advanced shader bundle retained");
         }
         for(const auto* scenario : {"malformed-result",

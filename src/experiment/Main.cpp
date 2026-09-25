@@ -26,10 +26,10 @@ int main(int argc, char** argv) {
             return 0;
         }
         if(argc == 2 && std::string_view(argv[1]) == "--help") {
-            std::cout
-                << "Usage: ngm-experiment --fixture PATH --output-root DIR --scenario NAME --seed N "
-                   "--width N --height N --frame N [--shader-dir DIR] [--timeout-ms N] [--validation true|false]\n"
-                   "Runs a fresh graphics or compute fixture in isolated configuration and retains a report.\n";
+            std::cout << "Usage: ngm-experiment --fixture PATH --output-root DIR --scenario NAME --seed N "
+                         "--width N --height N --frame N [--shader-dir DIR] [--timeout-ms N] [--validation true|false] "
+                         "[--warmup N]\n"
+                         "Runs a fresh graphics or compute fixture in isolated configuration and retains a report.\n";
             return 0;
         }
         std::map<std::string, std::string> values;
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
             const std::string key = argv[index];
             if(key != "--fixture" && key != "--output-root" && key != "--scenario" && key != "--seed" &&
                key != "--width" && key != "--height" && key != "--frame" && key != "--shader-dir" &&
-               key != "--timeout-ms" && key != "--validation") {
+               key != "--timeout-ms" && key != "--validation" && key != "--warmup") {
                 throw std::invalid_argument("Unsupported argument: " + key);
             }
             if(index + 1 >= argc || !values.emplace(key, argv[index + 1]).second) {
@@ -58,6 +58,8 @@ int main(int argc, char** argv) {
         options.width = number(values.at("--width"));
         options.height = number(values.at("--height"));
         options.frame = number(values.at("--frame"));
+        if(values.contains("--warmup"))
+            options.warmup = number(values.at("--warmup"));
         if(values.contains("--shader-dir")) {
             options.shader_directory = values.at("--shader-dir");
         }

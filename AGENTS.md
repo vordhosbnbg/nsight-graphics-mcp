@@ -80,8 +80,11 @@ After explicit owner approval, five real GPU Trace probes pass on the two
 matching releases, with temporary permissions restored after each batch. The
 0.3.3 slice adds bounded export parsers; 0.3.4 adds shared asynchronous profiling
 and retained metric queries, with actual MCP protocol calls on both releases.
-All 28 CPU checks pass, followed by the final focused regression. Product workload,
-repeatable comparison and source-repair acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+At 0.3.5 the normal fixture/experiment runner adds performance workgroups, explicit
+warmup and all-frame timestamps/readback. All 29 CPU checks pass, followed by the
+final focused timestamp regression and ten real launches/566 exact-output frames.
+Measured variability and the isolated-dispatch cadence are retained. New-fixture
+Nsight profiling, repeated comparison and source-repair acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual
