@@ -71,6 +71,17 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-016 adds native x86-64 Arch Linux packaging at **0.4.1**. The `package` preset
+provides `ngm_arch_sources` and `ngm_arch_package`: a source archive containing
+the exact dependency sources, generated checksummed PKGBUILD/.SRCINFO, and a
+locally built package. Runtime installation contains the server, capture CLI,
+documentation and license notices; fixtures and optional proprietary helpers
+remain separate. All **31 CPU checks**, extracted-package CLI/MCP checks and
+ELF linkage inspection pass on the recorded Arch host. See
+[docs/ARCH_PACKAGE.md](docs/ARCH_PACKAGE.md) and
+[docs/BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md). No new GPU qualification
+or AUR publication is implied.
+
 R-004 completes at **0.3.2** with optional persistent Streamable HTTP on IPv4
 loopback, required private-file bearer authentication and a shared trusted-user
 workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass

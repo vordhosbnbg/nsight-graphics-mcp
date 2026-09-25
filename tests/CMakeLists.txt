@@ -159,4 +159,10 @@ ngm_register_check(ngm_linkage_check
         -P "${PROJECT_SOURCE_DIR}/cmake/AuditLinkage.cmake"
     DEPENDS nsight-graphics-mcp ngm-vulkan-fixture ngm-experiment ngm-capture ngm_dependency_check glslang-standalone)
 
+ngm_register_check(ngm_install_check
+    COMMAND "${CMAKE_COMMAND}" "-DBUILD_ROOT=${CMAKE_BINARY_DIR}"
+        "-DEXPECTED_VERSION=${PROJECT_VERSION}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckInstall.cmake"
+    DEPENDS nsight-graphics-mcp ngm-capture)
+
 ngm_finalize_checks()

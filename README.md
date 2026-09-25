@@ -86,6 +86,9 @@ cmake --build --preset linux-gcc-debug
 cmake --build --preset linux-gcc-debug --target ngm_check
 ```
 
+On Arch Linux, use the [package preset and PKGBUILD](docs/ARCH_PACKAGE.md) to build
+an installable package with the server, capture CLI, and documentation.
+
 Configure your MCP client to launch the server with absolute paths:
 
 ```sh

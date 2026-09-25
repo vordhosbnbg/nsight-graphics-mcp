@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **All accepted roadmap items are Done. The visual first-release group completes at 0.3.0, compute correctness at 0.3.1, local Streamable HTTP at 0.3.2, and the R-009 performance group at 0.4.0. The shared stdio/HTTP surface has 26 tools. Each workflow retains its exact qualification scope, versions, evidence and limits in the linked documents.**
+Planning state: **All accepted items are Done: visual workflows at 0.3.0, compute at 0.3.1, local HTTP at 0.3.2, performance at 0.4.0, and Arch Linux packaging at 0.4.1. The shared stdio/HTTP surface has 26 tools. Qualification scopes remain recorded in their linked documents.**
 Last updated: **2026-09-25**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -181,6 +181,18 @@ Item conventions:
 ## Blocked
 
 ## Done
+
+### R-016
+
+```text
+Status: Done
+Area: build/packaging/docs
+Title: Package the server for Arch Linux
+Goal: Build an installable Arch Linux package from the repository's pinned sources.
+Scope: A package CMake preset, runtime install rules, a source-complete archive and checksummed PKGBUILD/.SRCINFO, local makepkg integration, installed-file checks and user documentation.
+Acceptance: The generated recipe builds from its accompanying sources without dependency downloads; CPU checks pass; the package includes the server, capture CLI, documentation and required license notices; extracted binaries report the product version and serve MCP; packaged ELF linkage matches declared runtime dependencies.
+Notes: Requested by the owner after 0.4.0 and implemented at 0.4.1. The local makepkg build passes all 31 CPU checks, including staged installation; the extracted package passes CLI/MCP checks with 26 tools and an ELF dependency audit matching glibc/gcc-libs. See docs/ARCH_PACKAGE.md and docs/BUILD_VALIDATION.md. Nsight and optional generated resource workers remain separately supplied. The fixture remains a development/validation target. No AUR publication or host installation was performed.
+```
 
 ### R-009
 

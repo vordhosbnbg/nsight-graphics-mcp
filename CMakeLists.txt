@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(NsightGraphicsMCP VERSION 0.4.0 LANGUAGES C CXX)
+project(NsightGraphicsMCP VERSION 0.4.1 LANGUAGES C CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Only Linux builds are currently supported.")
@@ -10,6 +10,7 @@ endif()
 
 option(NGM_WARNINGS_AS_ERRORS "Treat first-party warnings as errors" ON)
 option(NGM_BUILD_CHECKS "Build CPU-only first-party checks" ON)
+option(NGM_ENABLE_ARCH_PACKAGING "Enable local Arch Linux source/package targets" OFF)
 
 function(ngm_first_party target)
     target_compile_features(${target} PRIVATE cxx_std_20)
@@ -85,6 +86,9 @@ ngm_compile_shader(
     "${CMAKE_CURRENT_BINARY_DIR}/shaders/build.vert.spv")
 add_custom_target(ngm_shaders ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/shaders/build.vert.spv")
 add_dependencies(ngm-vulkan-fixture ngm_shaders)
+
+include(cmake/Install.cmake)
+include(cmake/ArchPackage.cmake)
 
 if(NGM_BUILD_CHECKS)
     enable_testing()

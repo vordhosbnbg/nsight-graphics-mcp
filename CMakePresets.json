@@ -28,12 +28,25 @@
       "name": "linux-gcc-release",
       "inherits": "linux-base",
       "cacheVariables": { "CMAKE_C_COMPILER": "gcc", "CMAKE_CXX_COMPILER": "g++", "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "package",
+      "displayName": "Arch Linux package build",
+      "inherits": "linux-gcc-release",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "/usr",
+        "NGM_ENABLE_ARCH_PACKAGING": "ON",
+        "NGM_RESOURCE_HELPERS_2026_3": "",
+        "NGM_RESOURCE_HELPERS_2026_2": "",
+        "NGM_NSIGHT_SDK_ROOT": ""
+      }
     }
   ],
   "buildPresets": [
     { "name": "linux-gcc-debug", "configurePreset": "linux-gcc-debug", "jobs": 4 },
     { "name": "linux-clang-debug", "configurePreset": "linux-clang-debug", "jobs": 4 },
-    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "jobs": 4 }
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "jobs": 4 },
+    { "name": "package", "configurePreset": "package", "jobs": 4 }
   ],
   "testPresets": [
     {
@@ -45,6 +58,7 @@
     },
     { "name": "linux-gcc-debug", "inherits": "cpu-tests", "configurePreset": "linux-gcc-debug" },
     { "name": "linux-clang-debug", "inherits": "cpu-tests", "configurePreset": "linux-clang-debug" },
-    { "name": "linux-gcc-release", "inherits": "cpu-tests", "configurePreset": "linux-gcc-release" }
+    { "name": "linux-gcc-release", "inherits": "cpu-tests", "configurePreset": "linux-gcc-release" },
+    { "name": "package", "inherits": "cpu-tests", "configurePreset": "package" }
   ]
 }

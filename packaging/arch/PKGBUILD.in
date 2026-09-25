@@ -1,0 +1,38 @@
+# Generated with a local source archive containing the exact dependency sources.
+pkgname=nsight-graphics-mcp
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Capture and inspect Vulkan workloads with NVIDIA Nsight Graphics through MCP'
+arch=('x86_64')
+url='https://github.com/vordhosbnbg/nsight-graphics-mcp'
+license=('MIT' 'Apache-2.0' 'Zlib')
+depends=('glibc' 'gcc-libs')
+makedepends=('cmake>=3.25' 'ninja' 'python' 'git' 'libxcb')
+optdepends=('nsight-graphics: live capture and GPU profiling')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('@SOURCE_SHA256@')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    # Archived dependencies must not inherit an unrelated parent checkout's Git identity.
+    export GIT_CEILING_DIRECTORIES="$srcdir"
+    cmake --preset package \
+        -DNGM_ENABLE_ARCH_PACKAGING=OFF \
+        -DNGM_WARNINGS_AS_ERRORS=OFF \
+        -DCMAKE_C_FLAGS="$CFLAGS $CPPFLAGS" \
+        -DCMAKE_CXX_FLAGS="$CXXFLAGS $CPPFLAGS" \
+        -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
+        -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+        -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS"
+    cmake --build --preset package --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-4}"
+}
+
+check() {
+    cd "$srcdir/$pkgname-$pkgver"
+    ctest --preset package
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+    DESTDIR="$pkgdir" cmake --install build/package --component Runtime
+}

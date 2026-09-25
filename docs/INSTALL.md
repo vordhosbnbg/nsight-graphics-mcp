@@ -68,10 +68,11 @@ compilers. The alternative presets are `linux-clang-debug` and `linux-gcc-releas
 linkage inspection. It launches no GPU integrations. A confinement check reported
 as skipped does not qualify resource-byte workers on that host.
 
-Run binaries from the build tree; this project does not currently provide a
-system installation or prebuilt release package. Shader debug information is
-preserved by the shared presets. A Release build is not automatically a qualified
-GPU performance measurement configuration.
+This walkthrough runs binaries from the build tree. For a system installation on
+Arch Linux, use the [package preset and PKGBUILD](ARCH_PACKAGE.md); that package
+contains the server and capture CLI, while the fixture stays in the build tree.
+Shader debug information is preserved by the shared presets. A Release build is
+not automatically a qualified GPU performance measurement configuration.
 
 ## Check the desktop and retain application baselines
 

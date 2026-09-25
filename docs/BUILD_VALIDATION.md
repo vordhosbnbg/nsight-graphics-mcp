@@ -1,5 +1,46 @@
 # Build and development validation
 
+## Arch Linux packaging (R-016, 0.4.1)
+
+Date: **2026-09-25**. Product **0.4.1**, package **0.4.1-1**, x86-64 Arch Linux
+with GCC **16.2.1**, CMake **4.4.3**, Ninja **1.13.2**, Python **3.14.7**,
+makepkg/pacman **7.1.0**, glibc **2.44**, and Linux **7.2.6-zen2-1-zen**.
+This is an individual packaging addition with a patch increment, rather than a
+new workflow milestone. The working source is based on **7ca115d** with the
+packaging changes; the archive records that dirty state explicitly.
+
+The documented `package` configure preset and `ngm_arch_package` target generate
+a checksummed source archive with all seven exact dependency revisions, PKGBUILD,
+and `.SRCINFO`. `makepkg` builds from the extracted archive using the host's Arch
+hardening and LTO flags, runs **31/31 CPU checks without skips**, and creates
+`nsight-graphics-mcp-0.4.1-1-x86_64.pkg.tar.zst`. The first complete CPU run takes
+**116.37 seconds**, including the new staged-install check and existing binary/
+archive linkage audit. No source downloads occur during configure or compilation.
+Five unused-result warnings originate in the pinned fastmcpp process helper;
+they do not prevent the build.
+
+Extraction and inspection of the actual package verify:
+
+- Only `nsight-graphics-mcp` and `ngm-capture` are installed in `/usr/bin`; both
+  report version **0.4.1** and run from the extracted staging directory.
+- Documentation, preview images, the project's MIT license, and fastmcpp,
+  nlohmann/json, cpp-httplib and LodePNG license notices are present.
+- Both executables have direct ELF dependencies on `libstdc++.so.6`,
+  `libgcc_s.so.1`, and `libc.so.6`, with no RPATH/RUNPATH. These match the declared
+  `gcc-libs` and `glibc` dependencies. Development archives and proprietary
+  toolchain helpers are absent from the package.
+- The extracted server negotiates MCP **2025-11-25**, lists **26 tools**, returns
+  `capabilities`, and exits cleanly on stdin EOF with an empty tool-search PATH
+  and an explicitly selected empty Nsight directory.
+
+The initial sandbox attempt encountered the host's read-only ccache directory;
+the authorized local rerun passed. Verification uses the existing Arch host and
+an independent extracted source tree, rather than a clean devtools chroot.
+No package was installed into the host, and no GPU integration was rerun for this
+packaging change. Existing capture qualification keeps its original build IDs.
+Local logs and receipts are in `build/package/arch-package.log`,
+`build/package/arch/`, and `build/package/validation/`.
+
 ## Visual release milestone (0.3.0)
 
 The related R-010/R-002/R-006/R-007/R-015/R-014 group completes at **0.3.0** on
