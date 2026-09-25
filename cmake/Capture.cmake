@@ -8,6 +8,10 @@ function(ngm_add_capture)
 endfunction()
 
 function(ngm_add_capture_checks)
+    ngm_add_check(ngm_profile_workflow_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ProfileWorkflowCheck.cpp"
+        LIBRARIES ngm_capture ngm_inspection
+        ARGS "$<TARGET_FILE:ngm_nsight_standin>" "$<TARGET_FILE:nsight-graphics-mcp>"
+        DEPENDS ngm_nsight_standin nsight-graphics-mcp)
     ngm_add_check(ngm_capture_service_check SOURCES "${PROJECT_SOURCE_DIR}/tests/CaptureServiceCheck.cpp"
         LIBRARIES ngm_capture
         ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)

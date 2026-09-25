@@ -11,7 +11,7 @@ capture, job status/cancellation, and bounded access to managed artifact bundles
 Retained capture metadata and paginated event/object inventories are implemented
 for the observed Nsight 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608
 Vulkan export profiles. The separate `capture_cpp` tool retains generated API
-source, metadata, and binary resource files through artifact access. Executed GPU state and profiling remain pending. At **0.2.12**, the surface has
+source, metadata, and binary resource files through artifact access. General executed GPU state remains unavailable. At **0.3.4**, three profiling tools bring the shared surface to **25 tools**; [PERFORMANCE.md](PERFORMANCE.md) defines their limits and unfinished acceptance work. At **0.2.12**, the surface has
 **22 tools**, including `capture_cpp_resources` and `capture_cpp_resource`. These
 provide literal references and bounded serialized input bytes; see
 [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) for exact scope and configuration.
@@ -56,6 +56,9 @@ below describe stdio unless explicitly identified otherwise.
 
 | Tool | Inputs and behavior |
 | --- | --- |
+| `profile` | Required absolute `executable`, `working_directory`, and `settings.architecture`. Optional arguments, pin, application output option and deadline follow capture. Settings select frames/submits, start/limit/duration and metric set. Launches one fresh target through GPU Trace with clocks unaltered; never changes permissions. Returns identity/artifact ID. See PERFORMANCE.md for defaults and prerequisites. |
+| `profile_metadata` | Required `profile_id`; validates retained service-produced evidence and returns producer, GPU/driver, requested/exported settings and hashed file references. Works offline after restart. |
+| `profile_metrics` | Required `profile_id` and `table` (frame_duration, frame_metrics, event_durations or regime_metrics). Optional row offset/limit (0/50, max 100), numeric column offset/limit (0/32, max 64). Returns positional values with original text, explicit ms for event durations and null for unresolved units. No inferred frame/statistic mapping. |
 | `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, `graphics_capture_api`, or `vk_frame_boundary`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. The extension delimiter requires application-enabled VK_EXT_frame_boundary and frame-end submissions; see COMPUTE.md for its measured 2026.3-only compute profile. Returns `identity` and `artifact_id`. |
 | `capture_cpp` | Required absolute `executable` and `working_directory`; optional `arguments`, `wait_frames` (default 2, range 2–1000000), `timeout_ms`, `pin`, and `application_output_option` with the same bounds as `capture`. Generates a C++ project in a fresh target. Read `derived/cpp-project.json` and its source paths through artifact tools. Does not accept `capture_frame` or `delimiter`; see CPP_CAPTURE.md. |
 | `capture_cpp_source` | Required `capture_id` and indexed `source_path`; optional `start_line` (default 1, range 1–4194304), `max_lines` (default 100, range 1–200). Returns numbered generated replay source lines, content hash and `next_line`; source cap 4 MiB, page cap 256 KiB. |

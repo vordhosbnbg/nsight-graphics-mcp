@@ -3,6 +3,8 @@
 #include "ngm/Capabilities.hpp"
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/Process.hpp"
+#include "ngm/ProfileEvidence.hpp"
+#include "ngm/ProfileSettings.hpp"
 
 #include <cstdint>
 #include <set>
@@ -140,6 +142,27 @@ struct NsightCppCaptureResult {
 // GPU replay, or establish arbitrary resource contents at an event.
 NsightCppCaptureResult run_nsight_cpp_capture(const NsightInstallation& installation,
                                               const NsightCppCaptureOptions& options, std::stop_token stop = {});
+
+struct NsightProfileOptions {
+    NsightRunContext context;
+    std::filesystem::path executable;
+    std::vector<std::string> arguments;
+    std::filesystem::path working_directory;
+    std::filesystem::path output_directory;
+    ProfileSettings settings;
+};
+struct NsightProfileResult {
+    NsightOperationResult operation;
+    ProfileReproduction reproduction;
+    std::filesystem::path trace_file;
+    std::filesystem::path reproduction_file;
+    std::map<std::string, std::filesystem::path> tables;
+};
+// GPU Trace auto-export on the two observed producer profiles. Always leaves
+// clocks unaltered, disables screenshots and uses a fresh target. No permission
+// changes, GPU replay, private-format parsing or inferred metric units.
+NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
+                                       std::stop_token stop = {});
 
 // No shell is used. Because the documented --args string does not define its
 // escaping rules, this adapter accepts only nonempty ASCII tokens composed of

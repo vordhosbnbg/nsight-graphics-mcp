@@ -693,4 +693,153 @@ NsightCppCaptureResult run_nsight_cpp_capture(const NsightInstallation& installa
     }
     return result;
 }
+
+void validate_profile_settings(const ProfileSettings& settings) {
+    if((settings.delimiter != "frames" && settings.delimiter != "submits") || settings.start_after > 1000000 ||
+       settings.limit < 1 || settings.limit > 1000 || settings.duration_ms < 1 || settings.duration_ms > 10000)
+        throw std::invalid_argument(
+            "Profile requires frames/submits, start_after 0..1000000, limit 1..1000, duration_ms 1..10000");
+    constexpr std::string_view characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_";
+    for(const auto* value : {&settings.architecture, &settings.metric_set})
+        if(value->empty() || value->size() > 64 || value->find_first_not_of(characters) != std::string::npos ||
+           value->front() == ' ' || value->back() == ' ')
+            throw std::invalid_argument("Profile architecture and metric_set require 1..64 ASCII name characters");
+}
+
+NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
+                                       std::stop_token stop) {
+    namespace fs = std::filesystem;
+    NsightProfileResult result;
+    auto& operation = result.operation;
+    operation.process.cleanup_confirmed = true;
+    if(!usable_installation(operation, installation))
+        return result;
+    const auto& cli = installation.cli;
+    if(!cli.path || !cli.help_valid || !matching_tools(cli, installation.capture) ||
+       !((cli.version == "2026.3.1.0" && cli.build == "38722833") ||
+         (cli.version == "2026.2.0.0" && cli.build == "37991608"))) {
+        operation.outcome = NsightOutcome::Unavailable;
+        operation.message = "GPU Trace requires matching qualified 2026.3.1.0/38722833 or 2026.2.0.0/37991608 tools";
+        return result;
+    }
+    for(const auto* flag :
+        {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--args", "--auto-export", "--architecture",
+         "--metric-set-name", "--set-gpu-clocks", "--collect-screenshot", "--max-duration-ms", "--start-after-frames",
+         "--start-after-submits", "--limit-to-frames", "--limit-to-submits"}) {
+        if(!cli.documented_options.contains(flag)) {
+            operation.outcome = NsightOutcome::Unavailable;
+            operation.message = std::string("ngfx help does not advertise GPU Trace option ") + flag;
+            return result;
+        }
+    }
+    const auto deadline = std::chrono::steady_clock::now() + options.context.timeout;
+    fs::path output;
+    try {
+        validate_profile_settings(options.settings);
+        const auto target = executable_path(options.executable);
+        const auto directory = directory_path(options.working_directory, "Application working directory");
+        const auto arguments = target_arguments(options.arguments);
+        output = fresh_file(options.output_directory);
+        auto process = process_options(*cli.path, options.context, "profile");
+        if(!fs::create_directory(output))
+            throw std::runtime_error("Could not claim fresh GPU Trace output directory");
+        process.arguments = {"--activity=GPU Trace Profiler",
+                             "--platform=Linux (x86_64)",
+                             "--exe=" + target.string(),
+                             "--dir=" + directory.string(),
+                             "--output-dir=" + output.string(),
+                             "--start-after-" + options.settings.delimiter + "=" +
+                                 std::to_string(options.settings.start_after),
+                             "--limit-to-" + options.settings.delimiter + "=" + std::to_string(options.settings.limit),
+                             "--max-duration-ms=" + std::to_string(options.settings.duration_ms),
+                             "--architecture=" + options.settings.architecture,
+                             "--metric-set-name=" + options.settings.metric_set,
+                             "--set-gpu-clocks=unaltered",
+                             "--collect-screenshot=0",
+                             "--auto-export"};
+        if(!arguments.empty())
+            process.arguments.push_back("--args=" + arguments);
+        if(!run_operation(operation, process, stop))
+            return result;
+    } catch(const std::exception& error) {
+        operation.outcome = NsightOutcome::InvalidInput;
+        operation.message = error.what();
+        return result;
+    }
+    const auto interrupted = [&] {
+        if(!stop.stop_requested() && std::chrono::steady_clock::now() < deadline)
+            return false;
+        operation.outcome = stop.stop_requested() ? NsightOutcome::Cancelled : NsightOutcome::TimedOut;
+        operation.message = "GPU Trace stopped during export validation";
+        return true;
+    };
+    try {
+        if(fs::symlink_status(output).type() != fs::file_type::directory)
+            throw std::runtime_error("GPU Trace output is not a real directory");
+        std::size_t entries = 0;
+        std::uint64_t bytes = 0;
+        std::vector<fs::path> traces, metadata;
+        constexpr std::uint64_t maximum_bytes = 1024ULL * 1024 * 1024;
+        for(auto it = fs::recursive_directory_iterator(output); it != fs::recursive_directory_iterator(); ++it) {
+            if(interrupted())
+                return result;
+            if(++entries > 256 || it.depth() > 3 || it->path().lexically_relative(output).native().size() > 384)
+                throw std::runtime_error("GPU Trace output exceeds entry/depth/path bounds");
+            const auto type = it->symlink_status().type();
+            if(type == fs::file_type::directory)
+                continue;
+            if(type != fs::file_type::regular || fs::hard_link_count(it->path()) != 1)
+                throw std::runtime_error("GPU Trace output contains non-regular or multiply linked evidence");
+            const auto size = regular_file_size(it->path(), true, maximum_bytes);
+            if(size > maximum_bytes - bytes)
+                throw std::runtime_error("GPU Trace output exceeds 1 GiB");
+            bytes += size;
+            if(it->path().extension() == ".ngfx-gputrace")
+                traces.push_back(it->path());
+            if(it->path().filename() == "REPRO_INFO.xls")
+                metadata.push_back(it->path());
+        }
+        if(traces.size() != 1 || metadata.size() != 1)
+            throw std::runtime_error("Expected exactly one GPU Trace and reproduction export");
+        regular_file_size(traces.front(), false, maximum_bytes);
+        const auto repro =
+            parse_profile_reproduction(read_regular_file(metadata.front(), ProfileEvidenceLimits::bytes));
+        if(repro.product_version != cli.version + " (build " + cli.build + ") (public-release)")
+            throw std::runtime_error("GPU Trace producer differs from selected tools");
+        const std::string suffix = options.settings.delimiter == "frames" ? " Frames" : " Submits";
+        if(repro.settings.at("GPU Clocks") != "Unaltered" ||
+           repro.settings.at("Metric Set") != options.settings.metric_set ||
+           repro.settings.at("Multi-Pass Metrics") != "Disabled" ||
+           repro.settings.at("Start After") != std::to_string(options.settings.start_after) + suffix ||
+           repro.settings.at("Limited To") != std::to_string(options.settings.limit) + suffix ||
+           !repro.settings.contains("Max Duration ") ||
+           repro.settings.at("Max Duration ") != std::to_string(options.settings.duration_ms) + " ms")
+            throw std::runtime_error("GPU Trace exported settings differ from requested collection");
+        for(const auto& [name, file, kind] : std::vector<std::tuple<std::string, std::string, ProfileTableKind>>{
+                {"frame_duration", "FRAME.xls", ProfileTableKind::FrameDuration},
+                {"frame_metrics", "GPUTRACE_FRAME.xls", ProfileTableKind::FrameMetrics},
+                {"event_durations", "D3DPERF_EVENTS.xls", ProfileTableKind::EventDurations},
+                {"regime_metrics", "GPUTRACE_REGIMES.xls", ProfileTableKind::RegimeMetrics}}) {
+            if(interrupted())
+                return result;
+            const auto path = metadata.front().parent_path() / file;
+            (void)parse_profile_table(read_regular_file(path, ProfileEvidenceLimits::bytes), kind);
+            result.tables.emplace(name, path);
+        }
+        if(interrupted())
+            return result;
+        result.reproduction = repro;
+        result.reproduction_file = metadata.front();
+        result.trace_file = traces.front();
+        operation.output_file = output;
+        operation.output_bytes = bytes;
+        operation.outcome = NsightOutcome::Success;
+        operation.message = "Live GPU Trace and four bounded text exports validated; numeric positions and physical "
+                            "scaling are not inferred";
+    } catch(const std::exception& error) {
+        operation.outcome = NsightOutcome::InvalidOutput;
+        operation.message = error.what();
+    }
+    return result;
+}
 } // namespace ngm

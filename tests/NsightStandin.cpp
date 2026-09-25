@@ -107,6 +107,12 @@ int main(int argc, char** argv) {
         for(const auto& argument : arguments) {
             stream << argument.size() << ':' << argument << '\n';
         }
+        const auto evidence = value(arguments, "--many-evidence");
+        if(!evidence.empty()) {
+            std::filesystem::create_directories(evidence);
+            for(int i = 0; i < 520; ++i)
+                std::ofstream(std::filesystem::path(evidence) / (std::to_string(i) + ".txt")) << "application evidence";
+        }
         std::cout << "target stdout\n";
         std::cerr << "target stderr\n";
         return 0;
@@ -137,9 +143,12 @@ int main(int argc, char** argv) {
             std::cout << "unrelated program --help --version\n";
         } else if(is_cli) {
             std::cout << "NVIDIA Nsight Graphics [general_options] [activity_options]:\n--version --help --help-all\n";
-            for(const auto* option : {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--wait-frames",
-                                      "--args", "--env", "--no-timeout"}) {
-                if(environment("NGM_OMIT_CPP_OPTION") != option) {
+            for(const auto* option :
+                {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--wait-frames", "--args", "--env",
+                 "--no-timeout", "--auto-export", "--architecture", "--metric-set-name", "--set-gpu-clocks",
+                 "--collect-screenshot", "--max-duration-ms", "--start-after-frames", "--start-after-submits",
+                 "--limit-to-frames", "--limit-to-submits"}) {
+                if(environment("NGM_OMIT_CPP_OPTION") != option && environment("NGM_OMIT_PROFILE_OPTION") != option) {
                     std::cout << ' ' << option;
                 }
             }
@@ -174,6 +183,9 @@ int main(int argc, char** argv) {
     if(is_cli && !environment("NGM_STANDIN_CPP_MODE").empty()) {
         mode = environment("NGM_STANDIN_CPP_MODE");
     }
+    if(is_cli && value(arguments, "--activity") == "GPU Trace Profiler" &&
+       !environment("NGM_STANDIN_PROFILE_MODE").empty())
+        mode = environment("NGM_STANDIN_PROFILE_MODE");
     std::cerr << "stand-in diagnostic only\n";
     if(mode == "hang") {
         hang();
@@ -181,6 +193,49 @@ int main(int argc, char** argv) {
     if(mode == "fail") {
         std::cout << "Version: 2026.3.1.0 (build 38722833)\n";
         return 1;
+    }
+    if(is_cli && value(arguments, "--activity") == "GPU Trace Profiler") {
+        namespace fs = std::filesystem;
+        if(value(arguments, "--set-gpu-clocks") != "unaltered" || value(arguments, "--collect-screenshot") != "0" ||
+           !has(arguments, "--auto-export") || value(arguments, "--platform") != "Linux (x86_64)")
+            return 86;
+        const auto target_exit = launch_target(arguments);
+        if(target_exit || mode == "missing")
+            return target_exit;
+        const auto output = fs::path(value(arguments, "--output-dir"));
+        const auto tables = output / "BASE_UNLOCKED";
+        fs::create_directories(tables);
+        std::ofstream(output / "synthetic.ngfx-gputrace") << "CPU synthetic trace, not Nsight binary evidence";
+        if(mode == "duplicate-trace")
+            std::ofstream(output / "second.ngfx-gputrace") << "duplicate";
+        const bool frames = !value(arguments, "--start-after-frames").empty();
+        const std::string unit = frames ? "frames" : "submits", suffix = frames ? " Frames" : " Submits";
+        std::ofstream(tables / "REPRO_INFO.xls")
+            << "Product Version\t" << (mode == "wrong-producer" ? "2026.9.0.0" : "2026.3.1.0")
+            << " (build 38722833) (public-release)\n"
+            << "Device Name\tCPU stand-in (not GPU evidence)\nDriver Version\tsynthetic\nAPI\tVulkan\n"
+            << "GPU Clocks\t" << (mode == "settings" ? "Base" : "Unaltered") << "\nMetric Set\t"
+            << value(arguments, "--metric-set-name") << "\nMulti-Pass Metrics\tDisabled\nStart After\t"
+            << value(arguments, "--start-after-" + unit) << suffix << "\nLimited To\t"
+            << value(arguments, "--limit-to-" + unit) << suffix << "\nMax Duration \t"
+            << value(arguments, "--max-duration-ms") << " ms\n";
+        std::ofstream(tables / "FRAME.xls") << "GPU frame time\t0.5\n";
+        std::ofstream(tables / "GPUTRACE_FRAME.xls") << "synthetic.metric\t1\nsecond.metric\t2\n";
+        std::ofstream(tables / "D3DPERF_EVENTS.xls")
+            << "event_text\ttime_ms\nsynthetic.work\t0.1\nsynthetic.work\t0.2\n";
+        std::ofstream(tables / "GPUTRACE_REGIMES.xls")
+            << "flattened_event_name\tsynthetic.metric\tsynthetic.metric\nsynthetic.work\t1\t2\nsynthetic.work\t3\t4\n";
+        if(mode == "malformed")
+            std::ofstream(tables / "GPUTRACE_FRAME.xls") << "bad\tnan\n";
+        if(mode == "oversize")
+            std::ofstream(tables / "GPUTRACE_FRAME.xls") << std::string(16 * 1024 * 1024 + 1, 'x');
+        if(mode == "hardlink")
+            fs::create_hard_link(output / "synthetic.ngfx-gputrace", output / "linked-trace");
+        if(mode == "symlink") {
+            fs::remove(tables / "GPUTRACE_FRAME.xls");
+            fs::create_symlink("FRAME.xls", tables / "GPUTRACE_FRAME.xls");
+        }
+        return 0;
     }
     if(is_cli) {
         if(value(arguments, "--activity") != "Generate C++ Capture" ||

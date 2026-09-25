@@ -106,7 +106,7 @@ Json manifest_provenance(const Json& report) {
     Json result{{"report_path", "raw/report.json"}};
     for(const auto* key : {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings",
                            "sdk", "readable_capture", "generated_cpp_project", "application_identity_observed",
-                           "cleanup_confirmed", "worker_outcome"}) {
+                           "cleanup_confirmed", "worker_outcome", "profiled"}) {
         if(report.contains(key)) {
             result[key] = report.at(key);
         }
@@ -144,18 +144,18 @@ std::string failure_reason(const std::string& message) {
     return result.empty() ? "Capture failed without a diagnostic" : result;
 }
 
-void retain_safe_cpp_failure_output(const fs::path& root, Json& report) {
+void retain_safe_cpp_failure_output(const fs::path& root, Json& report, const std::string& kind = "cpp") {
     // Only called after confirmed process cleanup, only on this attempt's
     // rejected generated output. Preserve regular evidence and never follow
     // links. Invalid entries cannot enter the artifact store's file inventory.
-    const auto output = root / "raw/cpp";
+    const auto output = root / "raw" / kind;
     std::error_code error;
     const auto type = fs::symlink_status(output, error).type();
     if(type == fs::file_type::not_found || error == std::errc::no_such_file_or_directory) {
         return;
     }
     if(error) {
-        throw std::runtime_error("Cannot inspect rejected C++ output: " + error.message());
+        throw std::runtime_error("Cannot inspect rejected " + kind + " output: " + error.message());
     }
     Json removed = Json::array();
     std::size_t removed_entries = 0;
@@ -192,7 +192,7 @@ void retain_safe_cpp_failure_output(const fs::path& root, Json& report) {
         }
     }
     if(removed_entries != 0) {
-        report["rejected_cpp_output"] = {
+        report["rejected_" + kind + "_output"] = {
             {"removed_entries", removed_entries},
             {"examples", std::move(removed)},
             {"policy", "After confirmed cleanup, rejected non-regular/over-limit entries in this attempt were removed. "
@@ -238,6 +238,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
     const auto root = attempt->writer.directory();
     bool readable_capture = false;
     bool generated_cpp_project = false;
+    bool profiled = false;
     bool inspected_application = false;
     try {
         const auto environment = isolated_environment(options, root);
@@ -270,7 +271,50 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
             throw std::runtime_error("Capture stopped before application launch");
         }
         fs::create_directories(root / "raw/logs/capture");
-        if(request.format == CaptureFormat::Cpp) {
+        if(request.format == CaptureFormat::Profile) {
+            NsightProfileOptions profile;
+            profile.context = {root / "raw/logs/capture", environment, remaining(context)};
+            profile.executable = request.executable;
+            profile.arguments = request.arguments;
+            profile.working_directory = request.working_directory;
+            profile.output_directory = root / "raw/profile";
+            profile.settings = request.profile;
+            completion.cleanup_confirmed = false;
+            const auto collected = run_nsight_profile(installation, profile, context.stop);
+            completion.cleanup_confirmed =
+                !collected.operation.launched || collected.operation.process.cleanup_confirmed;
+            report["profile"] = operation_json(collected.operation, root);
+            if(collected.operation.outcome != NsightOutcome::Success) {
+                if(completion.cleanup_confirmed)
+                    retain_safe_cpp_failure_output(root, report, "profile");
+                throw std::runtime_error("Profiling failed: " + collected.operation.message);
+            }
+            const auto reference = [&](const fs::path& path) {
+                return Json{{"path", relative_evidence(path, root)},
+                            {"sha256", sha256_regular_file(path, context.deadline, context.stop)}};
+            };
+            Json tables = Json::object();
+            for(const auto& [name, path] : collected.tables)
+                tables[name] = reference(path);
+            const auto& reproduction = collected.reproduction;
+            Json index{{"schema_version", 1},
+                       {"evidence_origin", "nsight_gpu_trace"},
+                       {"job", context.identity},
+                       {"trace", reference(collected.trace_file)},
+                       {"reproduction", reference(collected.reproduction_file)},
+                       {"tables", std::move(tables)},
+                       {"producer", reproduction.product_version},
+                       {"gpu", reproduction.gpu},
+                       {"driver", reproduction.driver},
+                       {"settings", reproduction.settings},
+                       {"requested", report.at("capture_settings")},
+                       {"scope",
+                        "Live target auto-export. Positional values are not independent runs or min/mean/max. "
+                        "No arbitrary physical unit scaling, GPU replay or application correctness inferred."}};
+            save(root / "derived/profile.json", index);
+            report["profile_index"] = "derived/profile.json";
+            profiled = true;
+        } else if(request.format == CaptureFormat::Cpp) {
             NsightCppCaptureOptions capture;
             capture.context = {root / "raw/logs/capture", environment, remaining(context)};
             capture.executable = request.executable;
@@ -393,6 +437,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
     }
     report["readable_capture"] = readable_capture;
     report["generated_cpp_project"] = generated_cpp_project;
+    report["profiled"] = profiled;
     report["application_identity_observed"] = inspected_application;
     report["cleanup_confirmed"] = completion.cleanup_confirmed;
     report["worker_outcome"] = completion.outcome == JobOutcome::succeeded ? "succeeded" : "failed";
@@ -475,7 +520,11 @@ CaptureService::~CaptureService() {
 
 CaptureSubmission CaptureService::capture(CaptureRequest request) {
     const auto delimiter = capture_delimiter_name(request.delimiter);
-    if((request.format != CaptureFormat::Graphics && request.format != CaptureFormat::Cpp) ||
+    if((request.format != CaptureFormat::Graphics && request.format != CaptureFormat::Cpp &&
+        request.format != CaptureFormat::Profile) ||
+       (request.format != CaptureFormat::Profile && request.profile != ProfileSettings{}) ||
+       (request.format == CaptureFormat::Profile && (request.delimiter != CaptureDelimiter::Present ||
+                                                     request.capture_frame != 2 || request.cpp_wait_frames != 2)) ||
        (request.format == CaptureFormat::Cpp &&
         (request.delimiter != CaptureDelimiter::Present || request.capture_frame != 2 || request.cpp_wait_frames < 2 ||
          request.cpp_wait_frames > 1000000)) ||
@@ -510,10 +559,14 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
        !fs::is_directory(request.working_directory)) {
         throw std::invalid_argument("Application requires a regular executable file and existing working directory");
     }
+    if(request.format == CaptureFormat::Profile)
+        validate_profile_settings(request.profile);
     artifacts_.prune();
     Json provenance{{"schema_version", 1},
                     {"project_version", project_version()},
-                    {"evidence_origin", request.format == CaptureFormat::Cpp ? "nsight_cpp_capture" : "nsight_capture"},
+                    {"evidence_origin", request.format == CaptureFormat::Profile ? "nsight_gpu_trace"
+                                        : request.format == CaptureFormat::Cpp   ? "nsight_cpp_capture"
+                                                                                 : "nsight_capture"},
                     {"backend", "documented_nsight_cli"},
                     {"application",
                      {{"executable", request.executable.string()},
@@ -534,11 +587,25 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
             {"format", "cpp"}, {"wait_frames", request.cpp_wait_frames}, {"timeout_ms", request.timeout.count()}};
         provenance["sdk"]["status"] = "not_applicable";
     }
+    if(request.format == CaptureFormat::Profile) {
+        provenance["capture_settings"] = {{"format", "profile"},
+                                          {"delimiter", request.profile.delimiter},
+                                          {"start_after", request.profile.start_after},
+                                          {"limit", request.profile.limit},
+                                          {"duration_ms", request.profile.duration_ms},
+                                          {"architecture", request.profile.architecture},
+                                          {"metric_set", request.profile.metric_set},
+                                          {"gpu_clocks", "unaltered"},
+                                          {"multi_pass", false},
+                                          {"timeout_ms", request.timeout.count()}};
+        provenance["sdk"]["status"] = "not_applicable";
+    }
     auto attempt = std::make_shared<Attempt>();
     attempt->artifacts = &artifacts_;
     attempt->provenance = provenance;
     const std::vector<std::string> required_outputs =
-        request.format == CaptureFormat::Cpp
+        request.format == CaptureFormat::Profile ? std::vector<std::string>{"derived/profile.json", "raw/report.json"}
+        : request.format == CaptureFormat::Cpp
             ? std::vector<std::string>{"derived/cpp-project.json", "raw/report.json"}
             : std::vector<std::string>{"raw/capture.ngfx-capture", "raw/exports/metadata.raw", "raw/report.json"};
     attempt->writer = artifacts_.begin(manifest_provenance(provenance), required_outputs, request.pin);

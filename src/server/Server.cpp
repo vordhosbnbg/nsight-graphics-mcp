@@ -96,7 +96,16 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
             {"reason", "Each read requires a matching configured worker, exact qualified capture helpers and Linux "
                        "confinement. Configuration does not verify the binary or kernel support; the read checks both. "
                        "Each read retains database snapshots, output and logs as a quota-managed artifact."}}},
-          {"profiling", unavailable("GPU profiling and metric extraction are pending.")},
+          {"profiling",
+           {{"available", capture_ready},
+            {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
+            {"reason",
+             "Fresh-target GPU Trace collection requires "
+             "matching qualified tools, explicit architecture selection, compatible GPU/driver and "
+             "profiling permissions. Permissions are not probed or changed by this query. Clocks remain "
+             "unaltered. Retained metric queries require only --artifact-root, independently of this collection "
+             "availability. Numeric positions and unresolved physical units are preserved; workload "
+             "correctness, repeated comparisons and performance improvement are not inferred."}}},
           {"fixture_via_mcp",
            unavailable("No fixture-specific tool; the generic capture tool accepts its absolute executable path.")}}},
         {"prerequisites",
@@ -343,7 +352,8 @@ struct ProtocolService::Impl {
             "Use capture_cpp_source/capture_cpp_draws for qualified generated-source relationships and coverage "
             "limits. "
             "Found executable paths are not evidence of Nsight or GPU compatibility. Generated-source relationships "
-            "do not establish GPU state or extracted resource bytes; profiling is not implemented.");
+            "do not establish GPU state or extracted resource bytes. GPU Trace metrics preserve observed export "
+            "semantics.");
     }
 };
 ProtocolService::ProtocolService(const ServerOptions& options) : impl_(std::make_unique<Impl>(options)) {}

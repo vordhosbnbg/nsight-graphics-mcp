@@ -2,6 +2,7 @@
 
 #include "ngm/Artifacts.hpp"
 #include "ngm/Jobs.hpp"
+#include "ngm/ProfileSettings.hpp"
 
 #include <filesystem>
 #include <map>
@@ -11,7 +12,7 @@
 #include <vector>
 
 namespace ngm {
-enum class CaptureFormat { Graphics, Cpp };
+enum class CaptureFormat { Graphics, Cpp, Profile };
 enum class CaptureDelimiter { Present, GraphicsCaptureApi, VulkanFrameBoundary };
 std::string_view capture_delimiter_name(CaptureDelimiter delimiter);
 CaptureDelimiter parse_capture_delimiter(std::string_view name);
@@ -40,6 +41,7 @@ struct CaptureRequest {
     // Optional source-controlled fixture/app convention: append this option and
     // a fresh raw/application path. Empty leaves the supplied argv unchanged.
     std::string application_output_option;
+    ProfileSettings profile;
     // Supplemental caller-provided provenance is labelled separately from
     // executable hashes and tool observations made by this service.
     nlohmann::json application_provenance = nlohmann::json::object();

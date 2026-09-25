@@ -1156,3 +1156,38 @@ snapshot is pinned as `bundle-d345e0dadab7961610746f6f2d4845e2` in
 `artifacts/performance-evidence`, with 284 payload hashes and pin-after-restart
 verified. [PERFORMANCE.md](PERFORMANCE.md) records scope and limitations. R-009
 remains In Progress; the 22 MCP tools do not yet include profiling or metric queries.
+
+## Shared profiling service slice — 0.3.4
+
+GCC 16.2.1 Debug passes all **28/28 CPU checks** (262.14 seconds). After the
+review correction aligning inspection's whole-bundle inventory bound with the
+artifact store, the focused `ngm_profile_workflow_check` passes again (9.35
+seconds), including 520 application output files, same-size retained evidence
+corruption, unsupported tool/help observations, malformed/linked exports,
+timeout/cancellation, shared capture/profile GPU reservation and real stdio MCP
+calls using CPU stand-ins. The aggregate preceded that final narrow correction;
+it was not repeated afterward. Existing HTTP/stdin checks discover the shared
+25-tool surface.
+
+A separate C++ MCP integration runner invokes the actual server and installed
+Nsight tools. Both 2026.3.1.0/build 38722833 and 2026.2.0.0/build 37991608 produce
+successful, pinned profile bundles with confirmed cleanup. Actual
+`profile_metadata` and `profile_metrics` calls retrieve all four export tables;
+a fresh server without tool configuration returns identical metadata, and both
+server lifetimes exit 0. The wrapper restores the exact original profiling ACLs
+and DeviceFileModify settings. The server reports 0.3.4; the private workload
+binary remains the previously retained 0.3.2 prototype, with exact copied hashes.
+These are MCP protocol-client runs, not a new Codex-client acceptance claim.
+
+Working records are in `build/profile-service-integration`, CPU logs in
+`build/profile-aggregate.log` and `build/profile-workflow-final.log`, and
+fresh-context reviews in `build/profile-service-review`. The source-integrated
+workload, independent repeated comparisons and performance source-repair
+acceptance remain unfinished under R-009. See [PERFORMANCE.md](PERFORMANCE.md).
+
+Independent acceptance review checks actual MCP numeric results against the raw
+exports, producer/cleanup identities and restoration records with no remaining
+slice blocker. The complete service snapshot is pinned as
+`bundle-9de7695e0225eb604775a6fe52c5a4dd` in `artifacts/performance-evidence`;
+all 124 payload hashes and the pin after restart verify. Publication receipts are
+in `build/profile-service-publication`.

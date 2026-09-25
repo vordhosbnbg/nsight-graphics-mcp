@@ -1,6 +1,6 @@
 # Persistent Streamable HTTP service
 
-R-004 adds an optional local HTTP transport over the same 22-tool implementation
+R-004 adds an optional local HTTP transport over the same shared tool implementation (25 tools at 0.3.4)
 as stdio. R-004 completes at 0.3.2 after independent acceptance and pinned evidence publication.
 Stdio remains the default. HTTP is a persistent process: stdin EOF has no effect,
 and each HTTP client has an independent MCP initialization/session state.

@@ -103,9 +103,12 @@ Json query_capabilities(Client& client) {
                                                         "capture_cpp_source",
                                                         "capture_cpp_draws",
                                                         "capture_cpp_resources",
-                                                        "capture_cpp_resource"}),
+                                                        "capture_cpp_resource",
+                                                        "profile",
+                                                        "profile_metadata",
+                                                        "profile_metrics"}),
             "exactly the implemented tools advertised");
-    for(const auto* name : {"profiling", "fixture_via_mcp"}) {
+    for(const auto* name : {"fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
         require(operation["available"] == false && operation["status"] == "not_implemented",
                 "pending typed integrations remain unavailable");
@@ -126,7 +129,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 22, "discover exactly the implemented tools");
+    require(listing.size() == 25, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");

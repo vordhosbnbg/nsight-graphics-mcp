@@ -3,6 +3,7 @@
 #include "ngm/ImageEvidence.hpp"
 #include "ngm/Inspection.hpp"
 #include "ngm/NsightEvidence.hpp"
+#include "ngm/ProfileInspection.hpp"
 #include "ngm/Version.hpp"
 
 #include <fastmcpp/util/pagination.hpp>
@@ -521,7 +522,10 @@ Json implemented_tool_names() {
                         "capture_cpp_source",
                         "capture_cpp_draws",
                         "capture_cpp_resources",
-                        "capture_cpp_resource"});
+                        "capture_cpp_resource",
+                        "profile",
+                        "profile_metadata",
+                        "profile_metrics"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -544,6 +548,139 @@ bool WorkflowTools::shutdown() {
 }
 
 void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
+    const auto profile_ref =
+        object_schema({{"path", string_schema(512, 1)}, {"sha256", string_schema(64, 64)}}, {"path", "sha256"});
+    const auto settings_input =
+        object_schema({{"delimiter", {{"type", "string"}, {"maxLength", 7}, {"enum", {"frames", "submits"}}}},
+                       {"start_after", integer_schema(0, 1000000)},
+                       {"limit", integer_schema(1, 1000)},
+                       {"duration_ms", integer_schema(1, 10000)},
+                       {"architecture", string_schema(64, 1)},
+                       {"metric_set", string_schema(64, 1)}},
+                      {"architecture"});
+    auto profile_input = object_schema({{"executable", string_schema(4096, 1)},
+                                        {"working_directory", string_schema(4096, 1)},
+                                        {"arguments", array_schema(string_schema(4096), 256)},
+                                        {"settings", settings_input},
+                                        {"timeout_ms", integer_schema(1, 600000)},
+                                        {"pin", boolean_schema()},
+                                        {"application_output_option", string_schema(64)}},
+                                       {"executable", "working_directory", "settings"});
+    add_tool(tools, "profile", profile_input,
+             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                           {"identity", "artifact_id"}),
+             "Submit a fresh live-target GPU Trace job, serialized with captures. Requires profiling permission, "
+             "matching qualified "
+             "Nsight tools and an explicit architecture name from ngfx help. Defaults: start after 30 submits, limit 3 "
+             "submits, "
+             "duration 1000 ms, Throughput Metrics, deadline 120000 ms. Clocks are always unaltered; permissions are "
+             "never changed. "
+             "Poll job_status. This does not verify application correctness, warmup sufficiency or repeated-run "
+             "equivalence.",
+             false, false, [this](const Json& arguments) {
+                 CaptureRequest request;
+                 request.format = CaptureFormat::Profile;
+                 request.executable = absolute_path(arguments.at("executable"), true);
+                 request.working_directory = absolute_path(arguments.at("working_directory"));
+                 request.arguments = arguments.value("arguments", std::vector<std::string>{});
+                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+                 request.pin = arguments.value("pin", false);
+                 request.application_output_option = arguments.value("application_output_option", "");
+                 if(!request.application_output_option.empty() &&
+                    (request.application_output_option.front() != '-' ||
+                     request.application_output_option.find_first_of(" \t\r\n") != std::string::npos))
+                     throw std::invalid_argument("application_output_option must be one option starting with '-'");
+                 const auto& settings = arguments.at("settings");
+                 request.profile = {settings.value("delimiter", "submits"),
+                                    settings.value("start_after", std::uint64_t{30}),
+                                    settings.value("limit", std::uint64_t{3}),
+                                    settings.value("duration_ms", std::uint64_t{1000}),
+                                    settings.at("architecture"),
+                                    settings.value("metric_set", "Throughput Metrics")};
+                 return Json(service().capture(std::move(request)));
+             });
+    Json exported_fields = Json::object();
+    for(const auto key : {"API", "Chip Name", "Start After", "Max Duration ", "Limited To", "V-Sync Mode", "GPU Clocks",
+                          "Metric Set", "Real-Time Shader Profiler", "Multi-Pass Metrics", "Time Every Action"})
+        exported_fields[key] = string_schema(4096);
+    auto requested_schema = settings_input;
+    requested_schema["properties"]["format"] = {{"type", "string"}, {"enum", {"profile"}}};
+    requested_schema["properties"]["gpu_clocks"] = {{"type", "string"}, {"enum", {"unaltered"}}};
+    requested_schema["properties"]["multi_pass"] = boolean_schema();
+    requested_schema["properties"]["timeout_ms"] = integer_schema(1, 600000);
+    requested_schema["required"] = {"format",       "delimiter",  "start_after", "limit",      "duration_ms",
+                                    "architecture", "metric_set", "gpu_clocks",  "multi_pass", "timeout_ms"};
+    const auto profile_tables = object_schema({{"frame_duration", profile_ref},
+                                               {"frame_metrics", profile_ref},
+                                               {"event_durations", profile_ref},
+                                               {"regime_metrics", profile_ref}},
+                                              {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"});
+    add_tool(tools, "profile_metadata", object_schema({{"profile_id", string_schema(39, 39)}}, {"profile_id"}),
+             object_schema({{"profile_id", string_schema(39, 39)},
+                            {"producer", string_schema(128, 1)},
+                            {"gpu", string_schema(4096, 1)},
+                            {"driver", string_schema(4096, 1)},
+                            {"settings", object_schema(exported_fields)},
+                            {"requested", requested_schema},
+                            {"trace", profile_ref},
+                            {"reproduction", profile_ref},
+                            {"tables", profile_tables},
+                            {"scope", string_schema(512)}},
+                           {"profile_id", "producer", "gpu", "driver", "settings", "requested", "trace", "reproduction",
+                            "tables", "scope"}),
+             "Inspect a complete service-produced GPU Trace using retained producer/settings evidence. No live tool or "
+             "GPU is required. "
+             "Imports and failed attempts are not qualified profiles; inspect them through artifact tools.",
+             true, false, [this](const Json& args) {
+                 return ProfileInspection(service().artifacts()).metadata(artifact_id(args, "profile_id"));
+             });
+    const auto number = object_schema({{"column_index", integer_schema(0, 4096)},
+                                       {"column_name", nullable(string_schema(4096))},
+                                       {"text", string_schema(4096, 1)},
+                                       {"value", {{"type", "number"}}},
+                                       {"unit", nullable(string_schema(16))}},
+                                      {"column_index", "column_name", "text", "value", "unit"});
+    const auto profile_row = object_schema({{"row_index", integer_schema(0, 4096)},
+                                            {"label", string_schema(4096, 1)},
+                                            {"values", array_schema(number, 64)}},
+                                           {"row_index", "label", "values"});
+    add_tool(tools, "profile_metrics",
+             object_schema({{"profile_id", string_schema(39, 39)},
+                            {"table",
+                             {{"type", "string"},
+                              {"maxLength", 16},
+                              {"enum", {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"}}}},
+                            {"offset", integer_schema(0, 4096)},
+                            {"limit", integer_schema(1, 100)},
+                            {"column_offset", integer_schema(0, 4096)},
+                            {"column_limit", integer_schema(1, 64)}},
+                           {"profile_id", "table"}),
+             object_schema({{"profile_id", string_schema(39, 39)},
+                            {"table", string_schema(16)},
+                            {"source", profile_ref},
+                            {"total_rows", integer_schema(0, 4096)},
+                            {"total_columns", integer_schema(0, 4096)},
+                            {"offset", integer_schema(0, 4096)},
+                            {"column_offset", integer_schema(0, 4096)},
+                            {"rows", array_schema(profile_row, 100)},
+                            {"next_offset", nullable(integer_schema(0, 4096))},
+                            {"next_column_offset", nullable(integer_schema(0, 4096))},
+                            {"scope", string_schema(512)}},
+                           {"profile_id", "table", "source", "total_rows", "total_columns", "offset", "column_offset",
+                            "rows", "next_offset", "next_column_offset", "scope"}),
+             "Page retained GPU Trace TSV rows and numeric columns after provenance/hash checks. Positions and "
+             "duplicate labels are "
+             "preserved, not joined to capture events or interpreted as min/mean/max. Only event_durations has "
+             "explicit ms units; "
+             "other units are null because physical scaling is unresolved. Defaults: 50 rows and 32 columns; pages may "
+             "be byte-limited.",
+             true, false, [this](const Json& args) {
+                 return ProfileInspection(service().artifacts())
+                     .metrics(artifact_id(args, "profile_id"), args.at("table"), args.value("offset", std::size_t{0}),
+                              args.value("limit", std::size_t{50}), args.value("column_offset", std::size_t{0}),
+                              args.value("column_limit", std::size_t{32}));
+             });
+
     add_tool(tools, "capture",
              object_schema({{"executable", string_schema(4096, 1)},
                             {"arguments", array_schema(string_schema(4096), 256)},

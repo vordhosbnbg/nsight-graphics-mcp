@@ -77,9 +77,11 @@ workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass.
 Client disconnect/session deletion preserves jobs; service shutdown cleans them
 up. See [docs/HTTP.md](docs/HTTP.md). R-009 performance remains unfinished.
 After explicit owner approval, five real GPU Trace probes pass on the two
-matching releases, with temporary permissions
-restored after each batch. The 0.3.3 slice adds bounded export parsers; production
-profiling tools and acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+matching releases, with temporary permissions restored after each batch. The
+0.3.3 slice adds bounded export parsers; 0.3.4 adds shared asynchronous profiling
+and retained metric queries, with actual MCP protocol calls on both releases.
+All 28 CPU checks pass, followed by the final focused regression. Product workload,
+repeatable comparison and source-repair acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual
@@ -93,7 +95,7 @@ The repository now implements the **0.3.0 visual first-release group**
 0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
 builds, a deterministic windowed Vulkan fixture, a C++ experiment runner,
 fastmcpp stdio integration, asynchronous capture jobs and managed artifact storage.
-The server exposes **22 tools**, including bounded metadata/event/object queries,
+The server exposes **25 tools**, including bounded metadata/event/object queries,
 image previews/comparisons, generated-source relationships and qualified optional
 serialized-resource reads. `ngm-capture` shares the capture service.
 
