@@ -73,32 +73,37 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 R-004 completes at **0.3.2** with optional persistent Streamable HTTP on IPv4
 loopback, required private-file bearer authentication and a shared trusted-user
-workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass.
-Client disconnect/session deletion preserves jobs; service shutdown cleans them
-up. See [docs/HTTP.md](docs/HTTP.md). R-009 performance remains unfinished.
-After explicit owner approval, five real GPU Trace probes pass on the two
-matching releases, with temporary permissions restored after each batch. The
-0.3.3 slice adds bounded export parsers; 0.3.4 adds shared asynchronous profiling
-and retained metric queries, with actual MCP protocol calls on both releases.
-At 0.3.5 the normal fixture/experiment runner adds performance workgroups, explicit
-warmup and all-frame timestamps/readback. All 29 CPU checks pass, followed by the
-final focused timestamp regression and ten real launches/566 exact-output frames.
-Measured variability and the isolated-dispatch cadence are retained. New-fixture
-Nsight profiling, repeated comparison and source-repair acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass
+at that milestone. Client disconnect/session deletion preserves jobs; service
+shutdown cleans them up. See [docs/HTTP.md](docs/HTTP.md).
+
+The **R-009 performance group completes at 0.4.0**. The 26-tool surface includes
+shared asynchronous GPU Trace jobs, bounded metric queries and repeated profile
+comparison. Actual source-edit/rebuild acceptance at the retained 0.3.6 development
+build passes on both matching Nsight releases, with four fresh traces per variant
+per release and independent exact numerical validation. All 30 CPU checks pass
+on 0.4.0, followed by focused numeric-guard checks and identical final-binary
+comparisons against retained real traces. Independent reviews pass. The complete
+2914-payload snapshot is pinned as bundle-d4db174806f33a707b908900599404d5 in
+`artifacts/performance-evidence`; hashes and restart pin are verified. See
+[docs/PERFORMANCE.md](docs/PERFORMANCE.md) for units, warmup, variability and scope.
+All approved temporary profiling access has been restored. Future permission
+changes still require an explicit owner decision; the product never changes them.
+All accepted roadmap items are now Done; do not invent further priorities.
 
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual
 shader repairs. The extension boundary is unsupported on the measured 2026.2
 injection path. Application source/readback stays distinct from Nsight dispatch
 and object inventories. See [docs/COMPUTE.md](docs/COMPUTE.md) for the pinned
-acceptance evidence. Performance remains subsequent roadmap work; HTTP completes as described above.
+acceptance evidence. Performance and HTTP complete as described above.
 
 The repository now implements the **0.3.0 visual first-release group**
 (R-010/R-002/R-006/R-007/R-015/R-014), following the build/basic-fixture group at
 0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
 builds, a deterministic windowed Vulkan fixture, a C++ experiment runner,
 fastmcpp stdio integration, asynchronous capture jobs and managed artifact storage.
-The server exposes **25 tools**, including bounded metadata/event/object queries,
+The server exposes **26 tools**, including bounded metadata/event/object queries,
 image previews/comparisons, generated-source relationships and qualified optional
 serialized-resource reads. `ngm-capture` shares the capture service.
 
@@ -119,8 +124,9 @@ referenced evidence are explicitly pinned. General executed event state and
 executed descriptor selection remain unavailable. Fixed-input descriptor hydration
 experiments are not a generic product API. Standalone GPU replay timed out on both
 releases and remains unqualified. Compute correctness is qualified within the
-R-008 scope above; performance analysis is in progress and Streamable HTTP
-is qualified within the local policy above. Update these instructions as the project develops.
+R-008 scope above; performance analysis is qualified within the measured R-009
+scope and Streamable HTTP within the local policy above. Update these instructions
+as the project develops.
 
 Local baseline, inspected on 2026-09-17:
 

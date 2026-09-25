@@ -1,11 +1,12 @@
 # Performance investigation (R-009)
 
-R-009 remains **In Progress**. The 0.3.4 service slice adds asynchronous GPU Trace
-submission and bounded retained metric queries, bringing the shared stdio/HTTP
-surface to 25 tools. The 0.3.3 pure export parsers underpin these queries.
-Version 0.3.5 integrates performance scenarios and repeated application-timestamp
-validation into the fixture/experiment runner. Repeated Nsight comparisons and
-source-repair acceptance remain unfinished.
+The **R-009 performance group completes at 0.4.0**, with 26 shared stdio/HTTP
+tools. Asynchronous GPU Trace jobs, retained metric queries, controlled fixtures
+and bounded repeated comparisons support a reviewed source-repair workflow.
+Hardware acceptance uses the explicitly retained **0.3.6 development build** on
+two matching Nsight releases. The final 0.4.0 build passes all 30 CPU checks,
+focused numeric-guard checks and identical offline comparisons on the real
+cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
@@ -49,6 +50,47 @@ The proprietary trace is retained as a reference, not decoded. Queries work afte
 restart without Nsight or GPU access; caller imports do not become qualified
 service-produced profiles. Successful trace output is bounded to 1 GiB, 256
 entries and three levels of recursion; each parsed table is bounded separately.
+
+## Repeated profile comparison
+
+`profile_compare` accepts `baseline` and `candidate` arrays of 2–8 distinct
+service-produced profile IDs each, a `table`, exact row `label`, zero-based
+numeric `column_index`, and required `workload_policy` / `warmup_policy` strings
+(up to 2048 bytes each). Each profile must come from a distinct collection job.
+The policies are returned as `caller_unverified` declarations; the tool does not
+establish equivalent inputs, output correctness or adequate warmup.
+
+Producer, exported GPU name, driver, exported settings and requested collection
+settings must match across both groups. Matching device names do not establish
+physical GPU identity. The process deadline may differ; application builds and
+arguments may differ for a repair. Each run includes its job identity and hashed
+source table/report references; the report retains application executable hashes,
+launch arguments and tool provenance for audit. Build/source correctness needs
+separate evidence. All bundles remain leased for the entire comparison.
+
+Every trace contributes one median of its exact-label rows at the selected
+column. Groups report the minimum, maximum, mean and median of those run medians,
+plus each trace's row count and corresponding within-trace statistics. Unequal
+row counts do not give one fresh run more weight. Original rows remain available
+through `profile_metrics`; no outliers are removed. Headerless columns remain
+positions without inferred sample or min/mean/max semantics. Only event durations
+have explicit `ms` units; other units remain null.
+
+`median_difference` is candidate minus baseline. `candidate_over_baseline` is
+the ratio of group medians; zero denominators or overflowing arithmetic produce
+null. `run_median_range_order` reports strictly lower, strictly higher, or
+overlapping/touching observed run-median ranges. This is descriptive evidence,
+not a confidence interval, a significance test or a claim that higher/lower is
+better. It says nothing about unobserved clock variation. Collection profiles
+are live-target GPU Traces, without replay.
+
+The CPU check `ngm_profile_compare_check` exercises actual service jobs through
+CLI stand-ins and an actual offline MCP comparison after restart. It checks equal
+run weighting, provenance/setting/column/label mismatches, duplicate IDs, bounds,
+explicit versus unresolved units and finite arithmetic at extreme values. These
+stand-ins establish product behavior, not real GPU compatibility or repair
+acceptance. The fresh-context static review is retained at
+`build/profile-comparison-review/review.md`.
 
 ## Real interface probes, 2026-09-25
 
@@ -116,7 +158,8 @@ fresh-process repetitions. Nsight terminates these targets after capture; only
 their setup records survive. Numerical correctness comes from the separately
 labeled application-validation runs, not the trace inventories. Product fixture
 integration, repeated profiling through MCP, diagnosis/edit/build verification
-and a complete performance acceptance report remain unfinished.
+and full acceptance remained unfinished at that prototype milestone; the later
+completion evidence is recorded below.
 
 ## Export contract and parser boundaries
 
@@ -281,7 +324,7 @@ per-launch duration statistics, first/second-half medians, across-launch ranges
 and paired median ratios. `status: pass` means successful numerical/timing
 validation; `comparison_status` separately reports observed range separation or
 an inconclusive comparison. Neither outcome substitutes for actual source repair
-or Nsight profiling acceptance, which remain subsequent R-009 work.
+or Nsight profiling acceptance, which remained subsequent work at 0.3.5.
 
 The final 0.3.5 batch is
 `build/linux-gcc-debug/tests/performance-integration/run-97579-35035408232136`.
@@ -332,3 +375,126 @@ zero-warmup CLI smoke run, source/binaries, CPU/build logs and independent revie
 Receipts are in `build/performance-fixture-publication`; the snapshot's documents
 predate their own publication reference. The superseded initial GPU batch is not
 part of this qualification snapshot.
+
+## Actual selected-scenario source repair, 0.3.6 validation
+
+The normal `performance-underfilled` fixture now passes real GPU Trace collection
+on both qualified releases. Two initial smoke traces established the exact event
+label and exported columns. Codex inspected the actual MCP `profile_metrics`
+results and separately retained application source/setup: the dispatch-specific
+`smsp__thread_inst_executed_per_inst_executed.ratio` was 1, with its `.pct` value
+3.125, while the selected shader declared `local_size_x = 1`. These observations
+support underfilled warp lanes as a bottleneck. Whole-frame values differed and
+were not substituted for dispatch-specific evidence. General counter scaling
+remains unresolved in the product API.
+
+The [NVIDIA compute architecture discussion](https://docs.nvidia.com/nsight-graphics/UserGuide/gpu-trace-system-architecture.html)
+describes CTA allocation constraints and increasing small thread groups to 64.
+An actual edit changes `performance-underfilled.comp` from local size 1 to 64
+in an isolated retained shader bundle. The same scenario, executable, transform,
+inputs and bounds guard remain selected. The pinned glslang binary recompiles
+that edited source using `-V --target-env vulkan1.3 -g0`; its manifest is updated
+from the resulting bytes. The fixture reads actual SPIR-V LocalSize and changes
+dispatch group count from 16,384 to 256. This is not a selection of the prebuilt
+`performance-reference` scenario. The resulting bytes match that reference, as
+expected for this one-line repair without shader debug information.
+
+`build/performance-repair/{source.patch,rebuild.json,diagnosis/diagnosis.md}`
+retain the diagnosis, actual patch and compiler command/hashes. Source identities
+are `c3319c655bb280522c517c2ff94292f5447922206d93f96c15d9f5ad0c461bb0`
+(before) and `2b5b828ec2e07fdfdfd78d533ad44dfdcc3d3526de7e3bd90c23e12ed2024c72`
+(after); SPIR-V identities are
+`7566b21171a4ab97b3bae32a2afb494894e5583416d6e4310b0353dea95549c7` and
+`4aab2dde6637932aaec8b98631792634b01d1febc568dc82afaa4fbee75f221a`.
+
+The C++ numerical harness runs two synchronization-validation launches
+(33×35, seed UINT32_MAX, one warmup and two measured submits), then four launches
+per variant at 128×128, seed 42, 30 warmup and 40 measured submits each. Alternating
+pair order limits a simple order bias. Its independent wide-integer oracle checks
+all **566 frames / 9,181,970 output values** exactly, including warmup frames.
+The same `performance-underfilled` scenario uses the baseline or edited shader
+bundle explicitly. All ten runs pass. Application timestamps remain distinct
+from Nsight measurements. Report:
+`build/performance-repair/numerical-validation/run-103840-36713159012608/report.json`.
+
+Application launch medians range from **638.032–638.432 µs** before to
+**50.624–51.136 µs** after; paired median ratios are 12.4784–12.6113. All 160
+measured samples per variant remain retained: before **636.768–3130.592 µs**,
+after **50.016–147.264 µs**. Some second-half medians drift materially, reaching
+1483.312 µs before and 128.128 µs after. Medians do not erase these tails or prove
+stationary clocks. The application cadence still fence-waits, reads back,
+serializes and hashes each frame; these are isolated dispatches, not continuous
+throughput measurements.
+
+The C++ MCP batch then collects four fresh baseline and four fresh repaired traces
+per release, alternating pair order. All use 30 skipped submits, three collected
+submits, 1000 ms collection cap, `Ampere GA10x`, `Throughput Metrics`, unaltered
+clocks, disabled multi-pass metrics/screenshots and no replay. The actual
+`profile_compare` tool summarizes each trace's three exact-label rows before
+comparing the four trace medians. Comparisons remain separate per producer.
+
+| Producer | Original trace medians (ms) | Repaired trace medians (ms) | All original rows (ms) | All repaired rows (ms) | Repaired/original group median |
+| --- | --- | --- | --- | --- | --- |
+| 2026.3.1.0/build 38722833 | 0.602656–0.604064 | 0.060512–0.061824 | 0.602080–0.648288 | 0.059872–0.063584 | 0.101249 |
+| 2026.2.0.0/build 37991608 | 0.602336–0.604160 | 0.059872–0.062560 | 0.601760–0.606976 | 0.059552–0.063648 | 0.099995 |
+
+In both cohorts, all dispatch-specific lane-ratio rows change from 1 to 32, and
+the corresponding `.pct` rows from 3.125 to 100. This supports the diagnosis;
+no source-line timing, general executed-state inspection or universal speedup is
+claimed. There are four independent application launches per group, not twelve
+independent repetitions. The desktop remains active and clocks are uncontrolled;
+collection settings and observed variability are reported without claiming
+statistical significance. Application timestamps and Nsight durations use
+different instrumentation and are not pooled.
+
+All runs use the recorded RTX 3080 Ti / driver 615.71.09 on KDE Wayland/Xwayland,
+GCC 16.2.1 Debug host build and glslang 16.4 performance shaders. Exact context,
+server/fixture identities and harness commands are in
+`build/performance-repair/{host-build-context.json,harness-build.json}`.
+`repeated-2026.3/report.json` and `repeated-2026.2/report.json` contain every
+request/response, job, source identity, metric page and comparison. All 16 jobs
+confirm cleanup and release the GPU reservation. Their original service bundles
+are persistently pinned in the adjacent `store` directories, verified after
+server restart. The two smoke profiles are pinned separately.
+
+Approved temporary capability access is restored after the smoke batch, the
+failed harness batch and the corrected repeated batch; the exact journals are
+under `access-smoke`, `failed-attempts/access-repeats-nonexecutable`, and
+`access-repeats`. Actual final ACL inspection confirms root-only 0400 with no
+extended ACL. No driver reload, desktop restart or clock change occurred.
+I-035/I-036 preserve the two harness setup failures and their corrections.
+Independent acceptance and final publication are recorded below.
+
+The independent fresh-context acceptance report is
+`build/performance-repair-review/review.md`. It finds no remaining code or
+acceptance blocker. Its main verifier passes 16,298 assertions and 1,437 hash
+checks; its separate diagnosis verifier passes 899 assertions and 62 hash checks.
+Together they verify 1,255 retained frames / 20,470,546 exact output values,
+including every retained application readback from all eighteen real profiles.
+These readbacks remain application evidence, separate from the audited raw Nsight
+exports. Both verifier scripts and complete initial/final outputs are retained.
+The frozen server and CMake contents preserve exact 0.3.6 hardware identities.
+
+The final 0.4.0 aggregate passes all 30 CPU checks; focused checks and a further
+fresh-context review cover the final pre-conversion numeric range guard. The
+0.4.0 binary reproduces all six real-cohort comparison responses exactly using
+retained evidence without GPU access. See BUILD_VALIDATION.md for commands and
+logs. Managed archival publication completes this acceptance record.
+
+The complete **2914-payload** qualification snapshot is complete/pinned as
+`bundle-d4db174806f33a707b908900599404d5`, store `artifacts/performance-evidence`.
+Every payload hash verifies, and an actual fresh-server `artifact_info` call
+confirms the persistent pin after restart. Receipts and the payload manifest are
+in `build/performance-repair-publication`. The archive includes all raw captures,
+application evidence, source edits/build commands, failed attempts, permission
+journals, independent audits, source/binary snapshots and checks; isolated tool
+caches are excluded. Snapshot documents predate their own publication reference
+and final roadmap bookkeeping. Original service-produced profile bundles remain
+separately pinned in their respective stores and remain the profile-query targets;
+the archive is an imported qualification record, not a new service-produced trace.
+
+This completes the R-009 performance group and its minor increment to **0.4.0**.
+No roadmap items remain In Progress, Pending or Blocked. The observed scope is a
+source-available isolated-dispatch repair on the recorded hardware; source-line
+profiling, stationary clocks, generic metric scaling and continuous-throughput
+performance are not inferred from these results.

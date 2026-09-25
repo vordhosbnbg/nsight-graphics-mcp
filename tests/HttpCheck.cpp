@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         require(other.tool("capabilities")["server"]["protocol_version"] == "2025-11-25",
                 "independent protocol version B");
         require(!fs::exists(store), "discovery does not open store");
-        require(c.rpc("tools/list")["result"]["tools"].size() == 25, "same implemented tools");
+        require(c.rpc("tools/list")["result"]["tools"].size() == 26, "same implemented tools");
         bad = c.headers();
         bad.erase("Accept");
         bad.emplace("Accept", "application/json;q=1");
@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
             } catch(const fastmcpp::TransportHttpError& e) {
                 throw std::runtime_error(std::string(e.what()) + ": " + e.body());
             }
-            require(sdk.list_tools().size() == 25, "supported client tool discovery");
+            require(sdk.list_tools().size() == 26, "supported client tool discovery");
             // Preserve JSON Schema union types: the pinned client's optional
             // high-level result coercion assumes string-only schema types.
             const auto result = sdk.call("tools/call", {{"name", "capabilities"}, {"arguments", Json::object()}});

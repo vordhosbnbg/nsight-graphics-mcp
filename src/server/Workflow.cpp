@@ -525,7 +525,8 @@ Json implemented_tool_names() {
                         "capture_cpp_resource",
                         "profile",
                         "profile_metadata",
-                        "profile_metrics"});
+                        "profile_metrics",
+                        "profile_compare"});
 }
 
 WorkflowTools::WorkflowTools(ServerOptions options) : options_(std::move(options)) {}
@@ -680,6 +681,79 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                               args.value("limit", std::size_t{50}), args.value("column_offset", std::size_t{0}),
                               args.value("column_limit", std::size_t{32}));
              });
+
+    const auto statistic = object_schema({{"count", integer_schema(1, 4096)},
+                                          {"minimum", {{"type", "number"}}},
+                                          {"maximum", {{"type", "number"}}},
+                                          {"median", {{"type", "number"}}},
+                                          {"mean", {{"type", "number"}}}},
+                                         {"count", "minimum", "maximum", "median", "mean"});
+    const auto comparison_run =
+        object_schema({{"profile_id", string_schema(39, 39)},
+                       {"job", identity_schema()},
+                       {"source", profile_ref},
+                       {"report", profile_ref},
+                       {"project_version", string_schema(64)},
+                       {"within_trace", statistic}},
+                      {"profile_id", "job", "source", "report", "project_version", "within_trace"});
+    const auto comparison_group =
+        object_schema({{"runs", array_schema(comparison_run, 8)}, {"run_medians", statistic}}, {"runs", "run_medians"});
+    auto collection_schema = requested_schema;
+    collection_schema["properties"].erase("timeout_ms");
+    collection_schema["required"] = {"format",       "delimiter",  "start_after", "limit",     "duration_ms",
+                                     "architecture", "metric_set", "gpu_clocks",  "multi_pass"};
+    auto comparison_ids = array_schema(string_schema(39, 39), 8);
+    comparison_ids["minItems"] = 2;
+    add_tool(
+        tools, "profile_compare",
+        object_schema({{"baseline", comparison_ids},
+                       {"candidate", comparison_ids},
+                       {"table",
+                        {{"type", "string"},
+                         {"maxLength", 16},
+                         {"enum", {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"}}}},
+                       {"label", string_schema(4096, 1)},
+                       {"column_index", integer_schema(0, 4095)},
+                       {"workload_policy", string_schema(2048, 1)},
+                       {"warmup_policy", string_schema(2048, 1)}},
+                      {"baseline", "candidate", "table", "label", "column_index", "workload_policy", "warmup_policy"}),
+        object_schema({{"table", string_schema(16)},
+                       {"label", string_schema(4096, 1)},
+                       {"column_index", integer_schema(0, 4095)},
+                       {"column_name", nullable(string_schema(4096))},
+                       {"unit", nullable(string_schema(16))},
+                       {"common", object_schema({{"producer", string_schema(128, 1)},
+                                                 {"gpu", string_schema(4096, 1)},
+                                                 {"driver", string_schema(4096, 1)},
+                                                 {"settings", object_schema(exported_fields)},
+                                                 {"collection", collection_schema}},
+                                                {"producer", "gpu", "driver", "settings", "collection"})},
+                       {"declarations", object_schema({{"origin", string_schema(32)},
+                                                       {"workload_policy", string_schema(2048, 1)},
+                                                       {"warmup_policy", string_schema(2048, 1)}},
+                                                      {"origin", "workload_policy", "warmup_policy"})},
+                       {"baseline", comparison_group},
+                       {"candidate", comparison_group},
+                       {"median_difference", nullable({{"type", "number"}})},
+                       {"candidate_over_baseline", nullable({{"type", "number"}})},
+                       {"run_median_range_order",
+                        {{"type", "string"},
+                         {"maxLength", 32},
+                         {"enum", {"candidate_lower", "candidate_higher", "overlap_or_touch"}}}},
+                       {"scope", string_schema(1024)}},
+                      {"table", "label", "column_index", "column_name", "unit", "common", "declarations", "baseline",
+                       "candidate", "median_difference", "candidate_over_baseline", "run_median_range_order", "scope"}),
+        "Compare 2..8 distinct fresh GPU Trace jobs per group with identical producer, GPU, driver and collection "
+        "settings. Select one exact row label and zero-based numeric column. Each trace contributes one median "
+        "of its matching rows; run medians receive equal weight. Returns descriptive ranges/means/medians and "
+        "report hashes for launch/build provenance. Required workload/warmup policies are unverified caller "
+        "declarations. This does not establish equivalent inputs, correctness, statistical significance or "
+        "clock stability. Only event_durations has explicit ms units. No live tools or GPU required.",
+        true, false, [this](const Json& args) {
+            return ProfileInspection(service().artifacts())
+                .compare({args.at("baseline"), args.at("candidate"), args.at("table"), args.at("label"),
+                          args.at("column_index"), args.at("workload_policy"), args.at("warmup_policy")});
+        });
 
     add_tool(tools, "capture",
              object_schema({{"executable", string_schema(4096, 1)},

@@ -6,6 +6,9 @@
 #include "ngm/ProfileSettings.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <numeric>
 #include <set>
 #include <span>
 
@@ -90,15 +93,20 @@ void inventory(ArtifactStore& artifacts, const std::string& id, const Json& inde
 struct OpenProfile {
     ArtifactLease lease;
     Json index;
+    Json report_reference;
+    Json report;
 };
 OpenProfile open(ArtifactStore& artifacts, const std::string& id) {
-    OpenProfile result{artifacts.lease(id), {}};
+    OpenProfile result{artifacts.lease(id), {}, {}, {}};
     const auto info = artifacts.inspect(id);
     if(info.provenance.value("evidence_origin", "") != "nsight_gpu_trace")
         throw InspectionError(Error::NotCapture, "Artifact is not a service-produced GPU Trace");
     if(info.summary.status != "complete" || info.summary.quarantined)
         throw InspectionError(Error::IncompleteCapture, "Profile is not complete; inspect its job/report");
-    const auto report = parse(artifacts.read(id, "raw/report.json", 2 * 1024 * 1024));
+    const auto report_bytes = artifacts.read(id, "raw/report.json", 2 * 1024 * 1024);
+    result.report_reference = {{"path", "raw/report.json"}, {"sha256", hash(report_bytes)}};
+    result.report = parse(report_bytes);
+    const auto& report = result.report;
     auto& index = result.index;
     index = parse(artifacts.read(id, "derived/profile.json", 256 * 1024));
     require(index.at("schema_version") == 1 && report.at("schema_version") == 1 &&
@@ -232,6 +240,38 @@ Json guarded(Function function) {
         throw InspectionError(Error::InvalidReport, "Missing profile collection setting");
     }
 }
+ProfileTableKind table_kind(const std::string& name) {
+    const std::map<std::string, ProfileTableKind> kinds{{"frame_duration", ProfileTableKind::FrameDuration},
+                                                        {"frame_metrics", ProfileTableKind::FrameMetrics},
+                                                        {"event_durations", ProfileTableKind::EventDurations},
+                                                        {"regime_metrics", ProfileTableKind::RegimeMetrics}};
+    const auto found = kinds.find(name);
+    if(found == kinds.end())
+        throw std::invalid_argument("Unknown profile table");
+    return found->second;
+}
+Json statistics(std::vector<double> values) {
+    std::sort(values.begin(), values.end());
+    const auto middle = values.size() / 2;
+    const double median = values.size() % 2 ? values[middle] : std::midpoint(values[middle - 1], values[middle]);
+    // Divide before summing in wider precision; the convex mean stays within
+    // the finite input range, including opposing near-DBL_MAX values.
+    long double mean = 0;
+    for(const auto value : values)
+        mean += static_cast<long double>(value) / values.size();
+    const double bounded_mean = static_cast<double>(
+        std::clamp(mean, static_cast<long double>(values.front()), static_cast<long double>(values.back())));
+    return {{"count", values.size()},
+            {"minimum", values.front()},
+            {"maximum", values.back()},
+            {"median", median},
+            {"mean", bounded_mean}};
+}
+Json finite_number(long double value) {
+    if(!std::isfinite(value) || std::abs(value) > std::numeric_limits<double>::max())
+        return nullptr;
+    return static_cast<double>(value);
+}
 } // namespace
 
 Json ProfileInspection::metadata(const std::string& id) const {
@@ -258,17 +298,11 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
        column_offset > ProfileEvidenceLimits::columns || column_limit == 0 || column_limit > 64)
         throw std::invalid_argument(
             "Profile page bounds: offset 0..4096, limit 1..100, column_offset 0..4096, column_limit 1..64");
-    const std::map<std::string, ProfileTableKind> kinds{{"frame_duration", ProfileTableKind::FrameDuration},
-                                                        {"frame_metrics", ProfileTableKind::FrameMetrics},
-                                                        {"event_durations", ProfileTableKind::EventDurations},
-                                                        {"regime_metrics", ProfileTableKind::RegimeMetrics}};
-    const auto kind = kinds.find(name);
-    if(kind == kinds.end())
-        throw std::invalid_argument("Unknown profile table");
+    const auto kind = table_kind(name);
     return guarded([&] {
         const auto profile = open(artifacts_, id);
         const auto& ref = profile.index.at("tables").at(name);
-        const auto table = parse_profile_table(reference(artifacts_, id, ref), kind->second);
+        const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
         const auto width = table.rows.front().values.size();
         const auto end_column = std::min(width, column_offset + column_limit);
         Json rows = Json::array();
@@ -277,12 +311,11 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             const auto& row = table.rows[next];
             Json values = Json::array();
             for(auto column = column_offset; column < end_column; ++column) {
-                values.push_back(
-                    {{"column_index", column},
-                     {"column_name", table.columns.empty() ? Json(nullptr) : Json(table.columns[column])},
-                     {"text", row.values[column].text},
-                     {"value", row.values[column].value},
-                     {"unit", kind->second == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)}});
+                values.push_back({{"column_index", column},
+                                  {"column_name", table.columns.empty() ? Json(nullptr) : Json(table.columns[column])},
+                                  {"text", row.values[column].text},
+                                  {"value", row.values[column].value},
+                                  {"unit", kind == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)}});
             }
             Json item{{"row_index", next}, {"label", row.label}, {"values", std::move(values)}};
             const auto size = item.dump().size();
@@ -309,6 +342,107 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             {"scope",
              "Zero-based export positions only; repeated labels/columns are preserved. Null unit means physical "
              "scaling is unresolved, not dimensionless. No frame/sample/statistic mapping is inferred."}};
+    });
+}
+
+Json ProfileInspection::compare(const ProfileComparison& request) const {
+    if(request.baseline.size() < 2 || request.baseline.size() > 8 || request.candidate.size() < 2 ||
+       request.candidate.size() > 8 || request.label.empty() || request.label.size() > 4096 ||
+       request.column_index >= ProfileEvidenceLimits::columns || request.workload_policy.empty() ||
+       request.workload_policy.size() > 2048 || request.warmup_policy.empty() || request.warmup_policy.size() > 2048)
+        throw std::invalid_argument("Comparison requires 2..8 distinct profiles per group, an exact label/column "
+                                    "and bounded workload/warmup declarations");
+    const auto kind = table_kind(request.table);
+    std::set<std::string> ids(request.baseline.begin(), request.baseline.end());
+    ids.insert(request.candidate.begin(), request.candidate.end());
+    if(ids.size() != request.baseline.size() + request.candidate.size())
+        throw std::invalid_argument("Comparison profiles must be distinct across both groups");
+    return guarded([&] {
+        // Keep every lease until the entire comparison completes. A prune can
+        // race acquisition and fail the request, but cannot remove an open run.
+        std::map<std::string, OpenProfile> profiles;
+        std::set<std::string> jobs;
+        Json common, column_name;
+        for(const auto& id : ids) {
+            auto profile = open(artifacts_, id);
+            require(jobs.insert(profile.index.at("job").at("job_id").get<std::string>()).second,
+                    "Comparison requires distinct collection jobs");
+            Json settings = profile.index.at("requested");
+            settings.erase("timeout_ms"); // Process deadline is not a collection setting.
+            Json observed{{"producer", profile.index.at("producer")},
+                          {"gpu", profile.index.at("gpu")},
+                          {"driver", profile.index.at("driver")},
+                          {"settings", profile.index.at("settings")},
+                          {"collection", std::move(settings)}};
+            if(common.is_null())
+                common = std::move(observed);
+            else if(common != observed)
+                throw std::invalid_argument("Profile producer, GPU, driver and collection settings must match");
+            profiles.emplace(id, std::move(profile));
+        }
+        bool first_column = true;
+        const auto group = [&](const std::vector<std::string>& members) {
+            Json runs = Json::array();
+            std::vector<double> medians;
+            for(const auto& id : members) {
+                const auto& profile = profiles.at(id);
+                const auto& ref = profile.index.at("tables").at(request.table);
+                const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
+                if(request.column_index >= table.rows.front().values.size())
+                    throw std::invalid_argument("Selected column is absent in a comparison profile");
+                const Json name = table.columns.empty() ? Json(nullptr) : Json(table.columns[request.column_index]);
+                if(first_column) {
+                    column_name = name;
+                    first_column = false;
+                } else if(column_name != name)
+                    throw std::invalid_argument("Selected column names differ across profiles");
+                std::vector<double> values;
+                for(const auto& row : table.rows)
+                    if(row.label == request.label)
+                        values.push_back(row.values[request.column_index].value);
+                if(values.empty())
+                    throw std::invalid_argument("Selected exact row label is absent in a comparison profile");
+                auto stats = statistics(std::move(values));
+                medians.push_back(stats.at("median"));
+                runs.push_back({{"profile_id", id},
+                                {"job", profile.index.at("job")},
+                                {"source", ref},
+                                {"report", profile.report_reference},
+                                {"project_version", profile.report.at("project_version")},
+                                {"within_trace", std::move(stats)}});
+            }
+            return Json{{"runs", std::move(runs)}, {"run_medians", statistics(std::move(medians))}};
+        };
+        auto baseline = group(request.baseline), candidate = group(request.candidate);
+        const auto& a = baseline.at("run_medians");
+        const auto& b = candidate.at("run_medians");
+        const double am = a.at("median"), bm = b.at("median");
+        const std::string ordering = b.at("maximum").get<double>() < a.at("minimum").get<double>() ? "candidate_lower"
+                                     : b.at("minimum").get<double>() > a.at("maximum").get<double>()
+                                         ? "candidate_higher"
+                                         : "overlap_or_touch";
+        return Json{
+            {"table", request.table},
+            {"label", request.label},
+            {"column_index", request.column_index},
+            {"column_name", column_name},
+            {"unit", kind == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)},
+            {"common", std::move(common)},
+            {"declarations",
+             {{"origin", "caller_unverified"},
+              {"workload_policy", request.workload_policy},
+              {"warmup_policy", request.warmup_policy}}},
+            {"baseline", std::move(baseline)},
+            {"candidate", std::move(candidate)},
+            {"median_difference", finite_number(static_cast<long double>(bm) - am)},
+            {"candidate_over_baseline", am == 0 ? Json(nullptr) : finite_number(static_cast<long double>(bm) / am)},
+            {"run_median_range_order", ordering},
+            {"scope", "Each fresh trace contributes one median of exact-label rows at the selected column. "
+                      "Rows are not independent runs; positional columns have no inferred statistic meaning. "
+                      "Ranges are descriptive, not confidence intervals or proof of improvement. Null unit "
+                      "means unresolved scaling. Null arithmetic means zero denominator or overflow. Reports "
+                      "retain launch/build provenance; equivalent inputs, correctness, warmup sufficiency "
+                      "and clock stability require separate evidence. Live-target collection, no replay."}};
     });
 }
 } // namespace ngm

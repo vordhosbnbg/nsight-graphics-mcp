@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the visual 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; Streamable HTTP (R-004) completes at 0.3.2; performance analysis (R-009) remains in progress; approved temporary profiling access enabled successful two-release probes, the 0.3.3 slice adds observed-export parsers, and 0.3.4 adds profiling jobs/queries for a 25-tool surface.**
+Planning state: **All accepted roadmap items are Done. The visual first-release group completes at 0.3.0, compute correctness at 0.3.1, local Streamable HTTP at 0.3.2, and the R-009 performance group at 0.4.0. The shared stdio/HTTP surface has 26 tools. Each workflow retains its exact qualification scope, versions, evidence and limits in the linked documents.**
 Last updated: **2026-09-25**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -176,23 +176,23 @@ Item conventions:
 
 ## In Progress
 
-### R-009
-
-```text
-Status: In Progress
-Area: profile/analysis/shaders/test
-Title: Analyze GPU and shader performance bottlenecks
-Goal: Add performance investigation after visual and compute correctness workflows are established.
-Scope: Controlled performance workloads in the test app, Nsight GPU Trace collection and supported metric exports, bounded metric queries, and repeatable comparisons with capture/build/hardware provenance.
-Acceptance: A known inefficient workload yields usable profiling evidence; Codex can identify a bottleneck supported by the available metrics; a corrected variant preserves output and shows a repeatable measured change; reports include warmup/repetition policy, units, variability, and relevant clock/replay settings.
-Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path. The owner approved temporary per-user capability access on 2026-09-25. Five real GPU Trace probes pass across matching 2026.3/2026.2 tools, with permissions restored after each batch. A private equivalent-output workload shows improved lane utilization and shorter dispatch times; application validation and Nsight counters remain distinct evidence. The 0.3.3 slice adds bounded observed-export parsers; 0.3.4 adds shared asynchronous profiling and bounded retained metric queries, with 28 CPU checks and actual MCP protocol calls on both releases; permissions are restored after the service batch. Independent service acceptance passes, and the 124-payload snapshot is pinned as bundle-9de7695e0225eb604775a6fe52c5a4dd in artifacts/performance-evidence. The 0.3.5 fixture slice integrates controlled performance shaders, explicit warmup and all-frame numerical/timestamp evidence through the ordinary experiment runner; 29 CPU checks and ten real launches/566 exact-output frames pass, with measured variability retained. Independent fixture acceptance passes; its 990-payload snapshot is pinned as bundle-a5fbe932759bd51e5785cbc361b26b3a in artifacts/performance-evidence. New-fixture Nsight profiling, repeatable comparison and source-repair acceptance remain unfinished. See docs/PERFORMANCE.md.
-```
-
 ## Pending
 
 ## Blocked
 
 ## Done
+
+### R-009
+
+```text
+Status: Done
+Area: profile/analysis/shaders/test
+Title: Analyze GPU and shader performance bottlenecks
+Goal: Add performance investigation after visual and compute correctness workflows are established.
+Scope: Controlled performance workloads in the test app, Nsight GPU Trace collection and supported metric exports, bounded metric queries, and repeatable comparisons with capture/build/hardware provenance.
+Acceptance: A known inefficient workload yields usable profiling evidence; Codex can identify a bottleneck supported by the available metrics; a corrected variant preserves output and shows a repeatable measured change; reports include warmup/repetition policy, units, variability, and relevant clock/replay settings.
+Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path. The owner approved temporary per-user capability access on 2026-09-25. Five real GPU Trace probes pass across matching 2026.3/2026.2 tools, with permissions restored after each batch. A private equivalent-output workload shows improved lane utilization and shorter dispatch times; application validation and Nsight counters remain distinct evidence. The 0.3.3 slice adds bounded observed-export parsers; 0.3.4 adds shared asynchronous profiling and bounded retained metric queries, with 28 CPU checks and actual MCP protocol calls on both releases; permissions are restored after the service batch. Independent service acceptance passes, and the 124-payload snapshot is pinned as bundle-9de7695e0225eb604775a6fe52c5a4dd in artifacts/performance-evidence. The 0.3.5 fixture slice integrates controlled performance shaders, explicit warmup and all-frame numerical/timestamp evidence through the ordinary experiment runner; 29 CPU checks and ten real launches/566 exact-output frames pass, with measured variability retained. Independent fixture acceptance passes; its 990-payload snapshot is pinned as bundle-a5fbe932759bd51e5785cbc361b26b3a in artifacts/performance-evidence. At 0.3.6, bounded repeated profile comparison is implemented and independently reviewed; all 30 CPU checks and the expanded focused comparison check pass. The R-009 performance group completes at 0.4.0: actual selected-scenario source edit/rebuild, exact numerical validation and four fresh traces per variant on each release pass independent acceptance. The final 30-check aggregate, focused numeric-guard checks and final-binary offline comparisons pass. Permissions are restored after every batch. The 2914-payload acceptance snapshot is pinned as bundle-d4db174806f33a707b908900599404d5 in artifacts/performance-evidence, with every payload verified and the pin checked after restart. Hardware acceptance retains its exact 0.3.6 development-build identities. See docs/PERFORMANCE.md.
+```
 
 ### R-004
 

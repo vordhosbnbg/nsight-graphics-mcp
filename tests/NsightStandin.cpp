@@ -132,8 +132,9 @@ int main(int argc, char** argv) {
                 std::cout << "NVIDIA (R) Nsight Graphics CLI\n";
             }
             const bool mismatch = environment("NGM_MISMATCH_TOOL") == name;
-            const auto version = mismatch ? "2025.1.0.0" : "2026.3.1.0";
-            const auto build = environment("NGM_MISMATCH_BUILD") == name ? "99999999" : "38722833";
+            const bool old = environment("NGM_PROFILE_OLD_RELEASE") == "1";
+            const auto version = mismatch ? "2025.1.0.0" : old ? "2026.2.0.0" : "2026.3.1.0";
+            const auto build = environment("NGM_MISMATCH_BUILD") == name ? "99999999" : old ? "37991608" : "38722833";
             std::cout << (is_cli ? "Version " : "Version: ") << version << " (build " << build << ") (stand-in)\n";
         }
         return is_cli || environment("NGM_DISCOVERY_EXIT_ONE_TOOL") == name ? 1 : 0;
@@ -210,10 +211,19 @@ int main(int argc, char** argv) {
             std::ofstream(output / "second.ngfx-gputrace") << "duplicate";
         const bool frames = !value(arguments, "--start-after-frames").empty();
         const std::string unit = frames ? "frames" : "submits", suffix = frames ? " Frames" : " Submits";
+        std::vector<std::string> target_options;
+        std::istringstream tokens(value(arguments, "--args"));
+        for(std::string token; tokens >> token;)
+            target_options.push_back(std::move(token));
+        const bool old = environment("NGM_PROFILE_OLD_RELEASE") == "1";
         std::ofstream(tables / "REPRO_INFO.xls")
-            << "Product Version\t" << (mode == "wrong-producer" ? "2026.9.0.0" : "2026.3.1.0")
-            << " (build 38722833) (public-release)\n"
-            << "Device Name\tCPU stand-in (not GPU evidence)\nDriver Version\tsynthetic\nAPI\tVulkan\n"
+            << "Product Version\t"
+            << (mode == "wrong-producer" ? "2026.9.0.0"
+                : old                    ? "2026.2.0.0"
+                                         : "2026.3.1.0")
+            << " (build " << (old ? "37991608" : "38722833") << ") (public-release)\n"
+            << "Device Name\tCPU stand-in (not GPU evidence)" << value(target_options, "--profile-gpu")
+            << "\nDriver Version\tsynthetic" << value(target_options, "--profile-driver") << "\nAPI\tVulkan\n"
             << "GPU Clocks\t" << (mode == "settings" ? "Base" : "Unaltered") << "\nMetric Set\t"
             << value(arguments, "--metric-set-name") << "\nMulti-Pass Metrics\tDisabled\nStart After\t"
             << value(arguments, "--start-after-" + unit) << suffix << "\nLimited To\t"
@@ -225,6 +235,14 @@ int main(int argc, char** argv) {
             << "event_text\ttime_ms\nsynthetic.work\t0.1\nsynthetic.work\t0.2\n";
         std::ofstream(tables / "GPUTRACE_REGIMES.xls")
             << "flattened_event_name\tsynthetic.metric\tsynthetic.metric\nsynthetic.work\t1\t2\nsynthetic.work\t3\t4\n";
+        if(auto values = value(target_options, "--profile-values"); !values.empty()) {
+            std::ofstream stream(tables / "GPUTRACE_REGIMES.xls");
+            const auto label = has(target_options, "--profile-other-label") ? "other.work" : "synthetic.work";
+            stream << "flattened_event_name\tsynthetic.metric" << value(target_options, "--profile-column") << '\n';
+            std::istringstream items(values);
+            for(std::string item; std::getline(items, item, ',');)
+                stream << label << '\t' << item << '\n';
+        }
         if(mode == "malformed")
             std::ofstream(tables / "GPUTRACE_FRAME.xls") << "bad\tnan\n";
         if(mode == "oversize")

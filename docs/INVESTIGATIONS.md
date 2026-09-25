@@ -1288,3 +1288,45 @@ records the commands, observations, preliminary workload and retention reference
   typed result conversion works for this tool surface.
 - **Revisit:** A future pinned client revision handling nullable schema types and
   duplicate media headers; retest high-level conversion before claiming support.
+
+### I-035 — Offline profile query probe supplied a nonexistent tool root
+
+- **Context:** 0.3.6 retained GPU Trace inspection on 2026-09-25, after successful
+  normal-fixture profiles from matching 2026.3.1.0/build 38722833 and
+  2026.2.0.0/build 37991608 tools. This failure precedes any Nsight invocation.
+- **Reproduction:** The Python MCP probe initially starts the server with
+  `--nsight-root build/no-live-backend-required` expanded to an absolute path,
+  although that directory does not exist. Initialization receives EOF.
+- **Expected/observed:** The probe intended to exercise offline retained queries;
+  server argument validation instead correctly rejects a nonexistent explicit
+  root with `--nsight-root requires an existing absolute directory`. No profile
+  or extraction tool runs. This is a probe setup error, not a backend limitation.
+- **Correction/evidence:** Use an existing empty installation directory. Actual
+  `profile_metrics` and `artifact_read` calls then succeed on both retained
+  profiles, and their persistent pins are verified. Failed initialization logs
+  are `build/performance-repair/diagnosis/invalid-root.{stderr,jsonl}`; corrected
+  requests/responses and source evidence are alongside them. The performance
+  acceptance snapshot in PERFORMANCE.md retains these records.
+- **Revisit:** Only if explicit-root startup validation or offline discovery
+  policy changes; a missing directory should not be mistaken for unavailable
+  profile inspection.
+
+### I-036 — Repeated-profile harness copied a nonexecutable fixture
+
+- **Context:** R-009 source-repair acceptance harness, server/fixture 0.3.6,
+  intended Nsight 2026.3.1.0/build 38722833 batch, 2026-09-25.
+- **Reproduction:** Python `shutil.copyfile` freezes the fixture bytes without
+  executable permissions; the initial C++ batch's `filesystem::copy_file`
+  preserves that 0644 mode in its fresh target. Submit `profile` for that target.
+- **Expected/observed:** The harness expected a new profiling job. The server
+  correctly returns `invalid_argument: Application executable must be an existing
+  executable regular file` before allocating a profile job or invoking Nsight.
+  No trace is produced. The access wrapper restores the exact baseline ACL and
+  capability-modify settings on this failed batch too.
+- **Correction/evidence:** The harness explicitly gives its newly copied target
+  owner executable permissions. The failed request/response, original harness
+  source, target bytes/mode record and restoration journal are under
+  `build/performance-repair/failed-attempts`. Subsequent corrected batch results
+  are recorded separately in PERFORMANCE.md and its acceptance snapshot.
+- **Revisit:** If snapshot/copy ownership changes, assert executable permissions
+  before launch. This failure does not indicate a Nsight compatibility problem.

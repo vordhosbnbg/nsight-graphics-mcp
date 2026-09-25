@@ -2,12 +2,23 @@
 #include "ngm/Artifacts.hpp"
 
 namespace ngm {
+struct ProfileComparison {
+    std::vector<std::string> baseline;
+    std::vector<std::string> candidate;
+    std::string table;
+    std::string label;
+    std::size_t column_index = 0;
+    // Caller declarations, not evidence that equivalent inputs or warmup occurred.
+    std::string workload_policy;
+    std::string warmup_policy;
+};
 class ProfileInspection {
 public:
     explicit ProfileInspection(ArtifactStore& artifacts) : artifacts_(artifacts) {}
     nlohmann::json metadata(const std::string& id) const;
     nlohmann::json metrics(const std::string& id, const std::string& table, std::size_t offset = 0,
                            std::size_t limit = 50, std::size_t column_offset = 0, std::size_t column_limit = 32) const;
+    nlohmann::json compare(const ProfileComparison& request) const;
 
 private:
     ArtifactStore& artifacts_;

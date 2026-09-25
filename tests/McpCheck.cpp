@@ -106,7 +106,8 @@ Json query_capabilities(Client& client) {
                                                         "capture_cpp_resource",
                                                         "profile",
                                                         "profile_metadata",
-                                                        "profile_metrics"}),
+                                                        "profile_metrics",
+                                                        "profile_compare"}),
             "exactly the implemented tools advertised");
     for(const auto* name : {"fixture_via_mcp"}) {
         const auto& operation = report["operations"][name];
@@ -129,7 +130,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 25, "discover exactly the implemented tools");
+    require(listing.size() == 26, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");

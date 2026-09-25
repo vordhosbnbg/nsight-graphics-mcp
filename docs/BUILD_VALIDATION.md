@@ -1225,3 +1225,58 @@ with no fixture-slice blocker. The final snapshot is pinned as
 `bundle-a5fbe932759bd51e5785cbc361b26b3a` in `artifacts/performance-evidence`;
 all 990 payload hashes and persistent pin after restart verify. Receipts are in
 `build/performance-fixture-publication`.
+
+## 0.3.6 repeated profile comparison, 2026-09-25
+
+`cmake --build --preset linux-gcc-debug --target ngm_check_all ngm-vulkan-fixture`
+passes all **30 CPU checks** in 288.75 seconds. The final expanded
+`ngm_profile_compare_check_run` passes in 6.37 seconds after adding headerless
+frame-table and exception lease-release cases. Logs are
+`build/profile-comparison-aggregate.log` and
+`build/profile-comparison-final-focused.log`. The original focused comparison /
+profiling workflow checks also pass (6.13 / 9.32 seconds).
+
+The new check uses actual service jobs at the process boundary with synthetic
+Nsight exports, and an actual offline stdio `profile_compare` call after restart.
+It validates equal weighting of per-trace medians, required repetition/selection
+bounds, producer/GPU/driver/settings/column/label mismatches, explicit units,
+zero denominators and extreme finite arithmetic. Existing stdio/HTTP checks
+verify the shared 26-tool surface. No CPU stand-in result establishes GPU support.
+
+A fresh-context static review found no actionable correctness defects; its report
+is `build/profile-comparison-review/review.md`. R-009 real repeated measurement
+and source-repair acceptance remain separate work recorded in PERFORMANCE.md.
+
+## 0.4.0 performance group acceptance, 2026-09-25
+
+The R-009 completion build passes all **30 CPU checks** in **289.72 seconds**:
+`cmake --build --preset linux-gcc-debug --target ngm_check_all ngm-vulkan-fixture`.
+The final range guard checks finite/range bounds before converting comparison
+arithmetic to double; subsequent focused comparison and profiling workflow checks
+pass. A separate fresh-context review finds no defect in that guard. Logs are
+`build/performance-release-{aggregate,final-focused}.log`; review is
+`build/profile-comparison-review/range-guard.md`.
+
+Real hardware acceptance uses the retained **0.3.6 development build**, not a
+retroactive 0.4.0 identity. An actual selected-scenario source edit and pinned
+shader rebuild preserve numerical output; sixteen repeated GPU Traces on the two
+qualified Nsight releases and the real MCP comparison tool show a repeatable
+measured dispatch-time change. An independent fresh-context audit accepts every
+R-009 criterion, with separate evidence origins, units, warmup, repetition and
+observed variability preserved. The main and diagnosis audits together check
+**1,255 retained frames / 20,470,546 exact output values**. Permissions are restored
+exactly after every batch, including the failed harness attempt. Detailed scoped
+results and retention are in [PERFORMANCE.md](PERFORMANCE.md).
+
+The final **0.4.0** binary also performs all six comparison queries against those
+retained real cohorts, with results identical to the accepted 0.3.6 responses;
+26-tool discovery and the 0.4.0 server identity are checked. This offline run uses
+an empty tool installation and makes no new GPU collection or permission change.
+Its transcript/report is `build/performance-repair/release-query`.
+
+The complete qualification snapshot is pinned as `bundle-d4db174806f33a707b908900599404d5`
+in `artifacts/performance-evidence`: 2914 payload hashes verify, and its pin is
+confirmed after server restart. Publication receipts are in
+`build/performance-repair-publication`; snapshot documents predate their own
+publication reference and the final roadmap move. R-009 is Done, completing the
+performance group at 0.4.0. No accepted roadmap work remains pending or active.
