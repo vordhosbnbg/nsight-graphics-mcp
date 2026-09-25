@@ -1,0 +1,52 @@
+[
+  {
+    "fixture": "1-FRAME.xls.tsv",
+    "raw_sha256": "c7a997ea6aaebda6328916948c1523e2077455c26d531dffad9779ac6518535f",
+    "fixture_sha256": "ce5f5e08a0f82e72e0229628f0e6bba1dc3100226f26117ea51849d0ce8d3b65"
+  },
+  {
+    "fixture": "1-D3DPERF_EVENTS.xls.tsv",
+    "raw_sha256": "4f27ddebbe558cd2f778f58cd57a4532106e6ba9ef4d39f2ebc443b900f2678e",
+    "fixture_sha256": "4f27ddebbe558cd2f778f58cd57a4532106e6ba9ef4d39f2ebc443b900f2678e"
+  },
+  {
+    "fixture": "1-GPUTRACE_FRAME.xls.tsv",
+    "raw_sha256": "d6b40bb29f5b0ae7d4f06daf1e5f69637a6c873850cf71049c00de66ba225363",
+    "fixture_sha256": "cfccb69771fa0d84ce1d8113b43a228466c9779c551c8cd29020f59752fa2da2"
+  },
+  {
+    "fixture": "1-GPUTRACE_REGIMES.xls.tsv",
+    "raw_sha256": "3b767693c50c0fe59347537c34e73197bddb0de61b4127dbc30716a7586cb77b",
+    "fixture_sha256": "2b1329f720364bf011e2a1b7dc77aa91d99c2ae8778037dde9582caf0f40f8e8"
+  },
+  {
+    "fixture": "1-REPRO_INFO.xls.tsv",
+    "raw_sha256": "03e6e1a6f8042e9f1fb62a4f3c16410f47b158fd54366eead176aaa7b3b656fe",
+    "fixture_sha256": "731983ec97bea4c8a00d1c61d049eed7a7b45f43a8d62d8f081d9591f4fa6a80"
+  },
+  {
+    "fixture": "64-FRAME.xls.tsv",
+    "raw_sha256": "8e42709e26bbc06f46e494817fb3647500873d2725e673f91fc3fea0c620e406",
+    "fixture_sha256": "b7262f4453d7d19338c0e285de321f282dc7e6cbf486f7b4d9aad39bff64cf36"
+  },
+  {
+    "fixture": "64-D3DPERF_EVENTS.xls.tsv",
+    "raw_sha256": "df18189c5f9fe91a317f5d75cd403c187f3bd23a0bec9550fe68db92d38b8e31",
+    "fixture_sha256": "df18189c5f9fe91a317f5d75cd403c187f3bd23a0bec9550fe68db92d38b8e31"
+  },
+  {
+    "fixture": "64-GPUTRACE_FRAME.xls.tsv",
+    "raw_sha256": "cae994841c2119eb55008325efab693aefbf657fcffbaf00c2f9b1e6c798c928",
+    "fixture_sha256": "b2c0c019d57de782452d0d30eeca29d4f2644cc76a579b8ecb5621ea0e2978f0"
+  },
+  {
+    "fixture": "64-GPUTRACE_REGIMES.xls.tsv",
+    "raw_sha256": "a1a7805ba0b28c50389b9af225b4cfce300396a5d6618d907353e537b4ded4f3",
+    "fixture_sha256": "994d1a65bbd0807f991ff7ff804bfb3929087f7f5c26b8a16ce5a8b3236ec582"
+  },
+  {
+    "fixture": "64-REPRO_INFO.xls.tsv",
+    "raw_sha256": "54210af17b4160e12284fb5c22fbdcc4e1f49ac7e4f691d176fa34f0afa5a39e",
+    "fixture_sha256": "731983ec97bea4c8a00d1c61d049eed7a7b45f43a8d62d8f081d9591f4fa6a80"
+  }
+]

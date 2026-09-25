@@ -75,9 +75,11 @@ R-004 completes at **0.3.2** with optional persistent Streamable HTTP on IPv4
 loopback, required private-file bearer authentication and a shared trusted-user
 workspace. All 26 CPU checks and real Codex HTTP capability/artifact calls pass.
 Client disconnect/session deletion preserves jobs; service shutdown cleans them
-up. See [docs/HTTP.md](docs/HTTP.md). R-009 performance remains unfinished; its
-first real trace fails the local counter-permission prerequisite (I-033), and
-permission changes require an explicit owner decision.
+up. See [docs/HTTP.md](docs/HTTP.md). R-009 performance remains unfinished.
+After explicit owner approval, five real GPU Trace probes pass on the two
+matching releases, with temporary permissions
+restored after each batch. The 0.3.3 slice adds bounded export parsers; production
+profiling tools and acceptance remain unfinished. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual

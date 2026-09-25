@@ -5,8 +5,8 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; Streamable HTTP (R-004) completes at 0.3.2; performance analysis (R-009) remains in progress, with real profiling awaiting an explicit permission decision.**
-Last updated: **2026-09-18**.
+Planning state: **The visual first-release group R-010/R-002/R-006/R-007/R-015/R-014 completes at 0.3.0 after independent acceptance and clean source-installation review. All nine visual source-repair scenarios pass both qualified Nsight releases; the current 22-tool surface includes bounded serialized resource reads. Compute correctness (R-008) completes at 0.3.1 for its qualified 2026.3 source-available path; Streamable HTTP (R-004) completes at 0.3.2; performance analysis (R-009) remains in progress; approved temporary profiling access enabled successful two-release probes, and the 0.3.3 slice adds observed-export parsers.**
+Last updated: **2026-09-25**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
 The initial interview established the first-release requirements; all implementation
@@ -185,7 +185,7 @@ Title: Analyze GPU and shader performance bottlenecks
 Goal: Add performance investigation after visual and compute correctness workflows are established.
 Scope: Controlled performance workloads in the test app, Nsight GPU Trace collection and supported metric exports, bounded metric queries, and repeatable comparisons with capture/build/hardware provenance.
 Acceptance: A known inefficient workload yields usable profiling evidence; Codex can identify a bottleneck supported by the available metrics; a corrected variant preserves output and shows a repeatable measured change; reports include warmup/repetition policy, units, variability, and relevant clock/replay settings.
-Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path. The first real 2026.3 GPU Trace probe reaches the target but fails because the current user lacks performance-counter access (I-033). An explicit temporary per-user permission proposal is pending owner response; no machine settings were changed.
+Notes: Third workflow priority, following R-008 and outside the first release by round 6's decision. Verify metric availability and data semantics against the installed Nsight version and GPU. Keep performance configurations separate from shader-debug configurations and account for replay reset work. Detailed per-source-line claims require a verified export path. The owner approved temporary per-user capability access on 2026-09-25. Five real GPU Trace probes pass across matching 2026.3/2026.2 tools, with permissions restored after each batch. A private equivalent-output workload shows improved lane utilization and shorter dispatch times; application validation and Nsight counters remain distinct evidence. The 0.3.3 slice adds bounded observed-export parsers, not profiling MCP tools. Product workload integration, asynchronous profiling, metric queries and repeatable comparison/repair acceptance remain unfinished. See docs/PERFORMANCE.md.
 ```
 
 ## Pending

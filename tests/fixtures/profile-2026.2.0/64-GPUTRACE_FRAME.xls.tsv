@@ -1,0 +1,4 @@
+gpc__cycles_elapsed.avg.per_second	1928.7
+SM_A.TriageSCG.sm__inst_executed_pipe_alu_realtime.sum	1.58099e+07
+smsp__thread_inst_executed_per_inst_executed.ratio	32
+smsp__thread_inst_executed_per_inst_executed.pct	100

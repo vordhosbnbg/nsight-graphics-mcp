@@ -1132,3 +1132,27 @@ Working evidence is in `build/http-qualification`; fresh-context transport and
 acceptance reviews are in `build/http-review` and `build/http-acceptance-review`.
 [HTTP.md](HTTP.md) records deployment policy, commands, protocol limits, client
 library limitations, and the managed qualification reference.
+
+## GPU Trace export parser slice — 0.3.3
+
+GCC 16.2.1 Debug builds the pure GPU Trace parsers and rebuilt server at 0.3.3.
+`ngm_profile_evidence_check` passes in 0.06 seconds, existing
+`ngm_nsight_evidence_check` in 0.96 seconds and `ngm_check_isolation` in 0.16
+seconds. A private C++ probe additionally parses all five complete real export
+sets. The complete now-27-check aggregate was not rerun; the last complete
+aggregate is the 0.3.2 result above.
+
+The owner-approved temporary profiling capability access enabled five successful
+GPU Trace runs on matching 2026.3.1.0/2026.2.0.0 tools. Every process reports exit 0
+and confirmed cleanup, and all three bounded batches restore/verify original
+ACLs and DeviceFileModify values. Ten private application launches separately
+validate numerical output and measure dispatch durations. These experiments use
+0.3.2 prototype binaries, not a completed 0.3.3 profiling service.
+
+Independent fresh-context review verifies parser behavior statically, all 22
+sanitized fixture projections and hashes, and documentation against raw results.
+Its minor notes were corrected and re-reviewed. The complete experiment/parser
+snapshot is pinned as `bundle-d345e0dadab7961610746f6f2d4845e2` in
+`artifacts/performance-evidence`, with 284 payload hashes and pin-after-restart
+verified. [PERFORMANCE.md](PERFORMANCE.md) records scope and limitations. R-009
+remains In Progress; the 22 MCP tools do not yet include profiling or metric queries.

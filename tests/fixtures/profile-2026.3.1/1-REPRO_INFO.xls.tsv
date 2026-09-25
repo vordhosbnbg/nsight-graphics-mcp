@@ -1,0 +1,28 @@
+Operating System	Linux (Arch Linux)
+Device Name	NVIDIA GeForce RTX 3080 Ti
+Chip Name	GA102
+Driver Version	615.71.09
+Product Version	2026.3.1.0 (build 38722833) (public-release)
+API	Vulkan
+Troubleshooting Collection Controls	API Timestamps, metrics, sampling oldest, instrumented, CB timestamps, FECS, warp state sampling control=31
+Start After	30 Submits
+Max Duration 	1000 ms
+Limited To	3 Submits
+Allocated Event Buffer Memory (kB)	20000
+Allocated Timestamps	100000
+V-Sync Mode	Enforced Off
+GPU Clocks	Unaltered
+Force Repaint	No
+Max Vulkan SC Internal CBs per Queue	24
+Max Vulkan SC Internal CB Memory (kB)	16
+Collect Screenshot	No
+Time Every Action	No
+Trace Shader Bindings	Yes
+Collect Shader Pipelines	Yes
+Collect External Shader Debug Info	Yes
+Warp State Sampling Interval	N/A (Warp State Sampling Disabled)
+Enable NVTX Ranges	Yes
+Recompile Cached Vulkan Shader Modules	Yes
+Metric Set	Throughput Metrics
+Real-Time Shader Profiler	Disabled
+Multi-Pass Metrics	Disabled

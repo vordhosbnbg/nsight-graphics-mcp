@@ -1257,6 +1257,16 @@ binaries, exact requests, logs, cleanup reports, CLI help, system observations
 and proposed permission changes are retained in complete/pinned
 `bundle-8d30dab0cf976915a34adff7b483ad10`, store `artifacts/performance-evidence`.
 
+I-033 follow-up (2026-09-25): the owner approved the temporary per-user access
+proposal. The capability nodes were absent in the new session; the documented
+`nvidia-modprobe -f` procedure recreated them with root-only defaults. Three
+bounded batches granted only the approved user access and restored exact ACL/
+modify settings afterward. The corrected basic 2026.3 trace and private compute
+variant pairs on both matching releases all exit 0, confirm cleanup and export
+metrics. This resolves the permission prerequisite for those runs. It does not
+complete R-009 or qualify a product profiling API. [PERFORMANCE.md](PERFORMANCE.md)
+records the commands, observations, preliminary workload and retention reference.
+
 ### I-034 — Pinned fastmcpp HTTP client compatibility edges
 
 - **Context:** R-004 HTTP adapter at 0.3.2, fastmcpp 3.4.7.1 at the existing pinned

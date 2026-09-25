@@ -23,6 +23,11 @@ Version **0.3.2** adds optional persistent loopback HTTP with private-token
 authentication and the same 22 tools. All 26 CPU checks pass, and real Codex HTTP
 capability/artifact calls verify interoperability. See [HTTP.md](docs/HTTP.md).
 
+Version **0.3.3** adds internal bounded parsers for GPU Trace text exports after
+successful private probes on both Nsight releases. Performance profiling through
+MCP remains unfinished; [PERFORMANCE.md](docs/PERFORMANCE.md) distinguishes the
+retained experimental evidence from the remaining product workflow.
+
 Start with [INSTALL.md](docs/INSTALL.md) for the source-build-to-repair walkthrough.
 [VISUAL_RELEASE.md](docs/VISUAL_RELEASE.md) consolidates capability/repair evidence
 and exact limits; [BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md) preserves versioned

@@ -1,0 +1,62 @@
+[
+  {
+    "fixture": "1-FRAME.xls.tsv",
+    "raw_sha256": "138ec020fd4566d81a60e81a0c072bc5a55bbde890791d410a65182102356a78",
+    "fixture_sha256": "dad5729d7ad40c72fda681442f56f3e9e9a51779f0f8eea0af8c329dfde4a629"
+  },
+  {
+    "fixture": "1-D3DPERF_EVENTS.xls.tsv",
+    "raw_sha256": "84eb1990910b002439d6965eeed607f465e8a628cf40af9f48e6ec1f54dd11c2",
+    "fixture_sha256": "84eb1990910b002439d6965eeed607f465e8a628cf40af9f48e6ec1f54dd11c2"
+  },
+  {
+    "fixture": "1-GPUTRACE_FRAME.xls.tsv",
+    "raw_sha256": "701deef7714d7d5a455957e524952e04c8844eb1dcc597bdfe53eff55a1b1e41",
+    "fixture_sha256": "8607058fadc3a0359667f53eea7e4fdfae28223c0b64153ee20add54c27ce824"
+  },
+  {
+    "fixture": "1-GPUTRACE_REGIMES.xls.tsv",
+    "raw_sha256": "dc9c3fc15e467c3dd25d29d9480539ee36b995b3a7998407e8899c6754fa2749",
+    "fixture_sha256": "2b1329f720364bf011e2a1b7dc77aa91d99c2ae8778037dde9582caf0f40f8e8"
+  },
+  {
+    "fixture": "1-REPRO_INFO.xls.tsv",
+    "raw_sha256": "528333fe61478986e6841e184653c8434eebb6145bfc3a38625a38e3fd923714",
+    "fixture_sha256": "f7cf93623a7f5514cea36e0a4e8d2a4b79c204538ff476b74fc8748975ed1bfd"
+  },
+  {
+    "fixture": "64-FRAME.xls.tsv",
+    "raw_sha256": "18c12f5b6b7f25274a526d21af96e68bb92369c9ee89ef1e70cf1b276a55a716",
+    "fixture_sha256": "4d4544f60e7e643559361179d62c8f064718dee77f952bb3e629535575b7035d"
+  },
+  {
+    "fixture": "64-D3DPERF_EVENTS.xls.tsv",
+    "raw_sha256": "6db1374426be2798d592cb229e1d0e22716056a4329c488b7d2d75c2bc30f386",
+    "fixture_sha256": "6db1374426be2798d592cb229e1d0e22716056a4329c488b7d2d75c2bc30f386"
+  },
+  {
+    "fixture": "64-GPUTRACE_FRAME.xls.tsv",
+    "raw_sha256": "d2a47bc3a4670e80317bc70d63244e180a0c887164a7b6815dbaeaf6b19f344e",
+    "fixture_sha256": "f83fc50c1c53c749d46035d020bc2878f9fdd6936118ccf8969bef2fcbc827e1"
+  },
+  {
+    "fixture": "64-GPUTRACE_REGIMES.xls.tsv",
+    "raw_sha256": "08c41e2958e5e7fd944bfef19500843a9d826fc1b50565ac6a5e3c86f7bee7a2",
+    "fixture_sha256": "994d1a65bbd0807f991ff7ff804bfb3929087f7f5c26b8a16ce5a8b3236ec582"
+  },
+  {
+    "fixture": "64-REPRO_INFO.xls.tsv",
+    "raw_sha256": "9e53c888c120bd39fa590938b6ac9dcff245ddc224c6d3291bdf06c86513ba81",
+    "fixture_sha256": "f7cf93623a7f5514cea36e0a4e8d2a4b79c204538ff476b74fc8748975ed1bfd"
+  },
+  {
+    "fixture": "graphics-GPUTRACE_FRAME.xls.tsv",
+    "raw_sha256": "baa185b26703e36b85e3dd4f3c886984bcd0075ea8865ae06ec535e466432623",
+    "fixture_sha256": "9f93eb80bd1d86e53cd59116c99e27605bb189b4e440bb2357547410a89767ea"
+  },
+  {
+    "fixture": "graphics-GPUTRACE_REGIMES.xls.tsv",
+    "raw_sha256": "70153f37475707c6a09d5d1148750478b5aabb74afe60e8afcc7f7f95b45c1c8",
+    "fixture_sha256": "5a83bcfef8cac560c869b8e864d090913b185b0df3522810bcd56e9ae345d0da"
+  }
+]

@@ -1,0 +1,7 @@
+# Observed GPU Trace exports
+
+Collected 2026-09-25 using matching Nsight 2026.3.1 tools on RTX 3080 Ti / driver 615.71.09, Vulkan, Ampere GA10x Throughput Metrics, clocks unaltered and multi-pass disabled. Private workload: 16384 uint32 values, 2048 xorshift steps, workgroup size 1 or 64; trace starts after 30 submits and stops after 3. Files named .xls by Nsight contain TSV text. These are small selected rows/columns from real exports; values and duplicate event labels are retained verbatim. Reproduction host identity, command line, paths and transient memory fields are removed. No binary trace is checked in. Original hashes and exact selected fixture hashes are in provenance.json; raw evidence location and pin will be recorded in docs/PERFORMANCE.md.
+
+Numeric positions are not independently verified repetitions or min/mean/max statistics. In particular, do not infer physical scaling from metric suffixes: cycles-per-second metrics are exported with values near 1930 on this setup, so raw numbers alone do not establish Hz. Event header time_ms explicitly supplies milliseconds. These fixtures prove parser behavior, not product profiling support.
+
+The two `graphics-*` subsets come from the windowed reference fixture trace on the same tool/driver setup, seed 42 at 192x128, starting after five presents and limited to three frames. They preserve three unnamed numeric positions and repeated headers.
