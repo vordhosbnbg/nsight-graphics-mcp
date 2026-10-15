@@ -7,12 +7,19 @@ function(ngm_add_inspection)
         "${PROJECT_SOURCE_DIR}/src/inspection/DescriptorState.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ResourceRead.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ProfileInspection.cpp"
-        "${PROJECT_SOURCE_DIR}/src/inspection/ProfileMarkers.cpp")
+        "${PROJECT_SOURCE_DIR}/src/inspection/ProfileMarkers.cpp"
+        "${PROJECT_SOURCE_DIR}/src/inspection/ReplayTiming.cpp"
+        "${PROJECT_SOURCE_DIR}/src/inspection/ReplayTimingInspection.cpp")
     target_link_libraries(ngm_inspection PUBLIC ngm_artifacts ngm_nsight)
     ngm_first_party(ngm_inspection)
 endfunction()
 
 function(ngm_add_inspection_checks)
+    ngm_add_check(ngm_replay_timing_inspection_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayTimingInspectionCheck.cpp"
+        LIBRARIES ngm_inspection ngm_capture ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
+    ngm_add_check(ngm_replay_timing_correlation_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayTimingCorrelationCheck.cpp"
+        LIBRARIES ngm_inspection)
+    target_include_directories(ngm_replay_timing_correlation_check PRIVATE "${PROJECT_SOURCE_DIR}/src/inspection")
     ngm_add_check(ngm_profile_marker_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ProfileMarkerCheck.cpp" LIBRARIES ngm_inspection
         ARGS "${PROJECT_SOURCE_DIR}/tests/fixtures/profile-2026.3.1/markers")
     ngm_add_check(ngm_descriptor_state_check SOURCES "${PROJECT_SOURCE_DIR}/tests/DescriptorStateCheck.cpp" LIBRARIES ngm_inspection)

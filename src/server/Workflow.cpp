@@ -5,6 +5,7 @@
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/ProfileInspection.hpp"
 #include "ngm/ProfileMarkers.hpp"
+#include "ngm/ReplayTiming.hpp"
 #include "ngm/Version.hpp"
 
 #include <fastmcpp/util/pagination.hpp>
@@ -291,6 +292,101 @@ Schema resource_span_schema() {
                           {"byte_offset", integer_schema(0, 4194304)},
                           {"byte_count", integer_schema(1, 4194304)}},
                          {"path", "start_line", "end_line"});
+}
+Schema replay_timings_schema() {
+    const auto closed = [](Json properties) {
+        Json required = Json::array();
+        for(const auto& [key, unused] : properties.items()) {
+            (void)unused;
+            required.push_back(key);
+        }
+        return object_schema(std::move(properties), std::move(required));
+    };
+    const auto digest = string_schema(64, 64);
+    const auto ref = closed({{"path", string_schema(512, 1)}, {"sha256", digest}});
+    auto file = ref;
+    file["properties"]["bytes"] = integer_schema(0, 4194304);
+    file["required"].push_back("bytes");
+    const auto span = resource_span_schema();
+    const auto analysis =
+        closed({{"analysis_id", string_schema(39, 39)},
+                {"interval_index", integer_schema(0, 2)},
+                {"collection_version", string_schema(64, 1)},
+                {"producer", string_schema(4096, 1)},
+                {"gpu", string_schema(4096, 1)},
+                {"driver", string_schema(4096, 1)},
+                {"replay_target_sha256", digest},
+                {"report", ref},
+                {"master", ref},
+                {"cpp_index", ref},
+                {"profile_index", ref},
+                {"source_inputs_sha256", digest},
+                {"source_files", array_schema(file, 64)},
+                {"tables", closed({{"event_durations", ref}, {"regime_metrics", ref}})},
+                {"setup_sources", array_schema(span, 10000)},
+                {"profile_hierarchy",
+                 closed({{"status", {{"type", "string"}, {"enum", {"available", "unavailable", "unsupported"}}}},
+                         {"reason", string_schema(4096, 1)}})},
+                {"unsupported",
+                 array_schema(closed({{"scope", string_schema(64, 1)}, {"reason", string_schema(65536, 1)}}), 1)}});
+    const auto selection = closed({{"generated_frame", integer_schema(0, 0)},
+                                   {"submission_index", integer_schema(0, 9999)},
+                                   {"submit_info_index", integer_schema(0, 63)},
+                                   {"command_buffer_index", integer_schema(0, 63)},
+                                   {"queue", string_schema(65536, 1)},
+                                   {"command_buffer", string_schema(65536, 1)},
+                                   {"recording", string_schema(65536, 1)},
+                                   {"generated_event_index", integer_schema()}});
+    const auto parameters =
+        object_schema({{"vertex_count", integer_schema(0, UINT32_MAX)},
+                       {"index_count", integer_schema(0, UINT32_MAX)},
+                       {"instance_count", integer_schema(0, UINT32_MAX)},
+                       {"first_vertex", integer_schema(0, UINT32_MAX)},
+                       {"first_index", integer_schema(0, UINT32_MAX)},
+                       {"first_instance", integer_schema(0, UINT32_MAX)},
+                       {"vertex_offset", {{"type", "integer"}, {"minimum", INT32_MIN}, {"maximum", INT32_MAX}}}},
+                      {"instance_count", "first_instance"});
+    const auto draw =
+        closed({{"analysis_id", string_schema(39, 39)},
+                {"interval_index", integer_schema(0, 2)},
+                {"timing_ref", digest},
+                {"selection", selection},
+                {"original_capture_event_id", {{"type", "null"}}},
+                {"function", {{"type", "string"}, {"enum", {"VulkanReplay_CmdDraw", "VulkanReplay_CmdDrawIndexed"}}}},
+                {"parameters", parameters},
+                {"draw_source", span},
+                {"submission_source", span},
+                {"marker_path",
+                 array_schema(string_schema(ProfileMarkerLimits::component_bytes, 1), ProfileMarkerLimits::depth)},
+                {"marker_sources", array_schema(span, ProfileMarkerLimits::depth)},
+                {"included_state_commands", array_schema(string_schema(128, 1), 32)},
+                {"duration_ms", nullable({{"type", "number"}, {"minimum", 0}})},
+                {"trace", nullable(closed({{"event_row_index", integer_schema(0, ProfileEvidenceLimits::rows)},
+                                           {"regime_row_index", integer_schema(0, ProfileEvidenceLimits::rows)},
+                                           {"raw_duration", string_schema(4096, 1)}}))},
+                {"status", {{"type", "string"}, {"enum", {"available", "unavailable"}}}},
+                {"reason", string_schema(4096, 1)}});
+    return closed({{"evidence_origin", {{"type", "string"}, {"enum", {"nsight_replay_timing_correlation"}}}},
+                   {"correlation_profile", string_schema(128, 1)},
+                   {"source_capture_id", string_schema(39, 39)},
+                   {"source_capture_sha256", digest},
+                   {"source_interval_count", {{"type", "integer"}, {"enum", {1, 3}}}},
+                   {"group_sha256", digest},
+                   {"analyses", array_schema(analysis, 3)},
+                   {"selection_domain", {{"type", "string"}, {"enum", {"analysis_generated_cpp_submission"}}}},
+                   {"unit", {{"type", "string"}, {"enum", {"ms"}}}},
+                   {"original_capture_event_ids_available", {{"type", "boolean"}, {"enum", {false}}}},
+                   {"live_performance_available", {{"type", "boolean"}, {"enum", {false}}}},
+                   {"physical_counter_interpretation_available", {{"type", "boolean"}, {"enum", {false}}}},
+                   {"scope", string_schema(2048, 1)},
+                   {"coverage", closed({{"available", integer_schema(0, 30000)},
+                                        {"unavailable", integer_schema(0, 30000)},
+                                        {"unsupported_analyses", integer_schema(0, 3)}})},
+                   {"total", integer_schema(0, 30000)},
+                   {"offset", integer_schema(0, 30000)},
+                   {"limit", integer_schema(1, 100)},
+                   {"next_offset", nullable(integer_schema(0, 30000))},
+                   {"draws", array_schema(draw, 100)}});
 }
 Schema push_state_schema() {
     const auto span = resource_span_schema();
@@ -763,6 +859,7 @@ Json implemented_tool_names() {
                         "capture_cpp",
                         "replay",
                         "capture_analyze_timing",
+                        "capture_draw_timings",
                         "job_status",
                         "job_cancel",
                         "artifact_list",
@@ -1159,6 +1256,29 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .compare({args.at("baseline"), args.at("candidate"), args.at("table"), args.at("label"),
                           args.at("column_index"), args.at("workload_policy"), args.at("warmup_policy")});
         });
+
+    auto timing_ids = array_schema(string_schema(39, 39), 3);
+    timing_ids["minItems"] = 1;
+    timing_ids["uniqueItems"] = true;
+    add_tool(tools, "capture_draw_timings",
+             object_schema({{"analysis_ids", std::move(timing_ids)},
+                            {"offset", integer_schema(0, 30000)},
+                            {"limit", integer_schema(1, 100)}},
+                           {"analysis_ids"}),
+             replay_timings_schema(),
+             "Inspect unique same-input literal marker ranges containing one submitted direct/indexed draw in "
+             "qualified 2026.3.1.0/build 38722833 replay timing analyses. Provide all interval analyses from one "
+             "source: one ID for a one-interval capture or three distinct IDs covering indices 0..2. Every call "
+             "checks source, target, invocation, child-index and payload identities, interprets all intervals "
+             "and refuses ambiguous or unsupported associations. Defaults: offset 0, limit 50; maximum 100. "
+             "Returned selection IDs belong to the generated C++ snapshot. Times include state packets, replay "
+             "and instrumentation; original numeric event IDs, original live cost and physical counter meaning "
+             "remain unavailable. No live Nsight tools or GPU are required to read retained evidence.",
+             true, false, [this](const Json& args) {
+                 return ReplayTimingInspection(service().artifacts())
+                     .draws(args.at("analysis_ids").get<std::vector<std::string>>(),
+                            args.value("offset", std::size_t{0}), args.value("limit", std::size_t{50}));
+             });
 
     add_tool(tools, "capture_analyze_timing",
              object_schema({{"capture_id", string_schema(39, 39)},

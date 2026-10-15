@@ -90,6 +90,7 @@ Json query_capabilities(Client& client) {
                                                         "capture_cpp",
                                                         "replay",
                                                         "capture_analyze_timing",
+                                                        "capture_draw_timings",
                                                         "job_status",
                                                         "job_cancel",
                                                         "artifact_list",
@@ -138,7 +139,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 31, "discover exactly the implemented tools");
+    require(listing.size() == 32, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -680,6 +681,18 @@ void workflow_check(const std::string& server, const std::string& standin, const
     require(timing_index.at("source").at("capture_id") == first_id &&
                 timing_index.at("requested").at("trigger") == "replay_pass_start",
             "actual stdio timing collection retains source and explicit trigger provenance");
+    const auto draw_timings =
+        successful_call(client, "capture_draw_timings", {{"analysis_ids", {timing.at("artifact_id")}}, {"limit", 2}});
+    validate_inspection("capture_draw_timings", draw_timings);
+    require(draw_timings.at("coverage").at("available") == 4 && draw_timings.at("draws").size() == 2 &&
+                draw_timings.at("next_offset") == 2 && draw_timings.at("draws")[0].at("duration_ms") == 1.25 &&
+                draw_timings.at("original_capture_event_ids_available") == false,
+            "actual stdio timing query preserves bounded association and identity scope");
+    expect_tool_error(call(client, "capture_draw_timings", {{"analysis_ids", {first_id}}}), "not_capture");
+    expect_tool_error(call(client, "capture_draw_timings", {{"analysis_ids", Json::array()}}), "invalid_argument");
+    expect_tool_error(
+        call(client, "capture_draw_timings", {{"analysis_ids", {timing.at("artifact_id"), timing.at("artifact_id")}}}),
+        "invalid_argument");
     const auto record2 = scratch.path / "target2.pid";
     auto sdk_arguments = capture_arguments(record2);
     sdk_arguments["delimiter"] = "graphics_capture_api";

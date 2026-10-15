@@ -2099,3 +2099,152 @@ failed controls, separate build identities, CPU logs and the portable verifier.
 The repaired source/imported payload sizes and SHA-256 all match; the imported
 verifier passes. It qualifies the 0.5.4 collector only. Draw correlation and
 independent per-draw timestamp acceptance remain unfinished.
+
+### I-067 — Timing-reader probe refuses replayer setup grammar
+
+- **Context/reproduce:** The uncommitted 0.5.5 pure correlation reader consumes
+  generated C++ plus event/regime tables from the final 0.5.4 first-interval
+  analysis `bundle-cb9f1be49f63e6e3ee1781720b550c53`. No new GPU job is run.
+  Input producer is 2026.3.1.0/build 38722833 on the recorded 3080 Ti host.
+- **First observed refusal:** The new timing parser reaches the source, but the
+  interpreter returns zero draws with `recording usage flags are outside the
+  qualified timing scope`. The actual generated setup recordings use the
+  literal `VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT`; application recording
+  flags remain zero. No timing is returned for this refused attempt.
+- **Evidence/retention:** Input sources/tables are already protected by the
+  0.5.4 pinned qualification `bundle-d95a9298e94a1dfc4b1e598bc2445d3f`.
+  `ReplayTimingReadProbe.cpp`, its exact compile/link receipt and
+  `r025-correlation-initial.*` retain the working diagnostic; publication of
+  these new controls belongs to the unfinished correlation slice.
+- **Revisit:** Qualify the literal simultaneous-use form separately from
+  one-time submission, and establish any pre-frame callback registrations
+  explicitly. Unknown setup/recording forms must continue to refuse; neither
+  source naming nor a matching row count establishes an active recording.
+- **Second control:** After explicit non-draw initial callback links and the
+  symbolic simultaneous-use form are admitted, a fresh raw read still returns
+  zero draws with `unclosed recording marker`. The retained
+  `r025-correlation-initialization-probe/0.*` shows one setup callback resolved.
+  In the actual source, recording 161 opens one label, 155 has three balanced
+  inner labels, and 162 closes the first label. Application recording 160 and
+  the final blit have balanced labels internally. The per-recording balance
+  assumption is too narrow; no malformed capture is established.
+- **Documented correction boundary:** Vulkan permits command labels to span
+  command buffers and queue submissions, with balance judged in one queue's
+  submission stream. Interpret that stream explicitly; do not drop the setup
+  records. Keep cross-buffer draw timing and interleaved queue/command shapes
+  unavailable until separately qualified. See the
+  [Khronos command-label reference](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdEndDebugUtilsLabelEXT.html).
+- **Allocation/ownership controls:** The queue-stream reader next refuses a
+  missing qualified command-buffer allocation. A timing-only allocation-block
+  reader establishes the required primary-buffer metadata without interpreting
+  unrelated pipeline/resource definitions or weakening recorded-state queries.
+  All three multi-interval snapshots then return 12 private candidate matches
+  each. The single-interval snapshot still refuses a missing current recording:
+  the prototype discarded every recording after any pool reset. Using each
+  allocation's literal pool ownership, rather than global invalidation, makes
+  all four retained snapshots return 12 candidates each with no unsupported
+  records. The `stream`, `allocation` and `pool` probe directories retain each
+  distinct attempt and source/binary identities. These remain private reader
+  controls; public bundle/group validation and independent timestamps are not
+  established by this result.
+
+### I-068 — New correlation test fixture collides with an imported name
+
+- **Observed/reproduce:** Building the uncommitted initial-recording tests at
+  0.5.5 fails because their `setup` string conflicts with the existing state
+  fixture's `setup`, introduced by its using-directive. The compiler reports
+  ambiguous references; no new test result or Nsight compatibility follows.
+- **Correction/evidence:** Rename the new constant `initial_setup_source` and
+  rebuild the focused targets. The original compiler diagnostics remain in
+  `r025-correlation-initialization-cpu.log`; this is separate from I-067's
+  actual source-reader refusal.
+- **Revisit:** Keep shared-fixture names explicit when adding new grammar cases.
+
+### I-069 — Pool-reset negative test names an unrelated fixture pool
+
+- **Observed/reproduce:** The added queue-stream lifetime check fails its
+  expected-refusal assertion. Its reset uses pool 40, while the shared fixture's
+  command buffer is allocated from pool 41. Keeping that recording is correct;
+  the test does not demonstrate an interpreter or Nsight defect.
+- **Correction/evidence:** Use pool 41 for the owning-pool negative case and
+  retain the pool-99 positive case. The corrected check passes. Preserve
+  `r025-correlation-stream-lifetime-cpu.log` and its `fixed` counterpart with
+  the correlation slice's qualification.
+- **Revisit:** Derive negative lifetime scenarios from the independent fixture
+  allocation rather than assuming an object number denotes ownership.
+
+### I-070 — Timing bundle reader passes its group budget as a per-file limit
+
+- **Observed/reproduce:** The uncommitted 0.5.5 retained-bundle reader's first
+  probe refuses before parsing the C++ or trace with `Fingerprint limit cannot
+  exceed 256 MiB`. It passes the 512 MiB aggregate read budget to the existing
+  fingerprint API as a per-file limit. The retained capture itself is smaller;
+  no corrupt input or Nsight failure is established.
+- **Correction/evidence:** Keep the aggregate group budget at 512 MiB and use
+  the existing 256 MiB per-file bound for the saved input. Preserve
+  `r025-inspection-first.stderr`, the probe source and compile/link receipt in
+  the unfinished correlation slice's evidence. Rerun the retained one/three-
+  interval groups before claiming the public reader is qualified.
+- **Revisit:** Check both API bounds and aggregate budgets when adding bounded
+  readers; a larger total allowance does not enlarge a per-file contract.
+- **Next control:** With the bound corrected, the reader reaches the source
+  report but assumes an unrecorded `capture_settings.format` field. The native
+  graphics report records delimiter, frame and interval count; it has no such
+  field. `r025-inspection-file-bound.stderr` and the more detailed
+  `r025-inspection-diagnostic.stderr` preserve the refusal. Check the existing
+  settings and successful hashed capture operation rather than inventing a
+  producer field. This is a reader-schema mistake, not a malformed source.
+
+### I-071 — New timing inspection check treats an optional root as a path
+
+- **Observed/reproduce:** The first 0.5.5 CPU inspection-check build fails at
+  its installation path expression: `CaptureServiceOptions.nsight_root` is an
+  optional path, and has no path division operator. No check executes or GPU
+  qualification follows from this failed build.
+- **Correction/evidence:** Dereference the test's explicitly assigned root.
+  Preserve `r025-inspection-cpu-first-build.log` with the correlation slice's
+  evidence, then rebuild and execute the focused checks.
+- **Revisit:** Follow the existing options contract when constructing isolated
+  test installations.
+
+### I-072 — Focused test invocation omits updated process dependencies
+
+- **Observed/reproduce:** The first 0.5.5 reader/transport CTest run builds the
+  check executables but omits the server and Nsight process stand-in. The MCP
+  and HTTP checks reject the old server identity; the reader rejects differing
+  synthetic C++/trace GPU names. After building the server alone, the remaining
+  stale stand-in still produces the GPU mismatch. No real GPU job is run.
+- **Correction/evidence:** Build both process dependencies before invoking
+  CTest, or use the registered focused `_run` targets, which declare them. Keep
+  `r025-inspection-cpu-first-test.log`, `r025-inspection-cpu-second-test.log`
+  and their build logs. Do not weaken version or GPU identity checks to admit
+  these stale test inputs.
+- **Revisit:** A check executable's build target is distinct from its registered
+  run target and does not imply all external process dependencies were rebuilt.
+
+### I-073 — New reader checks assume writable copies and a single HTTP interval
+
+- **Observed/reproduce:** With the current process dependencies built, the new
+  CPU mutation check cannot rewrite a copy of a sealed published input. Its
+  copied owner permissions remain read-only. The HTTP check separately supplies
+  one analysis for its existing three-interval capture; the reader correctly
+  refuses an incomplete group. The stdio check passes.
+- **Correction/evidence:** Make only the test-owned mutation files writable,
+  retain an explicit HTTP incomplete-group rejection, and collect its other two
+  synthetic analyses before querying the complete group. Preserve
+  `r025-inspection-standin-test.log`. These failures concern the new check setup,
+  not the protected source bundles or actual GPU correspondence.
+- **Revisit:** Keep artifact sealing and complete-group semantics in the tests
+  instead of bypassing either product rule.
+
+**Shared retention for I-067–I-073:** Complete/pinned
+**bundle-975763dfe5b2d8a5bbc97f0219e6ccec** retains all **483** new qualification
+payloads, source/build identities, successful/failed probes, CPU logs and
+transport transcripts. Source/imported payload SHA-256 and lengths agree; all
+eight compressed executable identities verify. The imported portable verifier
+passes 58 schemas, 14 refusals, 48 API-witness/path/raw-time matches, stable
+references and the 704 exact native input files retained in already pinned
+ancestor **bundle-d95a9298e94a1dfc4b1e598bc2445d3f**. The new slice qualifies
+retained literal draw-range association, with original numeric event IDs and
+independent per-draw timestamp acceptance still unavailable. R-025 stays In
+Progress; no new GPU work or machine-policy change occurs in this reader slice.

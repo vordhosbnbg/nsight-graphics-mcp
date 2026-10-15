@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         require(other.tool("capabilities")["server"]["protocol_version"] == "2025-11-25",
                 "independent protocol version B");
         require(!fs::exists(store), "discovery does not open store");
-        require(c.rpc("tools/list")["result"]["tools"].size() == 31, "same implemented tools");
+        require(c.rpc("tools/list")["result"]["tools"].size() == 32, "same implemented tools");
         bad = c.headers();
         bad.erase("Accept");
         bad.emplace("Accept", "application/json;q=1");
@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
             } catch(const fastmcpp::TransportHttpError& e) {
                 throw std::runtime_error(std::string(e.what()) + ": " + e.body());
             }
-            require(sdk.list_tools().size() == 31, "supported client tool discovery");
+            require(sdk.list_tools().size() == 32, "supported client tool discovery");
             // Preserve JSON Schema union types: the pinned client's optional
             // high-level result coercion assumes string-only schema types.
             const auto result = sdk.call("tools/call", {{"name", "capabilities"}, {"arguments", Json::object()}});
@@ -339,6 +339,25 @@ int main(int argc, char** argv) {
         require(timing_info.at("provenance").at("timing_collected") == true &&
                     timing_info.at("provenance").at("source").at("capture_id") == complete.at("artifact_id"),
                 "HTTP retains combined analysis origin and source identity");
+        const auto incomplete =
+            other.rpc("tools/call", {{"name", "capture_draw_timings"},
+                                     {"arguments", {{"analysis_ids", {timing.at("artifact_id")}}}}});
+        require(incomplete.at("result").at("isError") == true, "HTTP rejects incomplete interval groups");
+        Json timing_ids = Json::array({timing.at("artifact_id")});
+        for(std::size_t interval = 1; interval < 3; ++interval) {
+            const auto peer = other.tool("capture_analyze_timing", {{"capture_id", complete.at("artifact_id")},
+                                                                    {"architecture", "Ampere GA10x"},
+                                                                    {"interval_index", interval},
+                                                                    {"pin", true}});
+            require(await_job(other, peer.at("identity").at("job_id")).at("state") == "succeeded",
+                    "HTTP retains each source interval's analysis");
+            timing_ids.push_back(peer.at("artifact_id"));
+        }
+        const auto timings = other.tool("capture_draw_timings", {{"analysis_ids", timing_ids}});
+        require(timings.at("coverage").at("available") == 12 && timings.at("draws").size() == 12 &&
+                    timings.at("draws")[11].at("duration_ms") == 4.5 &&
+                    timings.at("physical_counter_interpretation_available") == false,
+                "HTTP shares the bounded retained draw-timing reader");
         auto waiting = capture(c, scratch.path / "wait.pid", true);
         wait_record(scratch.path / "wait.pid");
         c.remove();

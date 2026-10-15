@@ -115,6 +115,22 @@ exists yet. R-025 stays In Progress; R-024 and R-026 remain Pending. The surface
 stays 30 tools; installed configuration, helper closure and machine policies are
 unchanged. I-053–I-061 preserve failures and corrected serial qualification.
 
+The **0.5.5 R-025 association slice** brings the shared surface to **32 tools**.
+`capture_draw_timings` validates complete one/three-interval analysis groups and
+associates unique one-call literal ranges with generated-C++ submission selections.
+All **40 CPU checks** pass in **413.34 seconds**. Offline retained-data qualification
+passes **58** actual schemas and **14** refusals across three stdio/two HTTP starts,
+with **48** API-witness/raw-table matches and **704** unchanged native payloads.
+Original numeric capture IDs, live cost and physical counter meaning remain
+unavailable. Independent per-draw timestamps, new-input qualification and the
+full repair workflow remain unfinished; **R-025 stays In Progress**, R-024/R-026
+Pending. See docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md. I-067–I-073
+retain the reader and check-setup failures. Complete/pinned
+**bundle-975763dfe5b2d8a5bbc97f0219e6ccec** retains **483** verified payloads;
+its imported verifier also checks the already pinned 0.5.4 input snapshot.
+No new GPU collection, helper closure,
+installed server/worker or machine policy change occurs in this slice.
+
 The **0.5.4 R-025 collector slice** brings the shared surface to **31 tools**.
 `capture_analyze_timing` leases/snapshots one native input and collects generated
 C++ plus a selected-interval GPU Trace, with separate trigger/settings/hash

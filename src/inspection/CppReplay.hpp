@@ -47,7 +47,12 @@ struct CppReplay {
     std::map<std::string, ReplayObject> objects;
     std::map<std::string, ReplayRecording> recordings;
     std::vector<ReplayCall> frame;
+    // Timing-only literal initial command-buffer/callback relationships. Other
+    // setup helper effects and descriptor/resource contents are not interpreted.
+    std::vector<ReplayCall> initial_recordings;
     nlohmann::json unsupported = nlohmann::json::array();
 };
-CppReplay parse_cpp_replay(const std::vector<CppSource>& sources);
+enum class ReplayParseScope { RecordedState, Timing };
+CppReplay parse_cpp_replay(const std::vector<CppSource>& sources,
+                           ReplayParseScope scope = ReplayParseScope::RecordedState);
 } // namespace ngm::detail

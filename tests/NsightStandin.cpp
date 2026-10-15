@@ -2,6 +2,7 @@
 #include "DescriptorStateFixture.hpp"
 #include "DrawStateFixture.hpp"
 #include "PushStateFixture.hpp"
+#include "ReplayTimingFixture.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -217,6 +218,8 @@ int main(int argc, char** argv) {
     if(is_cli && value(arguments, "--activity") == "GPU Trace Profiler" &&
        !environment("NGM_STANDIN_PROFILE_MODE").empty())
         mode = environment("NGM_STANDIN_PROFILE_MODE");
+    if(is_cli && mode.empty() && std::filesystem::path(value(arguments, "--exe")).filename() == "ngfx-replay.bin")
+        mode = "timing-analysis";
     std::cerr << "stand-in diagnostic only\n";
     if(mode == "hang") {
         hang();
@@ -296,6 +299,12 @@ int main(int argc, char** argv) {
             std::ofstream(tables / "GPUTRACE_REGIMES.xls")
                 << "flattened_event_name\tsynthetic.metric\tsynthetic.metric\n";
         }
+        if(mode == "timing-analysis") {
+            const auto ordinal = value(arguments, "--start-after-frames");
+            const auto interval = ordinal.empty() ? 0 : std::stoull(ordinal);
+            std::ofstream(tables / "D3DPERF_EVENTS.xls") << ngm::check::timing::event_table(interval);
+            std::ofstream(tables / "GPUTRACE_REGIMES.xls") << ngm::check::timing::regime_table(interval);
+        }
         if(const auto fixtures = environment("NGM_STANDIN_PROFILE_EXPORT_ROOT"); !fixtures.empty())
             for(const auto* table : {"FRAME.xls", "GPUTRACE_FRAME.xls", "D3DPERF_EVENTS.xls", "GPUTRACE_REGIMES.xls"})
                 fs::copy_file(fs::path(fixtures) / (std::string(table) + ".tsv"), tables / table,
@@ -341,9 +350,26 @@ int main(int argc, char** argv) {
         struct Source {
             std::string path, text;
         };
-        const auto state_sources = descriptor_case ? ngm::check::descriptor::sources<Source>()
-                                   : push_case     ? ngm::check::push::sources<Source>()
-                                                   : ngm::check::state::sources<Source>(true);
+        std::uint64_t timing_interval = 0;
+        if(mode == "timing-analysis") {
+            std::istringstream tokens(value(arguments, "--args"));
+            std::string input;
+            for(std::string token; tokens >> token;)
+                input = std::move(token);
+            std::ifstream capture_file(input);
+            std::uint64_t count = 0;
+            for(std::string line; std::getline(capture_file, line);)
+                if(line.starts_with("frame_count="))
+                    count = std::stoull(line.substr(12));
+            const auto wait = std::stoull(value(arguments, "--wait-frames"));
+            if((count != 1 && count != 3) || wait < std::max(std::uint64_t{2}, count))
+                return 87;
+            timing_interval = wait - std::max(std::uint64_t{2}, count);
+        }
+        const auto state_sources = mode == "timing-analysis" ? ngm::check::timing::sources<Source>(timing_interval)
+                                   : descriptor_case         ? ngm::check::descriptor::sources<Source>()
+                                   : push_case               ? ngm::check::push::sources<Source>()
+                                                             : ngm::check::state::sources<Source>(true);
         for(const auto* file : {"CommandLists.h",        "ReplayProcedures.h",
                                 "FrameReset00.cpp",      "ReplayProcedures.cpp",
                                 "PerfMarkersReset.cpp",  "PerfMarkersSetup.cpp",
@@ -359,7 +385,7 @@ int main(int argc, char** argv) {
             }
             std::ofstream stream(project / file);
             stream << "// CPU stand-in generated project; not real Nsight source or serialized resource data\n";
-            if(state_case) {
+            if(state_case || mode == "timing-analysis") {
                 const auto source = std::find_if(state_sources.begin(), state_sources.end(),
                                                  [&](const auto& source) { return source.path == file; });
                 if(source != state_sources.end()) {
@@ -394,8 +420,9 @@ int main(int argc, char** argv) {
         {
             std::ofstream metadata(project / "metadata.json");
             metadata << R"({"metadata_version":1,"nsight_version":"2026.3.1","nsight_version_build_id":)"
-                     << (mode == "wrong-producer" ? "42" : "38722833")
-                     << R"(,"primary_api":"vulkan","primary_gpu":"CPU stand-in",)"
+                     << (mode == "wrong-producer" ? "42" : "38722833") << R"(,"primary_api":"vulkan","primary_gpu":")"
+                     << (mode == "timing-analysis" ? "CPU stand-in (not GPU evidence)" : "CPU stand-in")
+                     << R"(",)"
                         R"("project_filename":"cpu-synthetic-project","has_unsupported_operation":false)"
                      << (mode == "duplicate-key" ? R"(,"metadata_version":1})" : "}");
         }

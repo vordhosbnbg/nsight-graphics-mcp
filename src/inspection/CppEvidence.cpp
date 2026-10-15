@@ -8,6 +8,7 @@
 #include <charconv>
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string_view>
@@ -42,8 +43,9 @@ struct Token {
 };
 struct Document {
     const CppSource& source;
+    bool timing = false;
     std::vector<Token> tokens;
-    explicit Document(const CppSource& input) : source(input) {
+    explicit Document(const CppSource& input, bool timing_scope = false) : source(input), timing(timing_scope) {
         check(!input.path.empty() && input.path.size() <= 4096 && input.path.find('\0') == std::string::npos,
               "source path exceeds bounds or contains NUL");
         (void)Json(input.path).dump();
@@ -301,6 +303,12 @@ const std::set<std::string_view> value_types{"uint32_t",
                                              "VkPipelineCreateFlags",
                                              "VkPipeline",
                                              "VkPipelineCache"};
+bool value_type(const Document& d, std::string_view name) {
+    static const std::set<std::string_view> timing_types{
+        "VkCommandPoolResetFlags",  "VkQueryResultFlags", "VkBufferImageCopy", "VkExtent3D", "VkImageBlit",
+        "VkImageSubresourceLayers", "VkOffset3D"};
+    return value_types.contains(name) || (d.timing && timing_types.contains(name));
+}
 void value_expression(const Document& d, Range r) {
     const auto& t = d.tokens;
     for(auto i = r.first; i < r.second; ++i) {
@@ -316,13 +324,13 @@ void value_expression(const Document& d, Range r) {
                       std::isdigit(static_cast<unsigned char>(t[i + 1].value.front())),
                   "member access unsupported");
         if(i + 1 < r.second && t[i + 1].value == "(") {
-            check(value_types.contains(v) || v == "HexToFloat" || v == "HexToDouble" || v == "NV_TO_ARRAY" ||
+            check(value_type(d, v) || v == "HexToFloat" || v == "HexToDouble" || v == "NV_TO_ARRAY" ||
                       v == "NV_TO_UNION" || v == "NV_GET_RESOURCE_CHECKED" || v == "NV_GET_RESOURCE_STATIC" ||
                       v == "NV_TO_STACK_PTR" || v == "NV_TO_OUTPUT_ARRAY" || v == "NV_GET_RESOURCE",
                   "unrecognized expression helper");
         }
         if(i + 1 < r.second && t[i + 1].value == "{")
-            check(value_types.contains(v), "unrecognized aggregate type");
+            check(value_type(d, v), "unrecognized aggregate type");
     }
 }
 struct Declaration {
@@ -334,7 +342,7 @@ struct Declaration {
 };
 Declaration declaration(const Document& d, std::size_t at, std::size_t& next) {
     const auto& t = d.tokens;
-    check(t.at(at).value == "static" && value_types.contains(t.at(at + 1).value), "unsupported declaration type");
+    check(t.at(at).value == "static" && value_type(d, t.at(at + 1).value), "unsupported declaration type");
     Declaration result{std::string(t.at(at + 1).value), std::string(t.at(at + 2).value), {}, {at, at}, {}, 0};
     check(result.name.starts_with(result.type + "_") && result.name.find("_uid_") == std::string::npos,
           "unsupported or shadowing declaration name");
@@ -1053,21 +1061,96 @@ void charge_copy(const ReplayValue& value, SyntaxBudget& budget) {
     for(const auto& argument : value.arguments)
         charge_copy(argument, budget);
 }
+ReplayCall frame_call(const Document& d, const Call& call, const ReplayDeclarations& visible, SyntaxBudget& budget) {
+    if(!d.timing || call.name != "VulkanReplay_GetQueryPoolResults")
+        return replay_call(d, call, budget);
+    check(call.args.size() == 8, "unsupported timing host query arity");
+    ReplayCall result;
+    result.name = call.name;
+    result.event = call.event;
+    result.position = call.at;
+    result.source = d.span(call.at, call.end);
+    budget.take(result.name.size() + d.source.path.size() + 128);
+    for(std::size_t index = 0; index != call.args.size(); ++index) {
+        const auto argument = call.args[index];
+        if(index != 5) {
+            result.arguments.push_back(replay_value(d, argument, budget));
+            continue;
+        }
+        const auto& t = d.tokens;
+        check(argument.second - argument.first == 5 && t[argument.first + 1].value == "." &&
+                  t[argument.first + 2].value == "data" && t[argument.first + 3].value == "(" &&
+                  t[argument.first + 4].value == ")",
+              "timing host output must be a literal local byte-vector data pointer");
+        const auto name = std::string(t[argument.first].value);
+        const auto found = visible.find(name);
+        check(found != visible.end() && found->second.type == "timing_host_byte_vector" &&
+                  found->second.elements.size() == 1 && found->second.end < call.at,
+              "timing host output lacks a prior scoped byte-vector declaration");
+        ReplayValue output;
+        output.text = expr(d, argument);
+        output.constructor = "timing_host_byte_vector_data";
+        output.position = argument.first;
+        output.source = d.span(argument.first, argument.second - 1);
+        output.arguments = found->second.elements;
+        budget.take(output.text.size() + d.source.path.size() + 128);
+        result.arguments.push_back(std::move(output));
+    }
+    const auto& a = result.arguments;
+    const auto count = integer(a[3].text), bytes = integer(a[4].text);
+    check(count > 0 && count <= 8192 && bytes == count * 8 && bytes == integer(a[5].arguments[0].text) &&
+              integer(a[6].text) == 8 && a[7].constructor == "VkQueryResultFlags" && a[7].arguments.size() == 1 &&
+              a[7].arguments[0].text == "VK_QUERY_RESULT_64_BIT",
+          "timing host query requires bounded packed 64-bit output; no output values are interpreted");
+    return result;
+}
 void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visible, std::vector<ReplayCall>& calls,
                 SyntaxBudget& budget) {
     const auto& t = d.tokens;
+    std::optional<std::uint64_t> thread;
     for(auto i = opening + 1; i < t[opening].pair;) {
         check(!t[i].conditional && !t[i].value.starts_with('#'), "conditional frame unsupported");
         if(t[i].value == "{") {
+            check(!thread, "nested scopes inside a timing thread annotation are unqualified");
             frame_body(d, i, visible, calls, budget);
             i = t[i].pair + 1;
         } else if(t[i].value == "BEGIN_DATA_SCOPE_FUNCTION" || t[i].value == "BEGIN_DATA_SCOPE") {
             check(t.at(i + 1).value == "(" && t.at(i + 2).value == ")" && t.at(i + 3).value == ";",
                   "unsupported frame scope macro");
             i += 4;
+        } else if(d.timing && (t[i].value == "NV_THREAD_BEGIN" || t[i].value == "NV_THREAD_END")) {
+            check(t.at(i + 1).value == "(" && t.at(i + 1).pair == i + 3 && t.at(i + 4).value == ";",
+                  "unsupported timing thread annotation");
+            const auto id = integer(t[i + 2].value);
+            check(id <= 4096, "timing thread annotation exceeds bounds");
+            if(t[i].value == "NV_THREAD_BEGIN") {
+                check(!thread, "nested timing thread annotation");
+                thread = id;
+            } else {
+                check(thread && *thread == id, "unmatched timing thread annotation");
+                thread.reset();
+            }
+            i += 5;
+        } else if(d.timing && t[i].value == "std") {
+            check(d.expression(i, i + 7) == "std : : vector < uint8_t >" && t.at(i + 8).value == "(" &&
+                      t.at(i + 8).pair == i + 10 && t.at(i + 11).value == ";",
+                  "unsupported timing host byte-vector declaration");
+            const auto name = std::string(t[i + 7].value);
+            check(name.starts_with("std_vector_of_uint8_t_temp_"), "unqualified timing host output name");
+            (void)integer(std::string_view(name).substr(27));
+            const auto size = integer(t[i + 9].value);
+            check(size > 0 && size <= 65536 && !visible.contains(name), "timing host output exceeds bounds or shadows");
+            ReplayDeclaration output;
+            output.type = "timing_host_byte_vector";
+            output.end = i + 11;
+            output.elements.push_back(replay_value(d, {i + 9, i + 10}, budget));
+            visible.emplace(name, std::move(output));
+            i += 12;
         } else if(t[i].value == "static") {
             Body b;
             auto parsed = declaration(d, i, i);
+            check(!d.timing || parsed.name.find("_uid_") == std::string::npos,
+                  "timing frame declaration cannot shadow a capture-local handle");
             b.declarations.emplace(parsed.name, parsed);
             auto values = replay_values(d, b, budget);
             check(!visible.contains(parsed.name), "shadowed frame declaration");
@@ -1083,7 +1166,9 @@ void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visib
                 check(t.at(end + 1).value == ";", "unsupported frame helper statement");
                 invocation = {i, end + 1, std::string(t[i].value), arguments(d, i + 1), 0};
             }
-            auto value = replay_call(d, invocation, budget);
+            check(!thread || invocation.name == "VulkanHelper_RecordCommandBuffer",
+                  "only a recording invocation is qualified inside a timing thread annotation");
+            auto value = frame_call(d, invocation, visible, budget);
             value.visible = visible;
             // Account for the copied scope as well as its original syntax.
             for(const auto& [name, entry] : visible) {
@@ -1096,9 +1181,169 @@ void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visib
             i = invocation.end + 1;
         }
     }
+    check(!thread, "unclosed timing thread annotation");
+}
+// Callback metadata only: opaque setup helper effects and descriptor contents
+// are never interpreted as execution-time state by the timing reader.
+const std::set<std::string_view> timing_setup_helpers{"VulkanHelper_InitBegin",
+                                                      "VulkanHelper_InitEnd",
+                                                      "VulkanHelper_PopulateImageFlags",
+                                                      "VulkanHelper_PopulateBuffer3",
+                                                      "VulkanHelper_PopulateSwapchainImage",
+                                                      "VulkanHelper_PopulateImage3",
+                                                      "VulkanHelper_InitializeSwapchain",
+                                                      "VulkanHelper_InitializeQueryPool",
+                                                      "VulkanHelper_UpdateDescriptorSetsFromDatabase",
+                                                      "VulkanHelper_RegisterObject",
+                                                      "VulkanHelper_InitializeCommandBuffer",
+                                                      "VulkanReplay_SetDebugUtilsObjectNameEXT",
+                                                      "VulkanReplay_MapMemory"};
+void setup_statements(const Document& d, std::size_t opening) {
+    const auto& t = d.tokens;
+    for(auto at = opening + 1; at < t[opening].pair;) {
+        check(!t[at].conditional && !t[at].value.starts_with('#'), "conditional timing setup is unqualified");
+        if(t[at].value == "{") {
+            setup_statements(d, at);
+            at = t[at].pair + 1;
+        } else if(t[at].value == "static") {
+            check(t.at(at + 1).value.starts_with("Vk"), "unqualified timing setup declaration");
+            auto end = at + 2;
+            for(; end < t[opening].pair && t[end].value != ";"; ++end) {
+                check(!t[end].conditional, "conditional timing setup declaration");
+                if(t[end].value == "(" || t[end].value == "[" || t[end].value == "{")
+                    end = t[end].pair;
+            }
+            check(end < t[opening].pair, "unterminated timing setup declaration");
+            at = end + 1;
+        } else {
+            const auto name = t[at].value;
+            check((timing_setup_helpers.contains(name) || name == "NV_VK_REPLAY" || name == "NV_MESSAGE_VERBOSE" ||
+                   name == "BEGIN_DATA_SCOPE_FUNCTION" || name == "BEGIN_DATA_SCOPE" || name == "FreeCachedMemory") &&
+                      t.at(at + 1).value == "(" && t.at(t[at + 1].pair + 1).value == ";",
+                  "unknown executable timing setup statement");
+            if(name == "NV_VK_REPLAY")
+                check(timing_setup_helpers.contains(call(d, at).name), "unknown timing setup operation");
+            at = t[at + 1].pair + 2;
+        }
+    }
+}
+void timing_initializations(const Document& d, std::vector<ReplayCall>& output, SyntaxBudget& budget) {
+    const auto& t = d.tokens;
+    std::optional<std::size_t> root;
+    for(std::size_t at = 0; at + 5 < t.size(); ++at)
+        if(t[at].value == "void" && t[at + 1].value == "SetInitialFrameState00" && t[at + 2].value == "(") {
+            check(!root && !t[at].conditional && t[at + 2].pair == at + 3 && t[at + 4].value == "{" &&
+                      t[at + 4].brace == none,
+                  "unqualified timing setup root");
+            root = at + 4;
+        }
+    check(root.has_value(), "timing setup root is absent");
+    setup_statements(d, *root);
+    const std::set<std::string_view> controls{"if",   "else",   "for",   "while", "do",   "switch",
+                                              "goto", "return", "throw", "try",   "catch"};
+    const std::set<std::string_view> pure_calls{"NV_VK_REPLAY",
+                                                "NV_MESSAGE_VERBOSE",
+                                                "BEGIN_DATA_SCOPE_FUNCTION",
+                                                "BEGIN_DATA_SCOPE",
+                                                "FreeCachedMemory",
+                                                "NV_TO_ARRAY",
+                                                "NV_TO_STACK_PTR",
+                                                "NV_TO_UNION",
+                                                "NV_GET_RESOURCE",
+                                                "NV_GET_RESOURCE_STATIC",
+                                                "NV_GET_RESOURCE_CHECKED",
+                                                "DATABASE_HANDLE",
+                                                "uint32_t",
+                                                "uint64_t",
+                                                "int32_t",
+                                                "float",
+                                                "double",
+                                                "HexToFloat",
+                                                "HexToDouble"};
+    std::string instance;
+    bool ended = false;
+    for(auto at = *root + 1; at < t[*root].pair; ++at) {
+        const auto name = t[at].value;
+        check(!t[at].conditional && !controls.contains(name) && !name.starts_with("NV_THREAD_"),
+              "timing setup control flow or thread dispatch is unqualified");
+        if(at + 1 < t[*root].pair && t[at + 1].value == "(" &&
+           (std::isalpha(static_cast<unsigned char>(name.front())) || name.front() == '_'))
+            check(name.starts_with("Vk") || pure_calls.contains(name) || timing_setup_helpers.contains(name),
+                  "unknown timing setup helper call");
+        if(name != "NV_VK_REPLAY")
+            continue;
+        const auto operation = call(d, at);
+        if(operation.name == "VulkanHelper_InitBegin") {
+            check(instance.empty() && !ended && operation.args.size() == 1, "invalid timing setup begin");
+            instance = uid(expr(d, operation.args[0]), "VkInstance_uid_");
+        } else if(operation.name == "VulkanHelper_InitEnd") {
+            check(!instance.empty() && !ended && operation.args.size() == 1 && expr(d, operation.args[0]) == instance,
+                  "invalid timing setup end");
+            ended = true;
+        } else
+            check(!instance.empty() && !ended, "timing setup operation is outside its initialization bracket");
+        if(operation.name != "VulkanHelper_InitializeCommandBuffer")
+            continue;
+        const auto block = t[at].brace;
+        check(block != none && t[block].brace == *root, "initial recording must be a direct setup block");
+        const auto parsed = body(d, block, false);
+        check(parsed.calls.size() == 1 && parsed.calls[0].name == "VulkanHelper_InitializeCommandBuffer",
+              "initial recording block has other executable effects");
+        check(output.size() < 64, "initial recording metadata exceeds bounds");
+        auto invocation = replay_call(d, parsed.calls[0], budget);
+        invocation.visible = replay_values(d, parsed, budget);
+        output.push_back(std::move(invocation));
+    }
+    check(!instance.empty() && ended, "timing setup requires one matching initialization bracket");
+}
+// Timing needs allocation metadata, not pipeline/descriptor reconstruction.
+// Qualify the exact allocation block without interpreting unrelated resource
+// payloads; the recorded-state parser keeps its stricter whole-parent contract.
+void timing_allocations(const Document& d, std::map<std::string, ReplayObject>& output, SyntaxBudget& budget) {
+    const auto& t = d.tokens;
+    for(std::size_t at = 0; at + 3 < t.size(); ++at) {
+        if(t[at].value != "NV_VK_REPLAY" || t[at + 2].value != "VulkanReplay_AllocateCommandBuffers")
+            continue;
+        const auto block = t[at].brace;
+        check(block != none && t[block].brace != none, "timing allocation lacks an object block");
+        const auto parent = t[block].brace;
+        check(t[parent].brace == none && parent >= 4 && t[parent - 1].value == ")" &&
+                  t[parent - 1].pair + 1 == parent - 1 && t[parent - 1].pair >= 2 &&
+                  t[t[parent - 1].pair - 2].value == "void" &&
+                  t[t[parent - 1].pair - 1].value.starts_with("CreateResources") && !t[at].conditional,
+              "timing allocation is not a direct resource creation block");
+        for(auto token = parent + 1; token < t[parent].pair;) {
+            check(!t[token].conditional, "conditional resource parent is unqualified for timing");
+            if(t[token].value == "{")
+                token = t[token].pair + 1;
+            else if(t[token].value == "BEGIN_DATA_SCOPE_FUNCTION" && t.at(token + 1).value == "(" &&
+                    t.at(token + 1).pair == token + 2 && t.at(token + 3).value == ";")
+                token += 4;
+            else if(t[token].value == "NV_MESSAGE_VERBOSE" && t.at(token + 1).value == "(" &&
+                    t.at(token + 1).pair == token + 3 && t.at(token + 2).value.starts_with('"') &&
+                    t.at(token + 4).value == ";")
+                token = t[token + 1].pair + 2;
+            else
+                throw Unsupported("unqualified direct resource statement prevents timing allocation identity");
+        }
+        const auto parsed = body(d, block, false);
+        check(parsed.calls.size() == 1 && parsed.calls[0].name == "VulkanReplay_AllocateCommandBuffers",
+              "timing allocation block has other executable effects");
+        ReplayObject object;
+        object.creation = replay_call(d, parsed.calls[0], budget);
+        object.values = replay_values(d, parsed, budget);
+        object.source = d.span(block, t[block].pair);
+        const auto& args = object.creation.arguments;
+        check(args.size() == 3 && args[2].constructor == "NV_TO_OUTPUT_ARRAY" && args[2].arguments.size() == 1 &&
+                  args[2].arguments[0].text.starts_with("& "),
+              "timing allocation has an unqualified output");
+        const auto symbol = uid(args[2].arguments[0].text.substr(2), "VkCommandBuffer_uid_");
+        check(!object.values.contains(symbol) && output.emplace(symbol, std::move(object)).second,
+              "timing allocation has a shadowed or duplicate handle");
+    }
 }
 } // namespace
-CppReplay parse_cpp_replay(const std::vector<CppSource>& sources) {
+CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseScope scope) {
     CppReplay result;
     try {
         std::vector<Document> docs;
@@ -1110,11 +1355,12 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources) {
             check(paths.insert(source.path).second, "duplicate replay source path");
             total += source.text.size();
             check(total <= 16U * 1024U * 1024U, "aggregate replay source exceeds 16 MiB");
-            docs.emplace_back(source);
+            docs.emplace_back(source, scope == ReplayParseScope::Timing);
         }
         SyntaxBudget syntax;
         ResultBudget budget;
-        const auto objects = creations(docs, result.unsupported, budget, true);
+        const auto objects = scope == ReplayParseScope::Timing ? std::map<std::string, Creation>{}
+                                                               : creations(docs, result.unsupported, budget, true);
         for(const auto& [symbol, creation] : objects) {
             ReplayObject object;
             const auto& d = *creation.doc;
@@ -1135,6 +1381,8 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources) {
         for(const auto& d : docs) {
             const auto filename = std::filesystem::path(d.source.path).filename().string();
             const auto& t = d.tokens;
+            if(d.timing && filename.starts_with("Resources"))
+                timing_allocations(d, result.objects, syntax);
             if(filename.starts_with("CommandList")) {
                 struct Function {
                     std::size_t at, opening;
@@ -1178,6 +1426,9 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources) {
                                                            {"reason", error.what()}});
                     }
                 }
+            } else if(d.timing && filename.starts_with("FrameSetup")) {
+                check(filename == "FrameSetup00.cpp", "only FrameSetup00 initial recording metadata is qualified");
+                timing_initializations(d, result.initial_recordings, syntax);
             } else if(filename.starts_with("Frame") && filename.find("Part") != std::string::npos) {
                 check(filename == "Frame0Part00.cpp" && !frame_seen, "only one Frame0Part00 execution is qualified");
                 frame_seen = true;

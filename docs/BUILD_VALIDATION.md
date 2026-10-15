@@ -2509,3 +2509,67 @@ native pins and compressed executable identities. I-066 preserves and corrects
 an initial copy omission before final verification. `artifact_info` confirms
 complete/pinned/not in use. The installed **0.4.1** importer remains distinct
 from the tested **0.5.4** product.
+
+## 0.5.5 retained replay draw association, R-025 slice, 2026-10-15
+
+`capture_draw_timings` adds the **32nd** shared stdio/HTTP tool. It validates a
+complete one/three-interval timing-analysis group and associates unique literal
+source/event/regime paths containing one submitted direct/indexed call. It
+preserves generated-C++ selections and raw replay times with hashes, source
+spans and explicit coverage. Original numeric capture event IDs, original live
+cost and physical counter interpretation remain unavailable. **R-025 stays In
+Progress** for independent per-draw timestamps, new-input qualification and the
+complete source-edit/rebuild/recapture workflow. See [REPLAY_TIMING.md](REPLAY_TIMING.md).
+
+The GCC Debug aggregate passes **40/40 CPU checks** in **413.34 seconds** using
+`cmake --build --preset linux-gcc-debug --target ngm_check_all`, with
+`CTEST_PARALLEL_LEVEL=1`. The new `ngm_replay_timing_correlation_check` passes
+in **0.16 seconds** and `ngm_replay_timing_inspection_check` in **12.26 seconds**.
+The former covers mixed direct/indexed parameters, nested/repeated/multi-draw
+paths, reused recordings, queue-stream labels, pool/reset lifetimes, qualified
+initial non-draw callbacks, host queries and unsupported execution grammar.
+The latter exercises actual process-boundary collection with CPU stand-ins,
+then full-group identity, cross-interval source/trace ambiguity, regime-only
+paths, unsupported peers, mutations, paging, leases, pins and restart stability.
+MCP and HTTP checks pass in **29.12** and **6.77 seconds**, including positive
+bounded reads and incomplete-group refusal. Stand-ins do not qualify GPU work.
+
+The final frozen **0.5.5** server reads the four unchanged **0.5.4** analyses in
+the preceding section. It returns **36** available source-call ranges across
+the three-interval source and **12** for the single-interval source, with no
+unsupported analyses. Independent fixture API witnesses verify the call,
+parameters and unique original label paths; separate raw source/table checks
+verify source spans and exact returned duration cells. The witnesses have
+whole-scene timestamps only and **do not** establish independent per-draw
+timestamp acceptance.
+
+All **58** successful actual results pass their advertised JSON schemas across
+three stdio starts and two authenticated loopback HTTP starts; **14** invalid
+or legacy requests refuse. Caller reordering, paging and restart preserve
+references and values. All **704** selected native payload lengths/SHA-256 stay
+unchanged and the six native capture/analysis pins remain set. An empty
+toolchain directory is selected for every read, proving that the retained
+query does not require a live Nsight installation or GPU operation. No new
+GPU collection occurs. The collection host remains the recorded matching
+2026.3.1.0/build 38722833 / RTX 3080 Ti / 615.71.09 / KDE Wayland-Xwayland host.
+
+The frozen final reader SHA-256 is
+`4b29fb5e32ef721b01726c5d9a3d4366f0b98d45a33517792f945372374439f0`.
+I-067 records the initial timing grammar refusals and their queue-stream/pool
+corrections; I-068–I-073 retain the compile, schema and check-setup failures.
+Each private control keeps its exact source/build identity. The source/input
+qualification remains complete/pinned
+`bundle-d95a9298e94a1dfc4b1e598bc2445d3f`; its retained native snapshots provide
+the raw inputs for this additive reader qualification. The installed **0.4.1**
+server/importer and **0.4.2** optional worker remain unchanged, as do machine
+profiling, driver, desktop and clock policies.
+
+Complete/pinned **bundle-975763dfe5b2d8a5bbc97f0219e6ccec** retains **483**
+payloads (**74,752,747 bytes**) for this reader qualification, including all new
+successful/failed controls, source/patch/submodule identities, CPU logs, API
+witnesses, actual schemas/transcripts and eight losslessly compressed
+executable identities. The imported portable verifier passes; all source/
+imported payload lengths and SHA-256 match. It also checks all 704 input files
+against the separately pinned 0.5.4 ancestor snapshot, avoiding duplicate raw
+capture history. `artifact_info` confirms complete/pinned/not in use. The code
+snapshot precedes only this final documentation/pin bookkeeping.

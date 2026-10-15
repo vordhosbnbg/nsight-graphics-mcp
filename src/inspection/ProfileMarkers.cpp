@@ -6,12 +6,9 @@
 #include <stdexcept>
 
 namespace ngm {
-ProfileMarkerAssociation correlate_profile_marker(const ProfileTable& events, const ProfileTable& regimes,
-                                                  std::size_t row_index) {
-    if(row_index >= events.rows.size())
-        throw std::invalid_argument("Selected event row is absent; inspect profile_metrics event_durations first");
+ProfileMarkerTable correlate_profile_markers(const ProfileTable& events, const ProfileTable& regimes) {
     const auto refuse = [](ProfileMarkerStatus status, const char* reason) {
-        ProfileMarkerAssociation result;
+        ProfileMarkerTable result;
         result.status = status;
         result.reason = reason;
         return result;
@@ -33,7 +30,7 @@ ProfileMarkerAssociation correlate_profile_marker(const ProfileTable& events, co
         if(count++ == 0)
             first = row;
     }
-    ProfileMarkerAssociation result;
+    ProfileMarkerTable result;
     std::vector<std::string> stack;
     std::map<std::string, std::size_t> event_paths;
     for(std::size_t row = 0; row < events.rows.size(); ++row) {
@@ -62,10 +59,10 @@ ProfileMarkerAssociation correlate_profile_marker(const ProfileTable& events, co
             flat += component;
         }
         ++event_paths[flat];
-        if(row == row_index) {
-            result.path = stack;
-            result.flat_path = flat;
-        }
+        ProfileMarkerAssociation association;
+        association.path = stack;
+        association.flat_path = flat;
+        result.rows.push_back(std::move(association));
     }
     // The second export confirms the indentation interpretation, including
     // paths affected by leading whitespace or unsupported component spellings.
@@ -75,19 +72,35 @@ ProfileMarkerAssociation correlate_profile_marker(const ProfileTable& events, co
             return refuse(Status::Unavailable,
                           "An event path has no exact same-profile regime path; hierarchy association is unavailable");
     }
-    result.event_matches = event_paths.at(result.flat_path);
-    const auto& [matches, first] = regime_paths.at(result.flat_path);
-    result.regime_matches = matches;
-    if(result.event_matches != 1 || matches != 1) {
-        result.status = Status::Unavailable;
-        result.reason =
-            "Repeated exported marker paths lack unique occurrence keys; timing/counter association is unavailable";
-        return result;
-    }
     result.status = Status::Available;
-    result.reason =
-        "Unique exact event/regime path within the qualified single-frame export; scope is an exported marker range";
-    result.regime_row = first;
+    result.reason = "Qualified single-column event/regime hierarchy; occurrence uniqueness is checked per row";
+    for(auto& association : result.rows) {
+        association.event_matches = event_paths.at(association.flat_path);
+        const auto& [matches, first] = regime_paths.at(association.flat_path);
+        association.regime_matches = matches;
+        if(association.event_matches != 1 || matches != 1) {
+            association.status = Status::Unavailable;
+            association.reason =
+                "Repeated exported marker paths lack unique occurrence keys; timing/counter association is unavailable";
+        } else {
+            association.status = Status::Available;
+            association.reason = "Unique exact event/regime path within the qualified single-frame export; scope is an "
+                                 "exported marker range";
+            association.regime_row = first;
+        }
+    }
+    return result;
+}
+ProfileMarkerAssociation correlate_profile_marker(const ProfileTable& events, const ProfileTable& regimes,
+                                                  std::size_t row_index) {
+    if(row_index >= events.rows.size())
+        throw std::invalid_argument("Selected event row is absent; inspect profile_metrics event_durations first");
+    const auto table = correlate_profile_markers(events, regimes);
+    if(table.status == ProfileMarkerStatus::Available)
+        return table.rows.at(row_index);
+    ProfileMarkerAssociation result;
+    result.status = table.status;
+    result.reason = table.reason;
     return result;
 }
 } // namespace ngm

@@ -83,6 +83,14 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "capture, matching 2026.3 tools, desktop/GPU/driver and profiling access. Each job validates "
                        "source settings, hashes, triggers and cleanup. Clocks/permissions remain unchanged. "
                        "Collection is separate from proved draw association and original live performance."}}},
+          {"draw_timings",
+           {{"available", storage},
+            {"status", storage ? "qualified_retained_subset" : "missing_prerequisites"},
+            {"reason", "capture_draw_timings validates a complete one/three-interval same-input analysis group "
+                       "and associates unique literal source/event/regime paths containing one submitted draw. "
+                       "Requires qualified matching 2026.3 producer exports and fingerprints. Ambiguous paths "
+                       "or unsupported peers refuse. Selections belong to generated C++; original numeric event "
+                       "IDs, original live performance and physical counter attribution remain unavailable."}}},
           {"replay",
            {{"available", capture_ready},
             {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
@@ -263,7 +271,7 @@ Json output_schema() {
         }}
     })json");
     for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers",
-                                 "replay", "timing_collection"}) {
+                                 "replay", "timing_collection", "draw_timings"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }
