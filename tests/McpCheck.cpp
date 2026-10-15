@@ -105,6 +105,8 @@ Json query_capabilities(Client& client) {
                                                         "capture_objects",
                                                         "capture_cpp_source",
                                                         "capture_cpp_draws",
+                                                        "capture_draw_executions",
+                                                        "capture_draw_state",
                                                         "capture_cpp_resources",
                                                         "capture_cpp_resource",
                                                         "profile",
@@ -133,7 +135,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 26, "discover exactly the implemented tools");
+    require(listing.size() == 28, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -717,6 +719,62 @@ void workflow_check(const std::string& server, const std::string& standin, const
     expect_tool_error(call(client, "capture_cpp_resource",
                            {{"capture_id", cpp_id}, {"resource_ref", resource_ref}, {"length", 65537}}));
     expect_tool_error(call(client, "capture_cpp_resources", {{"capture_id", cpp_id}, {"section", "invalid"}}));
+    auto state_arguments = cpp_arguments;
+    state_arguments["arguments"].push_back("--state-cpp");
+    const auto state_capture = successful_call(client, "capture_cpp", state_arguments);
+    require(await_job(client, state_capture["identity"]["job_id"])["state"] == "succeeded",
+            "managed state-input capture");
+    const auto state_id = state_capture["artifact_id"].get<std::string>();
+    const auto state_listing =
+        successful_call(client, "capture_draw_executions", {{"capture_id", state_id}, {"limit", 1}});
+    require(state_listing["executions_total"] == 1 &&
+                state_listing["selection_domain"] == "generated_cpp_recorded_submission" &&
+                state_listing["captured_gpu_execution_correspondence"] == false &&
+                state_listing["full_effective_state_coverage"] == false,
+            "typed recorded-state selection domain and limits");
+    const auto state_ref = state_listing["executions"][0]["execution_ref"];
+    const auto state_value =
+        successful_call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}});
+    const auto& fields = state_value.at("execution").at("state");
+    require(fields.at("depth_compare").at("value") == "VK_COMPARE_OP_LESS" &&
+                fields.at("cull_mode").at("value") == "VK_CULL_MODE_NONE" &&
+                fields.at("descriptors").at("status") == "unavailable",
+            "dynamic state and explicit remaining coverage through MCP");
+    require(fields.at("shaders").at("value")[0].at("serialized_byte_read").at("resource_ref").is_string(),
+            "state shader links to existing opaque reader reference");
+    expect_tool_error(
+        call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", std::string(64, '0')}}),
+        "export_unavailable");
+    expect_tool_error(call(client, "capture_draw_executions", {{"capture_id", state_id}, {"section", "invalid"}}));
+    expect_tool_error(call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", "18"}}));
+    const auto other_state = successful_call(client, "capture_cpp", state_arguments);
+    require(await_job(client, other_state["identity"]["job_id"])["state"] == "succeeded",
+            "second independent state capture");
+    expect_tool_error(
+        call(client, "capture_draw_state", {{"capture_id", other_state["artifact_id"]}, {"execution_ref", state_ref}}),
+        "export_unavailable");
+    const auto state_index =
+        Json::parse(successful_call(client, "artifact_read",
+                                    {{"artifact_id", state_id}, {"path", "derived/cpp-project.json"}})["text"]
+                        .get<std::string>());
+    for(const auto* file : {"CommandList00.cpp", "data.bin", "data.bin.rec"}) {
+        const auto path = root / "bundles" / state_id / state_index.at("project_directory").get<std::string>() / file;
+        std::ifstream source(path, std::ios::binary);
+        const std::string original{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
+        auto changed = original;
+        require(!changed.empty(), "mutable state input exists");
+        changed[0] = changed[0] == '/' ? ' ' : '/';
+        {
+            std::ofstream output(path, std::ios::binary);
+            output << changed;
+        }
+        expect_tool_error(call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}}),
+                          "State input changed since capture");
+        {
+            std::ofstream output(path, std::ios::binary);
+            output << original;
+        }
+    }
     expect_tool_error(call(client, "capture_cpp_source", {{"capture_id", cpp_id}, {"source_path", "../escape.cpp"}}));
     expect_tool_error(call(client, "capture_cpp_source",
                            {{"capture_id", cpp_id}, {"source_path", cpp_index["source_files"][0]}, {"start_line", 0}}));
@@ -876,6 +934,11 @@ void workflow_check(const std::string& server, const std::string& standin, const
         {"--artifact-root", root.string(), "--artifact-max-bytes", "1", "--artifact-max-age-seconds", "0"});
     initialize(restarted);
     const auto restarted_preview = call(restarted, "artifact_preview_image", preview_arguments);
+    require(successful_call(restarted, "capture_draw_executions", {{"capture_id", state_id}, {"limit", 1}}) ==
+                    state_listing &&
+                successful_call(restarted, "capture_draw_state",
+                                {{"capture_id", state_id}, {"execution_ref", state_ref}}) == state_value,
+            "state references, hashes, fields and pins remain stable through restart");
     require(restarted_preview.at("result") == preview_result,
             "preview image and identities survive restart without GPU/Nsight");
     require(successful_call(restarted, "artifact_compare_images", comparison_arguments) == comparison,
@@ -1005,6 +1068,8 @@ int target_main(int argc, char** argv) {
             record = argv[++index];
         } else if(argument == "--wait") {
             wait = true;
+        } else if(argument == "--state-cpp") {
+            // Selects only the stand-in's synthetic source fixture.
         } else {
             return 83;
         }

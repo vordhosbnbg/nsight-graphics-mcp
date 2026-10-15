@@ -74,6 +74,19 @@ void snapshots(ngm::ArtifactStore& store, const fs::path& scratch) {
     }
     auto destination = store.begin(Json::object());
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    require(store.fingerprint(id, "raw/large", 18U * 1024U * 1024U, deadline) ==
+                    digest(std::string(17U * 1024U * 1024U, 'x')) &&
+                store.fingerprint(id, "raw/empty", 0, deadline) == digest(""),
+            "streamed inventoried identities without snapshotting payloads");
+    rejected([&] { store.fingerprint(id, "raw/large", 100, deadline); });
+    rejected([&] { store.fingerprint(id, "raw/empty", 100, std::chrono::steady_clock::now()); });
+    rejected([&] { store.fingerprint(id, "../raw/large", 18U * 1024U * 1024U, deadline); });
+    const auto directory = store.lease(id).directory();
+    fs::rename(directory / "raw", directory / "moved");
+    fs::create_directory_symlink(directory / "moved", directory / "raw");
+    rejected([&] { store.fingerprint(id, "raw/large", 18U * 1024U * 1024U, deadline); });
+    fs::remove(directory / "raw");
+    fs::rename(directory / "moved", directory / "raw");
     const auto copied =
         store.snapshot_file(id, "raw/large", destination, "raw/input/data", 18U * 1024U * 1024U, deadline);
     require(copied.bytes == 17U * 1024U * 1024U, "streaming copy length");

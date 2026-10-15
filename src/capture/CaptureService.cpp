@@ -339,9 +339,18 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
                 throw std::runtime_error("C++ capture failed: " + captured.operation.message);
             }
             Json sources = Json::array();
+            Json state_inputs = Json::array();
+            const auto retain_identity = [&](const fs::path& path) {
+                state_inputs.push_back({{"path", relative_evidence(path, root)},
+                                        {"bytes", fs::file_size(path)},
+                                        {"sha256", sha256_regular_file(path, context.deadline, context.stop)}});
+            };
             for(const auto& source : captured.source_files) {
                 sources.push_back(relative_evidence(captured.project_directory / source, root));
+                retain_identity(captured.project_directory / source);
             }
+            for(const auto* name : {"metadata.json", "Resources.h", "data.bin", "data.bin.rec"})
+                retain_identity(captured.project_directory / name);
             Json index{{"schema_version", 1},
                        {"evidence_origin", "nsight_generated_cpp"},
                        {"job", context.identity},
@@ -350,6 +359,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
                        {"screenshot_path", relative_evidence(captured.project_directory / "screenshot.bmp", root)},
                        {"database_path", relative_evidence(captured.project_directory / "data.bin", root)},
                        {"source_files", std::move(sources)},
+                       {"recorded_state_inputs", {{"schema_version", 1}, {"files", std::move(state_inputs)}}},
                        {"nsight_version", captured.metadata.nsight_version},
                        {"nsight_version_build_id", captured.metadata.build_id},
                        {"primary_api", captured.metadata.primary_api},

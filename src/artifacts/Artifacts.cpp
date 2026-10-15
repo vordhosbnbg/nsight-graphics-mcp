@@ -1,4 +1,5 @@
 #include "ngm/Artifacts.hpp"
+#include "ngm/Hash.hpp"
 #include "ngm/Version.hpp"
 
 #include <algorithm>
@@ -1373,6 +1374,38 @@ std::string ArtifactStore::read(const std::string& id, const std::string& relati
         corrupt("Artifact file size changed after publication: " + relative_path);
     }
     return result;
+}
+std::string ArtifactStore::fingerprint(const std::string& id, const std::string& relative_path,
+                                       std::size_t maximum_bytes,
+                                       std::chrono::steady_clock::time_point deadline) const {
+    check_relative(relative_path);
+    if(maximum_bytes > 256U * 1024U * 1024U)
+        throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Fingerprint limit cannot exceed 256 MiB");
+    auto protection = lease(id);
+    std::uint64_t expected = 0;
+    {
+        std::lock_guard lock(state_->mutex);
+        const auto& files = state_->entry(id).manifest.at("files");
+        const auto found = std::find_if(files.begin(), files.end(),
+                                        [&](const auto& value) { return value.at("path") == relative_path; });
+        if(found == files.end())
+            throw ArtifactError(ArtifactErrorCode::NotFound, "Fingerprint source is not inventoried");
+        expected = json_unsigned(found->at("bytes"));
+        if(expected > maximum_bytes)
+            throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Fingerprint source exceeds bounds");
+    }
+    auto directory = directory_at(state_->bundles.get(), id);
+    const std::filesystem::path path(relative_path);
+    for(const auto& component : path.parent_path())
+        directory = directory_at(directory.get(), component.string());
+    Descriptor file(openat(directory.get(), path.filename().c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC));
+    struct stat attributes{};
+    if(file.get() < 0 || fstat(file.get(), &attributes) != 0)
+        fail_errno("Open fingerprint input");
+    regular_attributes(attributes, relative_path);
+    if(static_cast<std::uint64_t>(attributes.st_size) != expected)
+        corrupt("Fingerprint inventory size changed");
+    return sha256_regular_descriptor(file.get(), deadline);
 }
 ArtifactUsage ArtifactStore::usage() const {
     std::lock_guard lock(state_->mutex);

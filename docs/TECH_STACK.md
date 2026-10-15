@@ -9,11 +9,22 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+R-021's first recorded-state slice at 0.4.5 uses a bounded internal syntax
+representation from the existing lexer, a separate pure `DrawState.cpp`
+interpreter and the shared inspection adapter. Capture-time source/payload
+fingerprints and streamed no-symlink artifact hashing bind submission references;
+no generated replay code is compiled or executed. Static and observed core
+dynamic forms pass four fresh 2026.3/private-witness comparisons, actual MCP
+queries and eight exact reads through the unchanged five-file worker boundary.
+There is no new dependency. GPU-observed state and descriptor/constant/value
+interpretation remain unavailable; see [DRAW_STATE.md](DRAW_STATE.md).
+
 R-020 completes header-only table compatibility at 0.4.4 with preserved headers,
 explicit query coverage and safe comparison refusal, using the existing parser
 and shared inspection layer. All 32 serial CPU checks pass. A separate fresh
 2026.3 Generate C++ Capture and exact shader read establish the next R-021 evidence
-path; general draw state remains unimplemented. See BUILD_VALIDATION.md.
+path; the later recorded-state subset is described above. General GPU-observed
+draw state remains unavailable. See BUILD_VALIDATION.md.
 
 R-019 completes the shared bounded launch overlay at 0.4.3 using the existing
 process supervisor and no new dependency. All 32 serial CPU checks pass; selected

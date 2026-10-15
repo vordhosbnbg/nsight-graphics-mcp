@@ -1,5 +1,13 @@
 # Local MCP server
 
+At **0.4.5**, two recorded-state tools bring the shared surface to **28 tools**:
+`capture_draw_executions` lists capture-local recorded submission occurrences;
+`capture_draw_state` interprets the qualified pipeline/shader, depth/culling and
+viewport/scissor subset for a listed reference. They require new capture-time
+fingerprints and matching 2026.3 producer evidence. General GPU-observed state,
+descriptors, constants and material values remain unavailable.
+[DRAW_STATE.md](DRAW_STATE.md) defines the contract, bounds and qualification.
+
 The visual release completes at **0.3.0**, preserving the 22-tool surface qualified
 at 0.2.12. [INSTALL.md](INSTALL.md) provides the exercised source-build and repair
 walkthrough; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates acceptance scope.

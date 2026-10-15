@@ -285,6 +285,127 @@ Schema resource_span_schema() {
                           {"byte_count", integer_schema(1, 4194304)}},
                          {"path", "start_line", "end_line"});
 }
+Schema draw_execution_schema(bool include_state) {
+    const auto span = resource_span_schema();
+    const auto selection = object_schema({{"frame", integer_schema(0, 0)},
+                                          {"submission_index", integer_schema(0, 10000)},
+                                          {"submit_info_index", integer_schema(0, 15)},
+                                          {"command_buffer_index", integer_schema(0, 63)},
+                                          {"queue", string_schema(64, 1)},
+                                          {"command_buffer", string_schema(64, 1)},
+                                          {"recording", string_schema(65536, 1)},
+                                          {"event_index", integer_schema()},
+                                          {"indirect_subdraw", {{"type", "null"}}}},
+                                         {"frame", "submission_index", "submit_info_index", "command_buffer_index",
+                                          "queue", "command_buffer", "recording", "event_index", "indirect_subdraw"});
+    auto result = object_schema(
+        {{"execution_ref", string_schema(64, 64)},
+         {"selection", selection},
+         {"event_index", integer_schema()},
+         {"function", {{"type", "string"}, {"enum", {"VulkanReplay_CmdDraw", "VulkanReplay_CmdDrawIndexed"}}}},
+         {"arguments", array_schema(string_schema(16384, 1), 6)},
+         {"labels", array_schema(string_schema(256), 16)},
+         {"source", span},
+         {"submission_source", span}},
+        {"execution_ref", "selection", "event_index", "function", "arguments", "labels", "source",
+         "submission_source"});
+    if(include_state) {
+        const auto evidence = object_schema({{"path", string_schema(512, 1)},
+                                             {"start_line", integer_schema(1, 4194304)},
+                                             {"end_line", integer_schema(1, 4194304)},
+                                             {"event_index", integer_schema()},
+                                             {"source", span}});
+        const auto field = [&](Schema value) {
+            return object_schema(
+                {{"status",
+                  {{"type", "string"},
+                   {"enum", {"qualified_recorded_state", "unavailable", "unsupported", "not_applicable"}}}},
+                 {"value", nullable(std::move(value))},
+                 {"reason", nullable(string_schema(65536, 1))},
+                 {"evidence", array_schema(evidence, 18)}},
+                {"status", "value", "reason", "evidence"});
+        };
+        auto stage = object_schema(
+            {{"stage", string_schema(64, 1)},
+             {"module", string_schema(64, 1)},
+             {"entry_point_expression", string_schema(258, 1)},
+             {"stage_source", span},
+             {"module_source", span},
+             {"resource_handle", integer_schema()},
+             {"declared_bytes", integer_schema(1, 16777216)},
+             {"serialized_byte_read", object_schema({{"status", {{"type", "string"}, {"enum", {"not_read"}}}},
+                                                     {"sha256", {{"type", "null"}}},
+                                                     {"reason", string_schema(256, 1)},
+                                                     {"resource_ref", nullable(string_schema(64, 64))}},
+                                                    {"status", "sha256", "reason", "resource_ref"})}},
+            {"stage", "module", "entry_point_expression", "stage_source", "module_source", "resource_handle",
+             "declared_bytes", "serialized_byte_read"});
+        Json properties{{"pipeline", field(object_schema({{"symbol", string_schema(64, 1)},
+                                                          {"layout", string_schema(64, 1)},
+                                                          {"render_pass", string_schema(64, 1)},
+                                                          {"subpass", integer_schema(0, 0)}},
+                                                         {"symbol", "layout", "render_pass", "subpass"}))},
+                        {"shaders", field(array_schema(stage, 8))},
+                        {"depth_test", field(boolean_schema())},
+                        {"depth_write", field(boolean_schema())},
+                        {"depth_compare", field(string_schema(64, 1))},
+                        {"cull_mode", field(string_schema(64, 1))},
+                        {"front_face", field(string_schema(64, 1))},
+                        {"viewports", field(array_schema(array_schema({{"type", "number"}}, 6), 16))},
+                        {"scissors", field(array_schema(array_schema(integer_schema(0, 2147483647), 4), 16))}};
+        const auto missing = object_schema({{"status", {{"type", "string"}, {"enum", {"unavailable"}}}},
+                                            {"value", {{"type", "null"}}},
+                                            {"reason", string_schema(256, 1)},
+                                            {"evidence", array_schema(evidence, 0)}},
+                                           {"status", "value", "reason", "evidence"});
+        for(const auto* key : {"descriptors", "push_constants", "uniform_material_values"})
+            properties[key] = missing;
+        Json required = Json::array();
+        for(const auto& [key, unused] : properties.items()) {
+            (void)unused;
+            required.push_back(key);
+        }
+        result["properties"]["state"] = object_schema(std::move(properties), std::move(required));
+        result["required"].push_back("state");
+    }
+    return result;
+}
+Schema recorded_state_schema(bool selected) {
+    auto result = cpp_inspection_schema();
+    auto& properties = result["properties"];
+    properties["evidence_origin"] = {{"type", "string"}, {"enum", {"nsight_generated_cpp_recorded_state"}}};
+    properties["selection_domain"] = {{"type", "string"}, {"enum", {"generated_cpp_recorded_submission"}}};
+    properties["captured_gpu_execution_correspondence"] = {{"type", "boolean"}, {"const", false}};
+    properties["full_effective_state_coverage"] = {{"type", "boolean"}, {"const", false}};
+    auto identity = cpp_file_schema();
+    identity["properties"]["bytes"] = integer_schema(0, 268435456);
+    properties["input_files"] = array_schema(identity, 260);
+    properties["association_scope"] = string_schema(512, 1);
+    if(selected)
+        properties["execution"] = draw_execution_schema(true);
+    else {
+        properties["executions"] = array_schema(draw_execution_schema(false), 100);
+        properties["unsupported"] = array_schema(object_schema({{"source", resource_span_schema()},
+                                                                {"recording", string_schema(65536, 1)},
+                                                                {"symbol", string_schema(65536)},
+                                                                {"scope", string_schema(64, 1)},
+                                                                {"reason", string_schema(65792, 1)}},
+                                                               {"reason"}),
+                                                 100);
+        properties["section"] = {{"type", "string"}, {"enum", {"executions", "unsupported"}}};
+        for(const auto* key : {"executions_total", "unsupported_total", "offset", "total"})
+            properties[key] = integer_schema(0, 100000);
+        properties["next_offset"] = nullable(integer_schema(0, 100000));
+    }
+    for(const auto& [key, unused] : properties.items()) {
+        (void)unused;
+        if(key == "executions" || key == "unsupported")
+            continue;
+        if(std::find(result["required"].begin(), result["required"].end(), key) == result["required"].end())
+            result["required"].push_back(key);
+    }
+    return result;
+}
 Schema resource_reference_schema() {
     auto span = resource_span_schema();
     for(const auto* key : {"sha256", "byte_offset", "byte_count"})
@@ -530,6 +651,8 @@ Json implemented_tool_names() {
                         "capture_objects",
                         "capture_cpp_source",
                         "capture_cpp_draws",
+                        "capture_draw_executions",
+                        "capture_draw_state",
                         "capture_cpp_resources",
                         "capture_cpp_resource",
                         "profile",
@@ -1254,6 +1377,36 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
             return InspectionService(service().artifacts())
                 .cpp_draws(artifact_id(arguments, "capture_id"), arguments.value("section", std::string("draws")),
                            arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
+    auto execution_input = inventory_input;
+    execution_input["properties"]["section"] = {{"type", "string"}, {"enum", {"executions", "unsupported"}}};
+    add_tool(
+        tools, "capture_draw_executions", execution_input, recorded_state_schema(false),
+        "List capture-local submitted draw occurrences from qualified Nsight 2026.3.1.0/build 38722833 generated C++. "
+        "Requires capture-time fingerprints from 0.4.5+, verified under a usage lease. Single Frame0Part00, primary "
+        "single-part recordings and direct/indexed draws only; page unsupported for reasons. These are recorded "
+        "submission occurrences, not observed GPU events or graphics function-inventory IDs. Default limit 50; maximum "
+        "100/256 KiB.",
+        true, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts())
+                .draw_executions(artifact_id(arguments, "capture_id"),
+                                 arguments.value("section", std::string("executions")),
+                                 arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
+        });
+    add_tool(
+        tools, "capture_draw_state",
+        object_schema({{"capture_id", string_schema(39, 39)}, {"execution_ref", string_schema(64, 64)}},
+                      {"capture_id", "execution_ref"}),
+        recorded_state_schema(true),
+        "Interpret recorded pipeline/shader, depth/culling and viewport/scissor state for one execution_ref listed "
+        "by capture_draw_executions. Static and qualified core dynamic forms obey setter/static-bind lifetime rules. "
+        "Fields have independent status, values and source evidence. Shader references link to capture_cpp_resource "
+        "for separately confined byte reads. Does not observe GPU event state, descriptor contents, push constants "
+        "or post-GPU uniform/material values. Foreign/stale references and mutated capture inputs refuse; result <=256 "
+        "KiB.",
+        true, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts())
+                .draw_state(artifact_id(arguments, "capture_id"), arguments.at("execution_ref").get<std::string>());
         });
     auto resource_input = inventory_input;
     resource_input["properties"]["section"] = {

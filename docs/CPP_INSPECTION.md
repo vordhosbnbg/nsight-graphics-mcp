@@ -1,5 +1,10 @@
 # Generated C++ source inspection
 
+At **0.4.5**, separate `capture_draw_executions`/`capture_draw_state` tools add
+a qualified recorded submission/state subset. [DRAW_STATE.md](DRAW_STATE.md)
+defines its capture-time hashes, execution references and limits. The source
+tools described below retain their existing relationship contract.
+
 Product **0.2.6** adds `capture_cpp_source` and `capture_cpp_draws` over complete
 retained `capture_cpp` bundles. These are generated replay **source relationships**:
 a draw's direct graphics-pipeline bind, that pipeline's stage initializers, and

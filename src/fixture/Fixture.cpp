@@ -31,7 +31,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 19> scenarios{"reference",
+constexpr std::array<std::string_view, 23> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -49,7 +49,11 @@ constexpr std::array<std::string_view, 19> scenarios{"reference",
                                                      "compute-index-error",
                                                      "compute-arithmetic-error",
                                                      "performance-reference",
-                                                     "performance-underfilled"};
+                                                     "performance-underfilled",
+                                                     "state-static",
+                                                     "state-dynamic",
+                                                     "state-indexed",
+                                                     "state-count"};
 constexpr std::array<std::string_view, 12> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
@@ -67,6 +71,10 @@ struct Workload {
     bool multipass = false;
     bool bindless = false;
     bool indirect = false;
+    bool state = false;
+    bool dynamic_state = false;
+    bool indexed = false;
+    bool dynamic_count = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
     std::uint32_t instance_count = 1;
@@ -78,6 +86,10 @@ Workload workload(std::string_view scenario) {
     result.multipass = combined || scenario == "multipass-reference" || scenario == "pass-output-error";
     result.bindless = combined || scenario == "bindless-reference" || scenario == "resource-selection-error";
     result.indirect = combined || scenario == "indirect-reference" || scenario == "indirect-parameter-error";
+    result.state = scenario.starts_with("state-");
+    result.dynamic_state = scenario == "state-dynamic" || scenario == "state-count";
+    result.indexed = scenario == "state-indexed";
+    result.dynamic_count = scenario == "state-count";
     result.channel_order = scenario == "pass-output-error" || scenario == "combined-pass-error" ? 1u : 0u;
     result.resource_xor = scenario == "resource-selection-error" || scenario == "combined-resource-error" ? 1u : 0u;
     result.instance_count =
@@ -97,6 +109,10 @@ Json workload_metadata(std::string_view scenario) {
         {"post_processing", selected.multipass},
         {"bindless_storage_buffers", selected.bindless},
         {"indirect_draw", selected.indirect},
+        {"indexed_draw", selected.indexed},
+        {"state_validation", selected.state},
+        {"dynamic_raster_depth_state", selected.dynamic_state},
+        {"dynamic_viewport_scissor_count", selected.dynamic_count},
         {"render_pass_count", selected.multipass ? 2 : 1},
         {"minimum_api_version", "1.3.0"},
         {"required_device_extensions", {"VK_KHR_swapchain"}},
@@ -114,6 +130,13 @@ T vk_struct(VkStructureType type) {
     T value{};
     value.sType = type;
     return value;
+}
+template <typename Handle>
+std::uint64_t handle_bits(Handle handle) {
+    if constexpr(std::is_pointer_v<Handle>)
+        return reinterpret_cast<std::uint64_t>(handle);
+    else
+        return static_cast<std::uint64_t>(handle);
 }
 
 void check(VkResult result, std::string_view operation) {
@@ -408,6 +431,14 @@ public:
             submit.signalSemaphoreCount = 1;
             submit.pSignalSemaphores = &present_ready_[image_index];
             check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
+            if(!options_.state_witness.empty()) {
+                state_witness_["submissions"].push_back({{"frame", frame},
+                                                         {"label", "frame." + std::to_string(frame)},
+                                                         {"queue_family", graphics_family_},
+                                                         {"command_buffer_count", 1},
+                                                         {"draw", draw_witness_}});
+                write_json(options_.state_witness, state_witness_);
+            }
             auto present = vk_struct<VkPresentInfoKHR>(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
             present.waitSemaphoreCount = 1;
             present.pWaitSemaphores = &present_ready_[image_index];
@@ -769,6 +800,10 @@ private:
         create.pNext = &enabled;
         check(vkCreateDevice(physical_, &create, nullptr, &device_), "creating the graphics device");
         volkLoadDevice(device_);
+        if(workload_.dynamic_state &&
+           (!vkCmdSetCullMode || !vkCmdSetFrontFace || !vkCmdSetDepthTestEnable || !vkCmdSetDepthWriteEnable ||
+            !vkCmdSetDepthCompareOp || !vkCmdSetViewportWithCount || !vkCmdSetScissorWithCount))
+            throw Unsupported("state fixture requires the core Vulkan 1.3 dynamic-state entry points");
         vkGetDeviceQueue(device_, graphics_family_, 0, &graphics_queue_);
         vkGetDeviceQueue(device_, present_family_, 0, &present_queue_);
         name(VK_OBJECT_TYPE_QUEUE, graphics_queue_, "fixture.graphics_queue");
@@ -898,15 +933,31 @@ private:
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &reference;
+        VkAttachmentDescription depth = color;
+        depth.format = VK_FORMAT_D32_SFLOAT;
+        depth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        const VkAttachmentReference depth_reference{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+        if(workload_.state)
+            subpass.pDepthStencilAttachment = &depth_reference;
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
         dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        if(workload_.state) {
+            dependency.srcStageMask |=
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            dependency.dstStageMask |=
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            dependency.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            dependency.dstAccessMask |=
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        }
         auto create = vk_struct<VkRenderPassCreateInfo>(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
-        create.attachmentCount = 1;
-        create.pAttachments = &color;
+        const std::array<VkAttachmentDescription, 2> attachments{color, depth};
+        create.attachmentCount = workload_.state ? 2u : 1u;
+        create.pAttachments = attachments.data();
         create.subpassCount = 1;
         create.pSubpasses = &subpass;
         create.dependencyCount = 1;
@@ -918,18 +969,63 @@ private:
     }
 
     void create_render_pass() {
+        if(workload_.state)
+            create_depth();
         render_pass_ = make_render_pass(format_, workload_.multipass ? "fixture.post.present" : "fixture.scene.raster");
         framebuffers_.resize(image_views_.size(), VK_NULL_HANDLE);
         for(std::size_t i = 0; i < framebuffers_.size(); ++i) {
             auto framebuffer = vk_struct<VkFramebufferCreateInfo>(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
             framebuffer.renderPass = render_pass_;
-            framebuffer.attachmentCount = 1;
-            framebuffer.pAttachments = &image_views_[i];
+            const std::array<VkImageView, 2> attachments{image_views_[i], depth_view_};
+            framebuffer.attachmentCount = workload_.state ? 2u : 1u;
+            framebuffer.pAttachments = attachments.data();
             framebuffer.width = extent_.width;
             framebuffer.height = extent_.height;
             framebuffer.layers = 1;
             check(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[i]), "creating a frame buffer");
         }
+    }
+
+    void create_depth() {
+        VkImageFormatProperties supported{};
+        if(vkGetPhysicalDeviceImageFormatProperties(
+               physical_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 0, &supported) != VK_SUCCESS ||
+           supported.maxExtent.width < extent_.width || supported.maxExtent.height < extent_.height ||
+           !(supported.sampleCounts & VK_SAMPLE_COUNT_1_BIT))
+            throw Unsupported("state fixture requires a D32_SFLOAT depth attachment at the selected dimensions");
+        auto create = vk_struct<VkImageCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);
+        create.imageType = VK_IMAGE_TYPE_2D;
+        create.format = VK_FORMAT_D32_SFLOAT;
+        create.extent = {extent_.width, extent_.height, 1};
+        create.mipLevels = create.arrayLayers = 1;
+        create.samples = VK_SAMPLE_COUNT_1_BIT;
+        create.tiling = VK_IMAGE_TILING_OPTIMAL;
+        create.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        check(vkCreateImage(device_, &create, nullptr, &depth_image_), "creating the state depth image");
+        VkMemoryRequirements requirements{};
+        vkGetImageMemoryRequirements(device_, depth_image_, &requirements);
+        std::optional<std::uint32_t> selected;
+        for(std::uint32_t i = 0; i < memory_properties_.memoryTypeCount; ++i)
+            if(requirements.memoryTypeBits & (1u << i)) {
+                selected = i;
+                if(memory_properties_.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                    break;
+            }
+        if(!selected)
+            throw Unsupported("no memory type supports the state depth image");
+        auto allocate = vk_struct<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
+        allocate.allocationSize = requirements.size;
+        allocate.memoryTypeIndex = *selected;
+        check(vkAllocateMemory(device_, &allocate, nullptr, &depth_memory_), "allocating state depth memory");
+        check(vkBindImageMemory(device_, depth_image_, depth_memory_, 0), "binding state depth memory");
+        auto view = vk_struct<VkImageViewCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+        view.image = depth_image_;
+        view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view.format = create.format;
+        view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+        check(vkCreateImageView(device_, &view, nullptr, &depth_view_), "creating the state depth view");
+        name(VK_OBJECT_TYPE_IMAGE, depth_image_, "fixture.state.depth");
     }
 
     void create_offscreen() {
@@ -1039,6 +1135,12 @@ private:
     }
 
     void create_buffers_and_descriptors() {
+        if(workload_.indexed) {
+            const std::array<std::uint32_t, 3> indices{0, 1, 2};
+            create_buffer(indices_, sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, "fixture.state.indices");
+            std::memcpy(indices_.mapped, indices.data(), sizeof(indices));
+            flush_buffer(indices_, "flushing state indices");
+        }
         create_buffer(readback_, static_cast<VkDeviceSize>(extent_.width) * extent_.height * 4,
                       VK_BUFFER_USAGE_TRANSFER_DST_BIT, "fixture.application_readback");
         const auto palette_usage =
@@ -1134,6 +1236,12 @@ private:
         create.pCode = code.data();
         VkShaderModule shader = VK_NULL_HANDLE;
         check(vkCreateShaderModule(device_, &create, nullptr, &shader), "creating shader " + filename);
+        if(workload_.state)
+            shader_witness_[std::to_string(handle_bits(shader))] = {
+                {"module_handle", handle_bits(shader)},
+                {"filename", filename},
+                {"bytes", create.codeSize},
+                {"sha256", ngm::sha256(std::as_bytes(std::span(code)))}};
         shaders_.push_back(shader);
         name(VK_OBJECT_TYPE_SHADER_MODULE, shader, "fixture." + filename);
         return shader;
@@ -1165,20 +1273,49 @@ private:
         auto assembly = vk_struct<VkPipelineInputAssemblyStateCreateInfo>(
             VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO);
         assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        const VkViewport viewport{0, 0, static_cast<float>(extent_.width), static_cast<float>(extent_.height), 0, 1};
-        const VkRect2D scissor{{0, 0}, extent_};
+        const VkViewport viewport =
+            workload_.dynamic_state
+                ? VkViewport{4, 6, 16, 16, 0.125f, 0.875f}
+                : VkViewport{0, 0, static_cast<float>(extent_.width), static_cast<float>(extent_.height), 0, 1};
+        const VkRect2D scissor = workload_.dynamic_state ? VkRect2D{{2, 3}, {8, 8}} : VkRect2D{{0, 0}, extent_};
         auto viewport_state =
             vk_struct<VkPipelineViewportStateCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO);
         viewport_state.viewportCount = 1;
         viewport_state.pViewports = &viewport;
         viewport_state.scissorCount = 1;
         viewport_state.pScissors = &scissor;
+        if(workload_.dynamic_count) {
+            viewport_state.viewportCount = viewport_state.scissorCount = 0;
+            viewport_state.pViewports = nullptr;
+            viewport_state.pScissors = nullptr;
+        }
         auto raster = vk_struct<VkPipelineRasterizationStateCreateInfo>(
             VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO);
         raster.polygonMode = VK_POLYGON_MODE_FILL;
         raster.cullMode = VK_CULL_MODE_NONE;
         raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         raster.lineWidth = 1;
+        if(workload_.dynamic_state) {
+            raster.cullMode = VK_CULL_MODE_FRONT_BIT;
+            raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        }
+        auto depth = vk_struct<VkPipelineDepthStencilStateCreateInfo>(
+            VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
+        depth.depthTestEnable = depth.depthWriteEnable = workload_.dynamic_state ? VK_FALSE : VK_TRUE;
+        depth.depthCompareOp = workload_.dynamic_state ? VK_COMPARE_OP_GREATER : VK_COMPARE_OP_LESS;
+        depth.maxDepthBounds = 1;
+        const std::array<VkDynamicState, 7> dynamic_states{
+            workload_.dynamic_count ? VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT : VK_DYNAMIC_STATE_VIEWPORT,
+            workload_.dynamic_count ? VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT : VK_DYNAMIC_STATE_SCISSOR,
+            VK_DYNAMIC_STATE_CULL_MODE,
+            VK_DYNAMIC_STATE_FRONT_FACE,
+            VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+            VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+            VK_DYNAMIC_STATE_DEPTH_COMPARE_OP};
+        auto dynamic =
+            vk_struct<VkPipelineDynamicStateCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
+        dynamic.dynamicStateCount = static_cast<std::uint32_t>(dynamic_states.size());
+        dynamic.pDynamicStates = dynamic_states.data();
         auto multisample =
             vk_struct<VkPipelineMultisampleStateCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO);
         multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1200,10 +1337,36 @@ private:
         create.pViewportState = &viewport_state;
         create.pRasterizationState = &raster;
         create.pMultisampleState = &multisample;
+        create.pDepthStencilState = workload_.state ? &depth : nullptr;
         create.pColorBlendState = &blend;
+        create.pDynamicState = workload_.dynamic_state ? &dynamic : nullptr;
         create.layout = pipeline_layout;
         create.renderPass = render_pass;
         check(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline), "creating " + label);
+        if(workload_.state) {
+            state_witness_["pipeline_api_inputs"] = {
+                {"pipeline_handle", handle_bits(pipeline)},
+                {"layout_handle", handle_bits(create.layout)},
+                {"render_pass_handle", handle_bits(create.renderPass)},
+                {"subpass", create.subpass},
+                {"depthTestEnable", depth.depthTestEnable},
+                {"depthWriteEnable", depth.depthWriteEnable},
+                {"depthCompareOp", depth.depthCompareOp},
+                {"cullMode", raster.cullMode},
+                {"frontFace", raster.frontFace},
+                {"viewport",
+                 {viewport.x, viewport.y, viewport.width, viewport.height, viewport.minDepth, viewport.maxDepth}},
+                {"scissor", {scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height}},
+                {"dynamic_states", workload_.dynamic_state ? Json(dynamic_states) : Json::array()}};
+            auto& witness_stages = state_witness_["pipeline_api_inputs"]["stages"] = Json::array();
+            for(const auto& stage : stages) {
+                auto module = shader_witness_.at(std::to_string(handle_bits(stage.module)));
+                module["stage"] = stage.stage;
+                module["flags"] = stage.flags;
+                module["entry_point"] = stage.pName;
+                witness_stages.push_back(std::move(module));
+            }
+        }
         name(VK_OBJECT_TYPE_PIPELINE, pipeline, label);
     }
 
@@ -1306,10 +1469,50 @@ private:
         pass.renderPass = workload_.multipass ? offscreen_pass_ : render_pass_;
         pass.framebuffer = workload_.multipass ? offscreen_framebuffer_ : framebuffers_[image_index];
         pass.renderArea = {{0, 0}, extent_};
-        pass.clearValueCount = 1;
-        pass.pClearValues = &clear;
+        VkClearValue depth_clear{};
+        depth_clear.depthStencil.depth = 1;
+        const std::array<VkClearValue, 2> clears{clear, depth_clear};
+        pass.clearValueCount = workload_.state ? 2u : 1u;
+        pass.pClearValues = clears.data();
         vkCmdBeginRenderPass(command_, &pass, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+        if(workload_.state)
+            draw_witness_ = {{"command", workload_.indexed ? "vkCmdDrawIndexed" : "vkCmdDraw"},
+                             {"bound_pipeline_handle", handle_bits(pipeline_)},
+                             {"active_render_pass_handle", handle_bits(pass.renderPass)},
+                             {"count", 3},
+                             {"instanceCount", 1},
+                             {"setters", Json::object()}};
+        if(workload_.dynamic_state) {
+            const VkViewport viewport{0, 0, static_cast<float>(extent_.width), static_cast<float>(extent_.height),
+                                      0, 1};
+            const VkRect2D scissor{{0, 0}, extent_};
+            if(workload_.dynamic_count) {
+                vkCmdSetViewportWithCount(command_, 1, &viewport);
+                vkCmdSetScissorWithCount(command_, 1, &scissor);
+            } else {
+                vkCmdSetViewport(command_, 0, 1, &viewport);
+                vkCmdSetScissor(command_, 0, 1, &scissor);
+            }
+            const VkBool32 enabled = VK_TRUE;
+            const VkCompareOp compare = VK_COMPARE_OP_LESS;
+            const VkCullModeFlags cull = VK_CULL_MODE_NONE;
+            const VkFrontFace front = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+            vkCmdSetDepthTestEnable(command_, enabled);
+            vkCmdSetDepthWriteEnable(command_, enabled);
+            vkCmdSetDepthCompareOp(command_, compare);
+            vkCmdSetCullMode(command_, cull);
+            vkCmdSetFrontFace(command_, front);
+            draw_witness_["setters"] = {
+                {"depthTestEnable", enabled},
+                {"depthWriteEnable", enabled},
+                {"depthCompareOp", compare},
+                {"cullMode", cull},
+                {"frontFace", front},
+                {"viewport",
+                 {viewport.x, viewport.y, viewport.width, viewport.height, viewport.minDepth, viewport.maxDepth}},
+                {"scissor", {scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height}}};
+        }
         const auto descriptor = descriptors_[options_.scenario == "binding-error" ? 1 : 0];
         vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor, 0,
                                 nullptr);
@@ -1320,6 +1523,9 @@ private:
         }
         if(workload_.indirect) {
             vkCmdDrawIndirect(command_, indirect_.handle, 0, 1, sizeof(VkDrawIndirectCommand));
+        } else if(workload_.indexed) {
+            vkCmdBindIndexBuffer(command_, indices_.handle, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed(command_, 3, 1, 0, 0, 0);
         } else {
             vkCmdDraw(command_, 3, 1, 0, 0);
         }
@@ -1490,6 +1696,7 @@ private:
             }
             destroy_buffer(readback_);
             destroy_buffer(indirect_);
+            destroy_buffer(indices_);
             if(offscreen_framebuffer_) {
                 vkDestroyFramebuffer(device_, offscreen_framebuffer_, nullptr);
             }
@@ -1513,6 +1720,12 @@ private:
             if(render_pass_) {
                 vkDestroyRenderPass(device_, render_pass_, nullptr);
             }
+            if(depth_view_)
+                vkDestroyImageView(device_, depth_view_, nullptr);
+            if(depth_image_)
+                vkDestroyImage(device_, depth_image_, nullptr);
+            if(depth_memory_)
+                vkFreeMemory(device_, depth_memory_, nullptr);
             for(const auto view : image_views_) {
                 if(view) {
                     vkDestroyImageView(device_, view, nullptr);
@@ -1541,6 +1754,12 @@ private:
     SdkControl& sdk_;
     const Workload workload_;
     Json device_support_ = Json::array();
+    Json state_witness_{{"schema_version", 1},
+                        {"evidence_origin", "private_fixture_api_witness"},
+                        {"scope", "API inputs and successful queue submission, not GPU state observation"},
+                        {"submissions", Json::array()}};
+    Json draw_witness_;
+    Json shader_witness_ = Json::object();
     xcb_connection_t* connection_ = nullptr;
     xcb_window_t window_ = XCB_WINDOW_NONE;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -1566,6 +1785,9 @@ private:
     std::vector<VkImageView> image_views_;
     std::vector<VkSemaphore> present_ready_;
     VkRenderPass render_pass_ = VK_NULL_HANDLE;
+    VkImage depth_image_ = VK_NULL_HANDLE;
+    VkDeviceMemory depth_memory_ = VK_NULL_HANDLE;
+    VkImageView depth_view_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers_;
     VkImage offscreen_image_ = VK_NULL_HANDLE;
     VkDeviceMemory offscreen_memory_ = VK_NULL_HANDLE;
@@ -1578,6 +1800,7 @@ private:
     VkPipelineLayout post_pipeline_layout_ = VK_NULL_HANDLE;
     VkPipeline post_pipeline_ = VK_NULL_HANDLE;
     Buffer indirect_;
+    Buffer indices_;
     Buffer readback_;
     std::array<Buffer, 2> palettes_{};
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
@@ -1630,6 +1853,8 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.output = value;
         } else if(option == "--shader-dir") {
             options.shader_directory = value;
+        } else if(option == "--state-witness") {
+            options.state_witness = value;
         } else {
             throw std::invalid_argument("unknown option " + std::string(option));
         }
@@ -1652,6 +1877,20 @@ Options parse_arguments(std::span<const char* const> arguments) {
         throw std::invalid_argument("output and shader directory paths must not be empty");
     }
     options.output = std::filesystem::absolute(options.output);
+    if(seen.contains("--state-witness") && options.state_witness.empty())
+        throw std::invalid_argument("state witness path must not be empty");
+    if(!options.state_witness.empty()) {
+        options.state_witness = std::filesystem::absolute(options.state_witness).lexically_normal();
+        const auto parent = std::filesystem::canonical(options.state_witness.parent_path());
+        if(!options.scenario.starts_with("state-") || std::filesystem::exists(options.state_witness) ||
+           std::filesystem::exists(options.state_witness.string() + ".tmp") ||
+           options.state_witness == options.output.lexically_normal() ||
+           (parent / options.state_witness.filename())
+               .string()
+               .starts_with(options.output.lexically_normal().string() + "/"))
+            throw std::invalid_argument(
+                "state witness requires a state scenario, a fresh file and a destination outside application output");
+    }
     if(options.sdk_first_boundary_frame &&
        (options.frame < 2 || *options.sdk_first_boundary_frame > options.frame - 2)) {
         throw std::invalid_argument("SDK first boundary must leave at least two subsequent application frames");

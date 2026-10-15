@@ -90,6 +90,15 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "Separate resource byte queries require a configured qualified worker for the producer. "
                        "Source relationships and serialized bytes do not establish executed GPU state or descriptor "
                        "selection."}}},
+          {"recorded_draw_state",
+           {{"available", storage},
+            {"status", storage ? "qualified_recorded_subset" : "missing_prerequisites"},
+            {"reason",
+             "capture_draw_executions/capture_draw_state interpret qualified direct/indexed draws, pipeline/shader, "
+             "depth/culling and viewport/scissor state in a single generated Frame0Part00 submission stream. "
+             "Requires 0.4.5+ capture-time input fingerprints and Nsight 2026.3.1.0/build 38722833. "
+             "Static/core dynamic forms have per-field provenance and refusals. Recorded submissions do not "
+             "establish observed GPU event state, descriptors, push constants or uniform/material values."}}},
           {"resource_bytes",
            {{"available", storage && (!options.resource_workers.nsight_2026_3.empty() ||
                                       !options.resource_workers.nsight_2026_2.empty())},
@@ -225,7 +234,7 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation : {"jobs", "artifacts", "resource_bytes"}) {
+    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }
@@ -365,6 +374,9 @@ struct ProtocolService::Impl {
             "Use capture_metadata/capture_events/capture_objects for supported retained export inventories. "
             "Use capture_cpp_source/capture_cpp_draws for qualified generated-source relationships and coverage "
             "limits. "
+            "Use capture_draw_executions/capture_draw_state for the separately qualified recorded submission/state "
+            "subset; "
+            "its references are distinct from graphics inventory event IDs. "
             "Found executable paths are not evidence of Nsight or GPU compatibility. Generated-source relationships "
             "do not establish GPU state or extracted resource bytes. GPU Trace metrics preserve observed export "
             "semantics.");

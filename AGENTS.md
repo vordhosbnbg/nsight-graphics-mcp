@@ -71,13 +71,32 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-021's first bounded recorded-state capability is implemented at **0.4.5** with
+**28 tools**. `capture_draw_executions` selects capture-local recorded submission
+occurrences; `capture_draw_state` interprets pipeline/shader, depth/culling and
+viewport/scissor fields with input fingerprints, static/dynamic lifetime rules
+and explicit coverage/refusals. Four fresh matching 2026.3 C++ captures agree with
+private fixture API witnesses; eight exact shader reads and MCP restart/schema
+checks pass. This remains recorded API state, with GPU execution correspondence
+and full effective-state coverage explicitly false. R-021 stays In Progress for
+descriptor/constant/value and execution-correspondence assessment; R-022 remains
+Pending. New 2026.2 state support is unqualified. See docs/DRAW_STATE.md and
+docs/BUILD_VALIDATION.md; no wider proprietary helper closure or machine-setting
+change is authorized by this slice.
+
+All **33 CPU checks** pass in the serial preset, followed by the focused fixture
+contract check after the final private-witness refinement. Qualification is pinned
+as `bundle-556efc8c7f65c8ebdb96e360197fc015`; source captures and shader reads are
+separately pinned in the external validation store documented in BUILD_VALIDATION.md.
+
 R-020 completes header-only profile compatibility at **0.4.4**. All **32 CPU
 checks** pass in the serial preset. Valid empty event/regime tables preserve
 headers and explicit unavailable coverage; frame metrics remain queryable and
 empty comparisons refuse. See docs/PERFORMANCE.md and docs/BUILD_VALIDATION.md.
 A separate fresh Generate C++ Capture on matching 2026.3 tools succeeds at 0.4.4,
 with source pin/restart queries and an exact 1,300-byte shader read. This is the
-evidence path for active R-021; no new draw-state query is implemented yet.
+evidence path for R-021; no state query existed at that milestone. The later
+0.4.5 recorded-state subset is described above.
 R-022 remains pending. I-038's graphics-capture timeouts remain unresolved.
 
 R-019 implements bounded per-job launch environments at **0.4.3**, shared by
@@ -141,7 +160,7 @@ The repository now implements the **0.3.0 visual first-release group**
 0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
 builds, a deterministic windowed Vulkan fixture, a C++ experiment runner,
 fastmcpp stdio integration, asynchronous capture jobs and managed artifact storage.
-The server exposes **26 tools**, including bounded metadata/event/object queries,
+The server exposes **28 tools**, including bounded metadata/event/object queries,
 image previews/comparisons, generated-source relationships and qualified optional
 serialized-resource reads. `ngm-capture` shares the capture service.
 

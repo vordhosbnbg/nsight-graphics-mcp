@@ -16,4 +16,8 @@ std::string sha256_file(const std::filesystem::path& path);
 // size, checking cancellation/deadline between chunks and detecting changes.
 std::string sha256_regular_file(const std::filesystem::path& path, std::chrono::steady_clock::time_point deadline,
                                 std::stop_token stop = {});
+// Hash an already safely opened regular descriptor without closing it or changing
+// its offset. Used after no-symlink traversal of managed artifact directories.
+std::string sha256_regular_descriptor(int descriptor, std::chrono::steady_clock::time_point deadline,
+                                      std::stop_token stop = {});
 } // namespace ngm

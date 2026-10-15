@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**26 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**28 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 ## Example workflows
 
@@ -28,6 +28,11 @@ demo shows a verified shader repair:
 These Nsight screenshots were retrieved through `artifact_preview_image`. The
 repaired capture matches the reference pixel for pixel.
 [Repair walkthrough](docs/INSTALL.md)
+
+For qualified 2026.3 C++ captures, `capture_draw_executions` and
+`capture_draw_state` expose recorded pipeline/shader, depth/culling and
+viewport/scissor state with field-level provenance. GPU-observed state and
+descriptor/material values remain unavailable. [Recorded-state scope](docs/DRAW_STATE.md)
 
 **Validate compute results**
 

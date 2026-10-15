@@ -154,9 +154,18 @@ std::string sha256_regular_file(const std::filesystem::path& path, std::chrono::
             }
         }
     } file{open(path.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)};
+    return sha256_regular_descriptor(file.descriptor, deadline, stop);
+}
+std::string sha256_regular_descriptor(int descriptor, std::chrono::steady_clock::time_point deadline,
+                                      std::stop_token stop) {
+    const auto check_stop = [&] {
+        if(stop.stop_requested() || std::chrono::steady_clock::now() >= deadline)
+            throw std::runtime_error("File hashing cancelled or deadline expired");
+    };
+    check_stop();
     struct stat before{};
-    if(file.descriptor < 0 || fstat(file.descriptor, &before) != 0 || !S_ISREG(before.st_mode) || before.st_size < 0) {
-        throw std::runtime_error("Expected a readable regular file for SHA-256: " + path.string());
+    if(descriptor < 0 || fstat(descriptor, &before) != 0 || !S_ISREG(before.st_mode) || before.st_size < 0) {
+        throw std::runtime_error("Expected a readable regular file for SHA-256");
     }
     Sha256 hash;
     std::array<std::byte, 65536> buffer{};
@@ -164,22 +173,22 @@ std::string sha256_regular_file(const std::filesystem::path& path, std::chrono::
     while(remaining_bytes) {
         check_stop();
         const auto requested = static_cast<std::size_t>(std::min<std::uint64_t>(remaining_bytes, buffer.size()));
-        const auto count = read(file.descriptor, buffer.data(), requested);
+        const auto count = pread(descriptor, buffer.data(), requested, before.st_size - remaining_bytes);
         if(count < 0 && errno == EINTR) {
             continue;
         }
         if(count <= 0) {
-            throw std::runtime_error("File changed or failed while hashing: " + path.string());
+            throw std::runtime_error("File changed or failed while hashing");
         }
         hash.update(std::span(buffer.data(), static_cast<std::size_t>(count)));
         remaining_bytes -= static_cast<std::uint64_t>(count);
     }
     check_stop();
     struct stat after{};
-    if(fstat(file.descriptor, &after) != 0 || before.st_size != after.st_size ||
+    if(fstat(descriptor, &after) != 0 || before.st_size != after.st_size ||
        before.st_mtim.tv_sec != after.st_mtim.tv_sec || before.st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
        before.st_ctim.tv_sec != after.st_ctim.tv_sec || before.st_ctim.tv_nsec != after.st_ctim.tv_nsec) {
-        throw std::runtime_error("File changed while hashing: " + path.string());
+        throw std::runtime_error("File changed while hashing");
     }
     return hash.finish();
 }

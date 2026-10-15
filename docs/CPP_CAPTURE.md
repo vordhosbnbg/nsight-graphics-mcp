@@ -120,3 +120,7 @@ to the exact tested producers, not a promise of future-release support.
 At **0.2.6**, [CPP_INSPECTION.md](CPP_INSPECTION.md) adds numbered source excerpts
 and qualified draw/pipeline/shader source relationships over these retained
 projects. Those queries preserve the resource-extraction and GPU-state limits.
+
+At **0.4.5**, new captures also retain input fingerprints for the separate
+[recorded-state queries](DRAW_STATE.md). Their qualified 2026.3 subset does not
+establish observed GPU event state or arbitrary after-event resource values.

@@ -142,6 +142,7 @@ int main() {
                     draws["source_files"].size() == 2,
                 "draw query lacks source relationship/identities");
         bounded(draws);
+        rejected(Error::ExportUnavailable, [&] { (void)inspection.draw_executions(id); });
         const auto resources = inspection.cpp_resources(id, "resources", 0, 1);
         bounded(resources);
         require(resources["resources"].size() == 1 && resources["resources_total"] == 1 &&

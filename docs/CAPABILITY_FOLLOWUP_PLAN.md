@@ -9,6 +9,13 @@ applicable version increment after each completed capability. R-018–R-022 in
 evidence and proposals; implementation/qualification updates are recorded there
 and in the capability-specific documents.
 
+Implementation update: A–C complete at **0.4.2–0.4.4**. At **0.4.5**, step D
+adds its first qualified recorded-state subset through two separate tools;
+[DRAW_STATE.md](DRAW_STATE.md) defines the four-case 2026.3 qualification and
+explicit execution/value limits. R-021 stays In Progress for the remaining
+assessment. Step E/R-022 remains Pending. The assessment below preserves its
+original scope; it is not a statement that all proposed state is now available.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

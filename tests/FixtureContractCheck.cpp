@@ -232,6 +232,22 @@ int main(int argc, char** argv) {
         set_argument(invalid_scenario, "--scenario", "combined-unrecognized");
         require_failure(invalid_scenario, 2, "unknown scenario", false);
 
+        for(const auto* scenario : {"state-static", "state-dynamic", "state-indexed", "state-count"}) {
+            auto selected = make_case(executable, scratch.path, std::string("state input ") + scenario);
+            copy_bundle(built_shaders, selected.shaders);
+            set_argument(selected, "--scenario", scenario);
+            require_failure(selected, 3, "DISPLAY is unset");
+            const auto record = Json::parse(ngm::read_regular_file(selected.output / "result.json", 1024 * 1024));
+            require(record.at("workload").at("state_validation") == true && record.at("device_support").empty(),
+                    "state scenarios preserve requested coverage without pretending hardware was checked");
+        }
+        auto bad_witness = make_case(executable, scratch.path, "witness requires state scenario");
+        bad_witness.process.arguments.insert(bad_witness.process.arguments.end(),
+                                             {"--state-witness", (scratch.path / "private-witness.json").string()});
+        require_failure(bad_witness, 2, "state witness requires", false);
+        require(!fs::exists(scratch.path / "private-witness.json"),
+                "invalid witness request writes no private evidence");
+
         auto malformed = make_case(executable, scratch.path, "malformed manifest");
         write_file(malformed.shaders / "provenance.json", "{ not JSON\n");
         require_failure(malformed, 1, "parse_error");

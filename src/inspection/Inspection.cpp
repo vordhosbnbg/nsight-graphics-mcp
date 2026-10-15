@@ -2,6 +2,7 @@
 
 #include "ResourceProfiles.hpp"
 #include "ngm/CppEvidence.hpp"
+#include "ngm/DrawState.hpp"
 #include "ngm/Hash.hpp"
 #include "ngm/NsightEvidence.hpp"
 
@@ -649,6 +650,150 @@ std::pair<Json, Json> resource_sources(ArtifactStore& store, const Capture& capt
     return {inspect_cpp_resources(sources), identities};
 }
 } // namespace
+namespace {
+std::pair<Json, Json> state_sources(ArtifactStore& store, const Capture& capture) {
+    if(capture.cpp_metadata.has_unsupported_operation)
+        fail(Error::ExportUnavailable, "Capture reports unsupported operations; inspect raw generated source");
+    if(std::string_view(capture.profile->cli_version) != "2026.3.1.0")
+        fail(Error::UnsupportedProducer, "Recorded draw state is qualified only for Nsight 2026.3.1.0/build 38722833");
+    const auto& index = capture.cpp_index;
+    if(!index.contains("recorded_state_inputs"))
+        fail(Error::ExportUnavailable,
+             "Capture has no capture-time state-input fingerprints; recapture with 0.4.5 or newer");
+    const auto& inputs = index.at("recorded_state_inputs");
+    require(number(inputs, "schema_version") == 1, "Unsupported state-input fingerprint schema");
+    const auto& files = member(inputs, "files");
+    require(files.is_array() && files.size() <= 260, "State-input fingerprint list exceeds bounds");
+    std::set<std::string> expected;
+    for(const auto& value : index.at("source_files"))
+        expected.insert(value.get<std::string>());
+    const auto project = index.at("project_directory").get<std::string>();
+    for(const auto* name : {"metadata.json", "Resources.h", "data.bin", "data.bin.rec"})
+        expected.insert(project + '/' + name);
+    std::map<std::string, Json> identities;
+    std::size_t total = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    for(const auto& file : files) {
+        const auto path = text(file, "path", 512), digest = text(file, "sha256", 64);
+        require(expected.erase(path) == 1 && digest.size() == 64 &&
+                    digest.find_first_not_of("0123456789abcdef") == std::string::npos,
+                "Missing, duplicated or invalid state-input identity");
+        const auto size = inventoried(capture, path, 256U * 1024U * 1024U);
+        require(number(file, "bytes") == size, "State-input size does not match inventory");
+        total += size;
+        if(total > 512U * 1024U * 1024U)
+            fail(Error::LimitExceeded, "State inputs exceed the 512 MiB fingerprint budget");
+        if(store.fingerprint(capture.info.summary.id, path, 256U * 1024U * 1024U, deadline) != digest)
+            fail(Error::InvalidExport,
+                 "State input changed since capture: " + path + "; recapture rather than reusing execution references");
+        identities.emplace(path, file);
+    }
+    require(expected.empty(), "State-input identities do not cover all captured inputs");
+    std::vector<CppSource> sources;
+    std::size_t source_bytes = 0;
+    for(const auto& value : index.at("source_files")) {
+        const auto path = value.get<std::string>(), name = std::filesystem::path(path).filename().string();
+        if(!name.starts_with("CommandList") && !name.starts_with("Resources") && !name.starts_with("Frame"))
+            continue;
+        source_bytes += inventoried(capture, path, 4U * 1024U * 1024U);
+        if(sources.size() >= 64 || source_bytes > 16U * 1024U * 1024U)
+            fail(Error::LimitExceeded, "State syntax exceeds the 16 MiB/64-file budget");
+        auto content = store.read(capture.info.summary.id, path, 4U * 1024U * 1024U);
+        if(source_identity(path, content) != identities.at(path))
+            fail(Error::InvalidExport, "State source changed while reading: " + path);
+        sources.push_back({path, std::move(content)});
+    }
+    Json anchors = Json::array();
+    for(const auto& [path, identity] : identities) {
+        (void)path;
+        anchors.push_back(identity);
+    }
+    auto parsed = inspect_draw_executions(sources);
+    // Resource references remain opaque and can be read through the existing
+    // confined reader; never turn initial bytes into post-event values here.
+    const auto resources = inspect_cpp_resources(sources);
+    const auto input_text = anchors.dump();
+    const auto input_hash = sha256(std::as_bytes(std::span(input_text.data(), input_text.size())));
+    for(auto& execution : parsed["executions"]) {
+        const auto identity = Json{{"capture_id", capture.info.summary.id},
+                                   {"inputs_sha256", input_hash},
+                                   {"selection", execution.at("selection")}}
+                                  .dump();
+        execution["execution_ref"] = sha256(std::as_bytes(std::span(identity.data(), identity.size())));
+        auto& shaders = execution["state"]["shaders"];
+        if(shaders.at("status") == "qualified_recorded_state") {
+            for(auto& stage : shaders["value"]) {
+                Json matches = Json::array();
+                const auto& module = stage.at("module_source");
+                for(const auto& resource : resources.at("resources")) {
+                    const auto& location = resource.at("source");
+                    if(resource.at("handle") == stage.at("resource_handle") && resource.at("readable") == true &&
+                       resource.at("expected_bytes") == stage.at("declared_bytes") &&
+                       location.at("path") == module.at("path") &&
+                       location.at("start_line") >= module.at("start_line") &&
+                       location.at("end_line") <= module.at("end_line"))
+                        matches.push_back(resource.at("resource_ref"));
+                }
+                stage["serialized_byte_read"] = {
+                    {"status", "not_read"},
+                    {"sha256", nullptr},
+                    {"reason",
+                     matches.size() == 1
+                         ? "Read this opaque shader resource through capture_cpp_resource for exact bytes/hash"
+                         : "No unique readable serialized shader reference"},
+                    {"resource_ref", matches.size() == 1 ? matches[0] : Json(nullptr)}};
+            }
+        }
+    }
+    return {std::move(parsed), std::move(anchors)};
+}
+Json state_base(const Capture& capture, const Json& parsed, Json identities) {
+    auto result = cpp_base_result(capture);
+    result["schema_profile"] = std::string(capture.profile->name) + "-recorded-state-v1";
+    for(const auto* key : {"selection_domain", "evidence_origin", "captured_gpu_execution_correspondence",
+                           "full_effective_state_coverage"})
+        result[key] = parsed.at(key);
+    result["input_files"] = std::move(identities);
+    result["association_scope"] = "Recorded API state at draw occurrences in one generated Frame0Part00 submission "
+                                  "stream; no observed GPU state or join to graphics function-inventory event IDs";
+    return result;
+}
+} // namespace
+Json InspectionService::draw_executions(const std::string& capture_id, const std::string& section, std::size_t offset,
+                                        std::size_t limit) const {
+    page_arguments(offset, limit);
+    if(section != "executions" && section != "unsupported")
+        throw std::invalid_argument("State section must be executions or unsupported");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    auto [parsed, identities] = state_sources(artifacts_, capture);
+    auto result = state_base(capture, parsed, std::move(identities));
+    result["section"] = section;
+    result["executions_total"] = parsed.at("executions").size();
+    result["unsupported_total"] = parsed.at("unsupported").size();
+    auto rows = parsed.at(section).get<std::vector<Json>>();
+    if(section == "executions")
+        for(auto& row : rows)
+            row.erase("state");
+    return page_result(std::move(result), section.c_str(), rows, offset, limit,
+                       [](const Json& value) { return value; });
+}
+Json InspectionService::draw_state(const std::string& capture_id, const std::string& execution_ref) const {
+    if(execution_ref.size() != 64 || execution_ref.find_first_not_of("0123456789abcdef") != std::string::npos)
+        throw std::invalid_argument("Execution reference must be a listed 64-character lowercase SHA-256 reference");
+    auto capture = load_capture(artifacts_, capture_id, true);
+    auto [parsed, identities] = state_sources(artifacts_, capture);
+    const auto& rows = parsed.at("executions");
+    const auto found = std::find_if(rows.begin(), rows.end(),
+                                    [&](const auto& row) { return row.at("execution_ref") == execution_ref; });
+    if(found == rows.end())
+        fail(Error::ExportUnavailable,
+             "Execution reference is absent, foreign or stale; list this capture's draw executions");
+    auto result = state_base(capture, parsed, std::move(identities));
+    result["execution"] = *found;
+    if(result.dump().size() > maximum_page_bytes || !fits_response(result))
+        fail(Error::LimitExceeded, "Selected state exceeds the bounded response; inspect raw sources");
+    return result;
+}
 Json InspectionService::cpp_resources(const std::string& capture_id, const std::string& section, std::size_t offset,
                                       std::size_t limit) const {
     page_arguments(offset, limit);

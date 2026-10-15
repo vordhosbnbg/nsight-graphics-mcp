@@ -1,4 +1,5 @@
 #include "ngm/CppEvidence.hpp"
+#include "CppReplay.hpp"
 #include "ngm/Hash.hpp"
 #include "ngm/Inspection.hpp"
 
@@ -225,6 +226,30 @@ Call call(const Document& d, std::size_t at) {
 // These are the value/cast helpers observed in qualified recording/creation
 // blocks. This is deliberately a generated-source grammar, not a C++ evaluator.
 const std::set<std::string_view> value_types{"uint32_t",
+                                             "VkCommandBuffer",
+                                             "VkCommandBufferResetFlags",
+                                             "VkSemaphore",
+                                             "VkFence",
+                                             "VkSwapchainKHR",
+                                             "VkSubmitInfo",
+                                             "VkPresentInfoKHR",
+                                             "VkSwapchainPresentFenceInfoKHR",
+                                             "VkDescriptorBufferInfo",
+                                             "VkCommandBufferAllocateInfo",
+                                             "VkRenderPassCreateInfo",
+                                             "VkRenderPassCreateFlags",
+                                             "VkAttachmentDescription",
+                                             "VkAttachmentDescriptionFlags",
+                                             "VkAttachmentReference",
+                                             "VkSubpassDescription",
+                                             "VkSubpassDescriptionFlags",
+                                             "VkSubpassDependency",
+                                             "VkPipelineDepthStencilStateCreateInfo",
+                                             "VkPipelineDepthStencilStateCreateFlags",
+                                             "VkStencilOpState",
+                                             "VkPipelineDynamicStateCreateInfo",
+                                             "VkPipelineDynamicStateCreateFlags",
+                                             "VkDynamicState",
                                              "VkCommandBufferBeginInfo",
                                              "VkCommandBufferUsageFlags",
                                              "VkDebugUtilsLabelEXT",
@@ -283,7 +308,7 @@ void value_expression(const Document& d, Range r) {
         if(i + 1 < r.second && t[i + 1].value == "(") {
             check(value_types.contains(v) || v == "HexToFloat" || v == "HexToDouble" || v == "NV_TO_ARRAY" ||
                       v == "NV_TO_UNION" || v == "NV_GET_RESOURCE_CHECKED" || v == "NV_GET_RESOURCE_STATIC" ||
-                      v == "NV_TO_STACK_PTR" || v == "NV_TO_OUTPUT_ARRAY",
+                      v == "NV_TO_STACK_PTR" || v == "NV_TO_OUTPUT_ARRAY" || v == "NV_GET_RESOURCE",
                   "unrecognized expression helper");
         }
         if(i + 1 < r.second && t[i + 1].value == "{")
@@ -294,12 +319,13 @@ struct Declaration {
     std::string type, name;
     std::vector<std::size_t> constructors;
     Range scope;
+    std::vector<Range> elements;
     std::uint64_t extent = 0;
 };
 Declaration declaration(const Document& d, std::size_t at, std::size_t& next) {
     const auto& t = d.tokens;
     check(t.at(at).value == "static" && value_types.contains(t.at(at + 1).value), "unsupported declaration type");
-    Declaration result{std::string(t.at(at + 1).value), std::string(t.at(at + 2).value), {}, {at, at}, 0};
+    Declaration result{std::string(t.at(at + 1).value), std::string(t.at(at + 2).value), {}, {at, at}, {}, 0};
     check(result.name.starts_with(result.type + "_") && result.name.find("_uid_") == std::string::npos,
           "unsupported or shadowing declaration name");
     auto i = at + 3;
@@ -315,6 +341,7 @@ Declaration declaration(const Document& d, std::size_t at, std::size_t& next) {
         i = t[opening].pair + 1;
         for(const auto element : arguments(d, opening)) {
             value_expression(d, element);
+            result.elements.push_back(element);
             if(t[element.first].value == result.type && element.first + 1 < element.second &&
                t[element.first + 1].value == "{" && t[element.first + 1].pair + 1 == element.second)
                 result.constructors.push_back(element.first + 1);
@@ -386,7 +413,7 @@ struct Creation {
 // are unrelated to pipeline/shader creation. Still reject unknown executable
 // helpers and unmodeled references to the handles we join, including sibling
 // anonymous blocks. This qualification does not interpret helper implementations.
-bool qualified_resource_sibling(const Document& d, std::size_t opening) {
+bool qualified_resource_sibling(const Document& d, std::size_t opening, bool state = false) {
     const auto& t = d.tokens;
     const auto end = t[opening].pair;
     const std::set<std::string_view> helpers{"BEGIN_DATA_SCOPE",
@@ -529,7 +556,7 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening) {
             continue;
         }
         if(t[i].value == "{") {
-            check(qualified_resource_sibling(d, i), "nested resource setup references an unmodeled handle");
+            check(qualified_resource_sibling(d, i, state), "nested resource setup references an unmodeled handle");
             i = t[i].pair + 1;
             continue;
         }
@@ -576,9 +603,13 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening) {
         check(v != "+" && v != "new" && v != "delete" && v != "throw", "unsupported resource expression");
         if(i + 1 < end && t[i + 1].value == "{" &&
            (std::isalpha(static_cast<unsigned char>(v.front())) || v.front() == '_'))
-            check(aggregate_types.contains(v), "unrecognized aggregate in resource sibling");
+            check(aggregate_types.contains(v) || value_types.contains(v), "unrecognized aggregate in resource sibling");
         creation |= v == "VulkanReplay_CreateGraphicsPipelines" || v == "VulkanReplay_CreateShaderModule";
+        if(state)
+            creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers";
         relevant_handle |= v.starts_with("VkPipeline_uid_") || v.starts_with("VkShaderModule_uid_");
+        if(state)
+            relevant_handle |= v.starts_with("VkCommandBuffer_uid_");
         if(i + 3 < end && t[i + 1].value == "(" && t[i + 2].value == "*" && t[i + 3].value == "reinterpret_cast") {
             const auto expression = d.expression(i + 1, t[i + 1].pair + 1);
             check(expression == "( * reinterpret_cast < xcb_connection_t * * > ( WindowSystemInstance ( ) . "
@@ -604,7 +635,8 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening) {
     }
     return !relevant_handle;
 }
-std::map<std::string, Creation> creations(const std::vector<Document>& docs, Json& unsupported, ResultBudget& budget) {
+std::map<std::string, Creation> creations(const std::vector<Document>& docs, Json& unsupported, ResultBudget& budget,
+                                          bool state = false) {
     std::map<std::string, Creation> result;
     std::set<std::string> duplicates;
     bool unassignable_output = false;
@@ -615,15 +647,18 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
         std::map<std::size_t, bool> qualified_parents;
         for(std::size_t i = 0; i + 3 < t.size(); ++i) {
             if(t[i].value != "NV_VK_REPLAY" || (t[i + 2].value != "VulkanReplay_CreateGraphicsPipelines" &&
-                                                t[i + 2].value != "VulkanReplay_CreateShaderModule"))
+                                                t[i + 2].value != "VulkanReplay_CreateShaderModule" &&
+                                                !(state && (t[i + 2].value == "VulkanReplay_CreateRenderPass" ||
+                                                            t[i + 2].value == "VulkanReplay_AllocateCommandBuffers"))))
                 continue;
             std::string symbol;
             try {
                 auto invocation = call(d, i);
                 const bool pipeline = invocation.name == "VulkanReplay_CreateGraphicsPipelines";
-                check(invocation.args.size() == (pipeline ? 6 : 4), "unsupported creation call arity");
+                const bool allocation = invocation.name == "VulkanReplay_AllocateCommandBuffers";
+                check(invocation.args.size() == (pipeline ? 6 : allocation ? 3 : 4), "unsupported creation call arity");
                 auto output = expr(d, invocation.args.back());
-                if(pipeline) {
+                if(pipeline || allocation) {
                     const std::string prefix = "NV_TO_OUTPUT_ARRAY ( & ";
                     check(output.starts_with(prefix) && output.ends_with(" )"), "unsupported pipeline output");
                     output = output.substr(prefix.size(), output.size() - prefix.size() - 2);
@@ -631,7 +666,10 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                     check(output.starts_with("& "), "unsupported shader output");
                     output = output.substr(2);
                 }
-                symbol = uid(output, pipeline ? "VkPipeline_uid_" : "VkShaderModule_uid_");
+                symbol = uid(output, pipeline                                             ? "VkPipeline_uid_"
+                                     : allocation                                         ? "VkCommandBuffer_uid_"
+                                     : invocation.name == "VulkanReplay_CreateRenderPass" ? "VkRenderPass_uid_"
+                                                                                          : "VkShaderModule_uid_");
                 const auto block = t[i].brace;
                 check(block != none && t[block].brace != none, "creation lacks object block");
                 const auto parent = t[block].brace;
@@ -646,7 +684,7 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                     bool qualified = true;
                     for(auto j = parent + 1; j < t[parent].pair;) {
                         if(t[j].value == "{") {
-                            if(!qualified_resource_sibling(d, j)) {
+                            if(!qualified_resource_sibling(d, j, state)) {
                                 qualified = false;
                                 break;
                             }
@@ -904,6 +942,212 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
     }
     return result;
 }
+namespace detail {
+namespace {
+struct SyntaxBudget {
+    std::size_t nodes = 0, bytes = 0;
+    void take(std::size_t count) {
+        bytes += count;
+        check(++nodes <= 100000 && bytes <= 32U * 1024U * 1024U, "normalized replay syntax exceeds bounds");
+    }
+};
+ReplayValue replay_value(const Document& d, Range r, SyntaxBudget& budget) {
+    check(r.first < r.second, "empty replay value");
+    value_expression(d, r);
+    ReplayValue value;
+    value.text = expr(d, r);
+    value.source = d.span(r.first, r.second - 1);
+    value.position = r.first;
+    budget.take(value.text.size() + d.source.path.size() + 128);
+    if(r.first + 1 < r.second && (d.tokens[r.first + 1].value == "(" || d.tokens[r.first + 1].value == "{") &&
+       d.tokens[r.first + 1].pair + 1 == r.second) {
+        value.constructor = d.tokens[r.first].value;
+        for(const auto argument : arguments(d, r.first + 1))
+            value.arguments.push_back(replay_value(d, argument, budget));
+    }
+    return value;
+}
+ReplayDeclarations replay_values(const Document& d, const Body& b, SyntaxBudget& budget) {
+    ReplayDeclarations result;
+    for(const auto& [name, parsed] : b.declarations) {
+        ReplayDeclaration value;
+        value.type = parsed.type;
+        value.end = parsed.scope.second;
+        for(const auto element : parsed.elements)
+            value.elements.push_back(replay_value(d, element, budget));
+        result.emplace(name, std::move(value));
+    }
+    return result;
+}
+ReplayCall replay_call(const Document& d, const Call& c, SyntaxBudget& budget) {
+    ReplayCall result;
+    result.name = c.name;
+    result.event = c.event;
+    result.position = c.at;
+    result.source = d.span(c.at, c.end);
+    budget.take(result.name.size() + d.source.path.size() + 128);
+    for(const auto argument : c.args)
+        result.arguments.push_back(replay_value(d, argument, budget));
+    return result;
+}
+void charge_copy(const ReplayValue& value, SyntaxBudget& budget) {
+    budget.take(value.text.size() + value.constructor.size() + value.source.dump().size() + 128);
+    for(const auto& argument : value.arguments)
+        charge_copy(argument, budget);
+}
+void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visible, std::vector<ReplayCall>& calls,
+                SyntaxBudget& budget) {
+    const auto& t = d.tokens;
+    for(auto i = opening + 1; i < t[opening].pair;) {
+        check(!t[i].conditional && !t[i].value.starts_with('#'), "conditional frame unsupported");
+        if(t[i].value == "{") {
+            frame_body(d, i, visible, calls, budget);
+            i = t[i].pair + 1;
+        } else if(t[i].value == "BEGIN_DATA_SCOPE_FUNCTION" || t[i].value == "BEGIN_DATA_SCOPE") {
+            check(t.at(i + 1).value == "(" && t.at(i + 2).value == ")" && t.at(i + 3).value == ";",
+                  "unsupported frame scope macro");
+            i += 4;
+        } else if(t[i].value == "static") {
+            Body b;
+            auto parsed = declaration(d, i, i);
+            b.declarations.emplace(parsed.name, parsed);
+            auto values = replay_values(d, b, budget);
+            check(!visible.contains(parsed.name), "shadowed frame declaration");
+            visible.insert(values.begin(), values.end());
+        } else {
+            Call invocation;
+            if(t[i].value == "NV_VK_REPLAY")
+                invocation = call(d, i);
+            else {
+                check(t[i].value == "VulkanHelper_RecordCommandBuffer" && t.at(i + 1).value == "(",
+                      "unknown executable frame statement");
+                const auto end = t[i + 1].pair;
+                check(t.at(end + 1).value == ";", "unsupported frame helper statement");
+                invocation = {i, end + 1, std::string(t[i].value), arguments(d, i + 1), 0};
+            }
+            auto value = replay_call(d, invocation, budget);
+            value.visible = visible;
+            // Account for the copied scope as well as its original syntax.
+            for(const auto& [name, entry] : visible) {
+                budget.take(name.size() + 64);
+                for(const auto& element : entry.elements)
+                    charge_copy(element, budget);
+            }
+            check(calls.size() < 10000, "too many frame statements");
+            calls.push_back(std::move(value));
+            i = invocation.end + 1;
+        }
+    }
+}
+} // namespace
+CppReplay parse_cpp_replay(const std::vector<CppSource>& sources) {
+    CppReplay result;
+    try {
+        std::vector<Document> docs;
+        docs.reserve(sources.size());
+        check(sources.size() <= 64, "too many replay source files");
+        std::set<std::string> paths;
+        std::size_t total = 0;
+        for(const auto& source : sources) {
+            check(paths.insert(source.path).second, "duplicate replay source path");
+            total += source.text.size();
+            check(total <= 16U * 1024U * 1024U, "aggregate replay source exceeds 16 MiB");
+            docs.emplace_back(source);
+        }
+        SyntaxBudget syntax;
+        ResultBudget budget;
+        const auto objects = creations(docs, result.unsupported, budget, true);
+        for(const auto& [symbol, creation] : objects) {
+            ReplayObject object;
+            const auto& d = *creation.doc;
+            object.creation = replay_call(d, creation.invocation, syntax);
+            object.values = replay_values(d, creation.content, syntax);
+            object.source = d.span(creation.opening, d.tokens[creation.opening].pair);
+            if(creation.invocation.name == "VulkanReplay_CreateGraphicsPipelines") {
+                try {
+                    object.shader_relationship = pipeline_evidence(creation, objects);
+                } catch(const Unsupported& error) {
+                    object.shader_relationship = {{"reason", error.what()}};
+                }
+            }
+            result.objects.emplace(symbol, std::move(object));
+        }
+        std::set<std::string> all_functions;
+        bool frame_seen = false;
+        for(const auto& d : docs) {
+            const auto filename = std::filesystem::path(d.source.path).filename().string();
+            const auto& t = d.tokens;
+            if(filename.starts_with("CommandList")) {
+                struct Function {
+                    std::size_t at, opening;
+                };
+                std::map<std::string, Function> functions;
+                for(std::size_t i = 0; i + 3 < t.size(); ++i)
+                    if(t[i].value == "void" && t[i + 1].value.starts_with("Record_") && t[i + 2].value == "(") {
+                        const auto end = t[i + 2].pair;
+                        check(t.at(end + 1).value == "{" && all_functions.size() < 4096 &&
+                                  all_functions.insert(std::string(t[i + 1].value)).second,
+                              "invalid or duplicate replay recording function");
+                        functions.emplace(std::string(t[i + 1].value), Function{i, end + 1});
+                    }
+                for(const auto& [name, function] : functions) {
+                    if(name.find("_Part") != std::string::npos)
+                        continue;
+                    try {
+                        const auto part = functions.find(name + "_Part00");
+                        check(part != functions.end(), "recording has no Part00");
+                        const auto prefix = name + "_Part";
+                        for(auto candidate = functions.lower_bound(prefix);
+                            candidate != functions.end() && candidate->first.starts_with(prefix); ++candidate)
+                            check(candidate == part, "multipart recording unsupported");
+                        for(const auto f : {function, part->second})
+                            check(!t[f.at].conditional && t[f.opening].brace == none &&
+                                      d.expression(f.at + 3, t[f.at + 2].pair) == "VkCommandBuffer cmdBuffer",
+                                  "unsupported replay recording signature");
+                        check(d.expression(function.opening + 1, t[function.opening].pair) ==
+                                  "BEGIN_DATA_SCOPE_FUNCTION ( ) ; " + part->first + " ( cmdBuffer ) ;",
+                              "recording wrapper is not one part call");
+                        const auto parsed = body(d, part->second.opening, true);
+                        ReplayRecording recording;
+                        recording.source = d.span(function.at, t[function.opening].pair);
+                        recording.values = replay_values(d, parsed, syntax);
+                        for(const auto& c : parsed.calls)
+                            recording.calls.push_back(replay_call(d, c, syntax));
+                        result.recordings.emplace(name, std::move(recording));
+                    } catch(const Unsupported& error) {
+                        budget.append(result.unsupported, {{"recording", name},
+                                                           {"source", d.span(function.at, t[function.opening].pair)},
+                                                           {"reason", error.what()}});
+                    }
+                }
+            } else if(filename.starts_with("Frame") && filename.find("Part") != std::string::npos) {
+                check(filename == "Frame0Part00.cpp" && !frame_seen, "only one Frame0Part00 execution is qualified");
+                frame_seen = true;
+                bool found = false;
+                for(std::size_t i = 0; i + 5 < t.size(); ++i)
+                    if(t[i].value == "void" && t[i + 1].value == "RunFrame0Part00" && t[i + 2].value == "(") {
+                        const auto end = t[i + 2].pair;
+                        check(!found && !t[i].conditional && t.at(end + 1).value == "{" && t[end + 1].brace == none &&
+                                  d.expression(i + 3, end) == "uint64_t frameIndex",
+                              "unsupported frame root");
+                        found = true;
+                        frame_body(d, end + 1, {}, result.frame, syntax);
+                    }
+                check(found, "frame root missing");
+            }
+        }
+        check(frame_seen, "submitted execution evidence requires Frame0Part00.cpp");
+    } catch(const Unsupported& error) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, error.what());
+    } catch(const std::out_of_range&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Truncated replay syntax");
+    } catch(const Json::exception&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Invalid UTF-8 in replay source");
+    }
+    return result;
+}
+} // namespace detail
+
 nlohmann::json inspect_cpp_resources(const std::vector<CppSource>& sources) {
     Json result{{"resources", Json::array()},
                 {"unsupported", Json::array()},

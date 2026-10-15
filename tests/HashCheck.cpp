@@ -1,6 +1,7 @@
 #include "Check.hpp"
 #include "ngm/Hash.hpp"
 
+#include <fcntl.h>
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
@@ -37,6 +38,13 @@ int main() {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         ngm::check::require(ngm::sha256_regular_file(regular, deadline) == hash("abc"),
                             "regular-file hashing retains the known answer");
+        const auto descriptor = open(regular.c_str(), O_RDONLY | O_CLOEXEC);
+        ngm::check::require(descriptor >= 0 && lseek(descriptor, 2, SEEK_SET) == 2,
+                            "opened descriptor with nonzero offset");
+        ngm::check::require(ngm::sha256_regular_descriptor(descriptor, deadline) == hash("abc") &&
+                                lseek(descriptor, 0, SEEK_CUR) == 2,
+                            "descriptor hash covers all bytes and preserves caller offset");
+        close(descriptor);
         const auto rejected = [&](const std::filesystem::path& path, auto until, std::stop_token stop = {}) {
             try {
                 ngm::sha256_regular_file(path, until, stop);

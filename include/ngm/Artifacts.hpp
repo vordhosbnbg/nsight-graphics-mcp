@@ -164,6 +164,10 @@ public:
     // The default remains 1 MiB. Transport tools impose their own smaller caps.
     std::string read(const std::string& id, const std::string& relative_path,
                      std::size_t maximum_bytes = 1024 * 1024) const;
+    // Streaming content identity with inventoried size, a usage lease and
+    // no-symlink traversal. Does not expose or snapshot file contents.
+    std::string fingerprint(const std::string& id, const std::string& relative_path, std::size_t maximum_bytes,
+                            std::chrono::steady_clock::time_point deadline) const;
     // Stream one inventoried regular file into a fresh path in an owned staging
     // writer, with no symlink traversal and a usage lease throughout the copy.
     // Destination is exclusive and read-only after completion. The caller must

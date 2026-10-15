@@ -1,4 +1,5 @@
 #include "CppEvidenceFixture.hpp"
+#include "DrawStateFixture.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -290,6 +291,11 @@ int main(int argc, char** argv) {
         const auto project =
             std::filesystem::path(value(arguments, "--output-dir")) / "CppCaptures/cpu-synthetic-project";
         std::filesystem::create_directories(project);
+        const bool state_case = value(arguments, "--args").find("--state-cpp") != std::string::npos;
+        struct Source {
+            std::string path, text;
+        };
+        const auto state_sources = ngm::check::state::sources<Source>(true);
         for(const auto* file : {"CommandLists.h",        "ReplayProcedures.h",
                                 "FrameReset00.cpp",      "ReplayProcedures.cpp",
                                 "PerfMarkersReset.cpp",  "PerfMarkersSetup.cpp",
@@ -305,6 +311,14 @@ int main(int argc, char** argv) {
             }
             std::ofstream stream(project / file);
             stream << "// CPU stand-in generated project; not real Nsight source or serialized resource data\n";
+            if(state_case) {
+                const auto source = std::find_if(state_sources.begin(), state_sources.end(),
+                                                 [&](const auto& source) { return source.path == file; });
+                if(source != state_sources.end()) {
+                    stream << source->text;
+                    continue;
+                }
+            }
             if(std::string_view(file) == "CommandList00.cpp")
                 stream << ngm::check::cpp::recording(ngm::check::cpp::begin + ngm::check::cpp::draw +
                                                      ngm::check::cpp::end);

@@ -1434,3 +1434,117 @@ This establishes a current generated-source/serialized-input path for R-021;
 it does not establish executed draw state or resolve I-038's separate graphics
 capture timeout. No application source, machine control or profiling permission
 is changed by this probe.
+
+
+## 0.4.5 recorded draw-state subset, 2026-10-15
+
+R-021 adds its first recorded-state capability with **28 shared stdio/HTTP tools**.
+The patch increment accompanies the new interpreter, adapter, input fingerprints,
+fixture/harness and checks. R-021 remains In Progress for the remaining state/value
+assessment; R-022 remains Pending. This does not complete general effective-state
+or GPU-observed event-state support. [DRAW_STATE.md](DRAW_STATE.md) defines the
+qualified grammar, field statuses and refusals.
+
+The source build is based on **0126133**, with the 0.4.5 changes explicitly dirty.
+GCC **16.2.1**, CMake **4.4.4**, Ninja **1.13.2**, Linux **7.2.7-zen1-1-zen**,
+Debug diagnostic GLSL/SPIR-V and the pinned submodule revisions are retained in
+qualification records. No dependency or proprietary helper closure is added.
+The optional reader remains the qualified stable **0.4.2** worker.
+
+Executed checks:
+
+```sh
+cmake --preset linux-gcc-debug
+cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+All **33/33 CPU checks pass**, without skips, in **351.98 seconds**. The new
+`ngm_draw_state_check` covers static/dynamic disagreement, missing and partial
+setters, static-bind invalidation, valid setter/rebind ordering, reused submitted
+recordings, one-time reuse refusal, duplicate annotations, multipart/secondary/
+indirect/unknown-command refusals, reset/unsubmitted identity, unknown extensions,
+nonfinite values and depth-not-applicable distinction. Actual MCP checks cover
+bounded selected results, reader links, foreign/guessed references, same-size
+source/database/record-file mutation and stable references/values/pins after
+restart. Artifact hashing also exercises a 17 MiB streamed file, bounds, deadline,
+path traversal and symlink-directory refusal; descriptor hashing preserves the
+caller's file offset. Existing source-relationship and byte-reader contracts pass.
+HTTP discovery reports the same 28-tool registry.
+
+After that aggregate, the private fixture witness was strengthened to retain
+actual successful pipeline-create/bind handles and shader-module API bytes/hash.
+Only the fixture, its private harness and the fixture contract check changed.
+The focused `ngm_fixture_contract_check` then passes in **41.59 seconds**, including
+all four state scenario selections without a desktop and invalid witness-path
+refusal. The final fixture/harness were rebuilt, then all four hardware cases
+below were freshly repeated. The earlier four-case feasibility run remains pinned
+under `capability-followup/draw-state-Z6C0y7`; it is not substituted for this final
+qualification.
+
+The final C++ runner used explicit absolute fixture/shader/tool/output/environment
+paths. Commands and complete argv arrays are retained as `draw-state-final-inputs.json`
+and `verify-mcp-inputs.json`. The executable modes exercised are:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_draw_state_integration
+build/linux-gcc-debug/tests/ngm_draw_state_integration FIXTURE SHADERS NSIGHT_ROOT OUTPUT_PARENT ENV_JSON
+build/linux-gcc-debug/tests/ngm_draw_state_integration --verify-mcp SERVER WORKER RUN
+```
+
+Each case first launches an independent normal fixture, then one fresh documented
+Generate C++ Capture with seed **42**, **192×128**, wait-frames **2**, final application
+frame **20** and the selected matching-driver overlay without the layer-disable
+filter. Matching **2026.3.1.0/build 38722833** tools succeed with cleanup confirmed
+and reservations released. C++ metadata reports **RTX 3080 Ti**, NVIDIA driver
+`61571`, Linux/Arch; the independent Vulkan baseline reports **615.71.09**, Vulkan
+**1.4.351**. The desktop is KDE Wayland, `DISPLAY=:1`, `WAYLAND_DISPLAY=wayland-0`;
+the fixture uses XCB/Xwayland. No system permission, clock, driver or display
+setting changed. I-038's graphics-format timeout remains a separate unresolved
+result.
+
+Final external run/store:
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/draw-state-mukBfY/`.
+
+| Case | Pinned source capture |
+| --- | --- |
+| state-static | `bundle-69d5b5ae7b8d928bd71b35801bc22fa6` |
+| state-dynamic | `bundle-deca2f1209070a68ae77884d5a086208` |
+| state-indexed | `bundle-bf8195d8714d160e31fb80b69dbbaf1f` |
+| state-count | `bundle-bd1d5937a4bfb03f49531aabe1d0b2bc` |
+
+The selected `frame.2` submission matches the private successful-submission witness.
+Seven raster/depth values match independent API inputs. Pipeline create/bind and
+active render-pass handles agree inside the private fixture witness; exported
+pipeline/stage relationships are audited separately rather than joining native
+handles to Nsight symbols by number. Both stages' actual `vkCreateShaderModule`
+input bytes/hash agree with the independently retained SPIR-V and exact confined
+resource reads. Dynamic creation values deliberately disagree with setters.
+
+The eight independently pinned read bundles, in case order (vertex/fragment), are:
+`bundle-880a1b112fd3ff6cc0916713cb198d46`,
+`bundle-c75ebab94d247af282ed9c655742caa3`,
+`bundle-60a3d8fbcc3a3736d4f36061020dc8ee`,
+`bundle-32606bf199a330f9ef8fdbc9f0c474f7`,
+`bundle-2ca4fcb9587ff057b0c5f857cbcfe3ee`,
+`bundle-7daf7d7d4ecad151f86e77ce339bc24d`,
+`bundle-b04f2d2379e7ccf5deabc01bfd234598`,
+`bundle-37e8ce7b30f634a0a77eb7057461bfdc`.
+
+Actual source-built 0.4.5 MCP calls return identical fields, references, input
+hashes and source/read pins after server restart. All **24** listing/state/read
+results pass their advertised JSON schemas (`jsonschema` is a validation aid,
+not a product dependency). The byte reader snapshots match the state selection's
+capture-time database hashes. Original captures and read bundles stay independently
+pinned in the external store. A consolidated **2,517,937-byte / 46-file** report,
+transcript, test-log and first-party-source snapshot is pinned in the configured
+central store as **bundle-556efc8c7f65c8ebdb96e360197fc015**. Its importer remains
+the connected installed **0.4.1** server; payload reports and exact server/fixture/
+harness identities describe the tested **0.4.5** build. Import does not promote raw
+reports into typed captures or imply the live connection was upgraded.
+
+New state queries refuse unanchored historical inputs and unqualified 2026.2
+producers. Descriptors, push constants and uniform/material values explicitly
+remain unavailable. Captured GPU execution correspondence and full effective-state
+coverage are always false in this subset; none of these checks qualify a general
+post-event memory read, indirect/secondary execution, game diagnosis, timing or
+counter correlation.
