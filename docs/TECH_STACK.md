@@ -9,6 +9,11 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+R-019 completes the shared bounded launch overlay at 0.4.3 using the existing
+process supervisor and no new dependency. All 32 serial CPU checks pass; selected
+driver/windowed fixture baselines pass, while current capture timeouts remain
+unqualified and retained as I-038. See LAUNCH_ENVIRONMENT.md for exact outcomes.
+
 The owner subsequently authorized implementation as R-018–R-022. R-018 uses the
 existing reader boundary; its 0.4.2 current-server retained-input validation is
 recorded in [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md). The remaining evaluation

@@ -100,6 +100,10 @@ int launch_target(const std::vector<std::string>& arguments) {
 int main(int argc, char** argv) {
     const auto name = std::filesystem::path(argv[0]).filename().string();
     const std::vector<std::string> arguments(argv + 1, argv + argc);
+    for(const auto* key : {"LD_LIBRARY_PATH", "VK_DRIVER_FILES", "VK_ICD_FILENAMES", "SDL_VIDEODRIVER",
+                           "QT_QPA_PLATFORM", "DISABLE_VK_LAYER_LUNARG_override", "VK_LOADER_LAYERS_DISABLE",
+                           "VK_LOADER_DEBUG", "HOME", "XDG_CONFIG_HOME", "TMPDIR"})
+        std::cerr << "NGM_ENV " << key << '=' << environment(key) << '\n';
     if(name == "target with spaces") {
         std::ofstream stream(environment("NGM_TARGET_RECORD"), std::ios::app);
         stream << "pid=" << getpid() << "\ncwd=" << std::filesystem::current_path().string() << '\n';

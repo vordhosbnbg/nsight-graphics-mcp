@@ -255,6 +255,7 @@ int main(int argc, char** argv) {
             const auto submitted = call(client, "profile",
                                         {{"executable", target.string()},
                                          {"working_directory", scratch.path.string()},
+                                         {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
                                          {"settings", {{"architecture", "Ampere GA10x"}}},
                                          {"pin", true}});
             Json state;
@@ -268,6 +269,13 @@ int main(int argc, char** argv) {
             require(state.at("state") == "succeeded" && state.at("cleanup_confirmed") == true,
                     "actual MCP profile workflow succeeds");
             const auto id = submitted.at("artifact_id");
+            const auto report =
+                Json::parse(call(client, "artifact_read", {{"artifact_id", id}, {"path", "raw/report.json"}})
+                                .at("text")
+                                .get<std::string>());
+            require(report.at("environment").at("SDL_VIDEODRIVER") == "x11" &&
+                        report.at("launch_environment").at("requested").at("SDL_VIDEODRIVER") == "x11",
+                    "actual stdio profile propagates its job overlay");
             require(call(client, "profile_metadata", {{"profile_id", id}}).at("producer").is_string(),
                     "typed profile metadata");
             require(

@@ -71,6 +71,14 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-019 implements bounded per-job launch environments at **0.4.3**, shared by
+capture, C++ capture, profile and the capture CLI. All **32 CPU checks** pass in
+the serial preset. Standalone matching-driver XCB/Xwayland fixture baselines
+pass, but three fresh current Nsight 2026.3 captures time out after connection;
+cleanup/pins pass and fresh capture compatibility remains unqualified. See
+[docs/LAUNCH_ENVIRONMENT.md](docs/LAUNCH_ENVIRONMENT.md) and I-038. No machine
+settings are changed. R-020–R-022 remain active/pending follow-up work.
+
 R-018 completes retained resource-reader activation at **0.4.2**. All 31 CPU
 checks pass, including actual Linux confinement. Two offline current-server MCP
 runs verify the independent 2,700-byte shader oracle, split ranges, provenance,

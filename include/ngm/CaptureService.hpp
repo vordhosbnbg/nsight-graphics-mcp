@@ -2,6 +2,7 @@
 
 #include "ngm/Artifacts.hpp"
 #include "ngm/Jobs.hpp"
+#include "ngm/LaunchEnvironment.hpp"
 #include "ngm/ProfileSettings.hpp"
 
 #include <filesystem>
@@ -42,6 +43,8 @@ struct CaptureRequest {
     // a fresh raw/application path. Empty leaves the supplied argv unchanged.
     std::string application_output_option;
     ProfileSettings profile;
+    // Validated closed overlay; frozen at submission and rechecked before launch.
+    LaunchEnvironment launch_environment;
     // Supplemental caller-provided provenance is labelled separately from
     // executable hashes and tool observations made by this service.
     nlohmann::json application_provenance = nlohmann::json::object();

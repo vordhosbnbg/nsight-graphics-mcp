@@ -72,6 +72,7 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
           {"transport", options.http ? "streamable_http" : "stdio"},
           {"protocol_version", protocol_version}}},
         {"implemented_tools", implemented_tool_names()},
+        {"launch_environment", launch_environment_policy()},
         {"operations",
          {{"capture", capture},
           {"jobs", store},
@@ -245,6 +246,19 @@ Json output_schema() {
         {"required", {"nsight_2026_3", "nsight_2026_2"}},
         {"properties",
          {{"nsight_2026_3", {{"type", {"string", "null"}}}}, {"nsight_2026_2", {{"type", {"string", "null"}}}}}}};
+    const auto policy = launch_environment_policy();
+    Json properties{
+        {"supported_keys",
+         {{"type", "array"}, {"maxItems", 8}, {"items", {{"type", "string"}, {"enum", policy.at("supported_keys")}}}}},
+        {"scope", {{"type", "string"}}}};
+    Json required = {"supported_keys", "scope"};
+    for(const auto* key : {"maximum_keys", "maximum_value_bytes", "maximum_path_entries", "maximum_total_bytes"}) {
+        properties[key] = {{"type", "integer"}, {"const", policy.at(key)}};
+        required.push_back(key);
+    }
+    schema["required"].push_back("launch_environment");
+    schema["properties"]["launch_environment"] = {
+        {"type", "object"}, {"additionalProperties", false}, {"properties", properties}, {"required", required}};
     return schema;
 }
 

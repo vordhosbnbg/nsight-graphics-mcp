@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
                "  [--application-output-option NAME] [--provenance-json PATH] [--pin]\n"
                "  [--delimiter present|graphics_capture_api|vk_frame_boundary]\n"
                "  [--format graphics|cpp] [--wait-frames N (cpp only)]\n"
+               "  [--launch-env KEY=VALUE ...] (validated per-job library/ICD/backend/layer overlay)\n"
                "Launch a fresh application with documented Nsight CLI, export evidence, and retain a managed bundle.\n"
                "Arguments are subject to the documented adapter's safe-token limit. --pin protects retained "
                "evidence.\n";
@@ -42,7 +43,7 @@ int main(int argc, char** argv) {
         std::set<std::string> seen;
         for(int index = 1; index < argc; ++index) {
             const std::string key(argv[index]);
-            if(key != "--argument" && !seen.insert(key).second) {
+            if(key != "--argument" && key != "--launch-env" && !seen.insert(key).second) {
                 throw std::invalid_argument("Duplicate option " + key);
             }
             if(key == "--pin") {
@@ -63,6 +64,11 @@ int main(int argc, char** argv) {
                 request.working_directory = value;
             } else if(key == "--argument") {
                 request.arguments.push_back(value);
+            } else if(key == "--launch-env") {
+                const auto split = value.find('=');
+                if(split == std::string::npos || split == 0 ||
+                   !request.launch_environment.emplace(value.substr(0, split), value.substr(split + 1)).second)
+                    throw std::invalid_argument("--launch-env requires a distinct KEY=VALUE");
             } else if(key == "--application-output-option") {
                 request.application_output_option = value;
             } else if(key == "--capture-frame") {

@@ -67,8 +67,14 @@ Json operation_json(const NsightOperationResult& result, const fs::path& root) {
             {"message", result.message}};
 }
 
-std::map<std::string, std::string> isolated_environment(const CaptureServiceOptions& options, const fs::path& root) {
+std::map<std::string, std::string> isolated_environment(const CaptureServiceOptions& options,
+                                                        const CaptureRequest& request, const fs::path& root) {
     auto environment = options.environment;
+    // Preserve the existing default injection policy. Only an explicit validated
+    // job overlay can disable the two qualified unwanted layers.
+    environment.erase("VK_LOADER_LAYERS_DISABLE");
+    for(const auto& [key, value] : request.launch_environment)
+        environment[key] = value;
     // Nsight adds its layer directory to this search path. Materialize the XDG
     // defaults first so that injection does not hide system Vulkan drivers when
     // the caller supplied no value. Preserve explicit installation search paths.
@@ -85,9 +91,6 @@ std::map<std::string, std::string> isolated_environment(const CaptureServiceOpti
         fs::create_directories(directory);
         environment[name] = directory.string();
     }
-    // Nsight owns its documented injection environment. In particular, do not
-    // carry over the fixture-only runner's implicit-layer disabling setting.
-    environment.erase("VK_LOADER_LAYERS_DISABLE");
     return environment;
 }
 
@@ -241,7 +244,10 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
     bool profiled = false;
     bool inspected_application = false;
     try {
-        const auto environment = isolated_environment(options, root);
+        if(validate_launch_environment(request.launch_environment, options.environment, context.deadline,
+                                       context.stop) != report.at("launch_environment").at("selection"))
+            throw std::runtime_error("Launch environment selection changed after job submission; submit a new job");
+        const auto environment = isolated_environment(options, request, root);
         report["environment"] = environment;
         report["application"]["sha256_before_launch"] =
             sha256_regular_file(request.executable, context.deadline, context.stop);
@@ -561,6 +567,7 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
     }
     if(request.format == CaptureFormat::Profile)
         validate_profile_settings(request.profile);
+    const auto launch_selection = validate_launch_environment(request.launch_environment, options_.environment);
     artifacts_.prune();
     Json provenance{{"schema_version", 1},
                     {"project_version", project_version()},
@@ -573,6 +580,12 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
                       {"arguments", request.arguments},
                       {"working_directory", request.working_directory.string()}}},
                     {"caller_provided_application_provenance", request.application_provenance},
+                    {"launch_environment",
+                     {{"requested", request.launch_environment},
+                      {"selection", launch_selection},
+                      {"scope", "Validated launch selections; loaded library identity and "
+                                "backend compatibility remain unverified"}}},
+                    {"environment", nullptr},
                     {"capture_settings",
                      {{"capture_frame", request.capture_frame},
                       {"frame_count", 1},

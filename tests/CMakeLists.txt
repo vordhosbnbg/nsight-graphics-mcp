@@ -54,6 +54,13 @@ set(NGM_CAPTURE_ARTIFACT_ROOT "${PROJECT_SOURCE_DIR}/artifacts/nsight-evidence" 
     "Managed evidence store for opt-in capture integration")
 set(NGM_CAPTURE_VALIDATION_ROOT "${PROJECT_SOURCE_DIR}/artifacts/capture-validation" CACHE PATH
     "Isolated reports for opt-in capture integration")
+set(NGM_LAUNCH_ENVIRONMENT_FILE "" CACHE FILEPATH "Explicit validated job overlay for opt-in launch integration")
+ngm_add_hardware_check(ngm_launch_environment_integration SOURCES LaunchEnvironmentIntegration.cpp
+    LIBRARIES ngm_capture
+    ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>" "${NGM_FIXTURE_SHADER_OUTPUT_DIR}"
+        "${NGM_NSIGHT_ROOT}" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}"
+        "${NGM_LAUNCH_ENVIRONMENT_FILE}")
+add_dependencies(ngm_launch_environment_integration nsight-graphics-mcp ngm-vulkan-fixture)
 ngm_add_hardware_check(ngm_compute_capture_integration SOURCES ComputeCaptureIntegration.cpp
     LIBRARIES ngm_experiments ngm_capture
     ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>"

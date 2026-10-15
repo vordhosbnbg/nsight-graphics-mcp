@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019–R-022 track launch environments, profile-table compatibility, selected-draw state and correlated timing/counters. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 26 tools; new capabilities require their own evidence.**
+Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019 completes launch-environment implementation at 0.4.3 with current capture timeouts explicitly unqualified; R-020–R-022 track profile-table compatibility, selected-draw state and correlated timing/counters. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 26 tools; new capabilities require their own evidence.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -176,24 +176,10 @@ Item conventions:
 
 ## In Progress
 
-### R-019
-
-```text
-Status: In Progress
-Area: core/capture/mcp/cli/test
-Title: Expose controlled per-job launch environments
-Goal: Reproduce explicit library/ICD/backend launch conditions through the existing job lifecycle.
-Scope: Add a bounded allowlisted environment overlay shared by capture, C++ capture, profile and ngm-capture; apply it to discovery/collection/export before reserved-directory isolation; retain requested/applied provenance.
-Acceptance: CPU stand-ins and actual stdio/HTTP prove propagation, validation, queued-job isolation, defaults, cleanup and unchanged resource-worker/parent environments; separately qualify the runtime fixture path.
-Notes: Authorized by the owner on 2026-10-15. Step B; first product increment. Machine permissions/clocks are outside scope. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
-```
-
-## Pending
-
 ### R-020
 
 ```text
-Status: Pending
+Status: In Progress
 Area: profile/inspection/mcp/test
 Title: Preserve valid header-only event and regime exports
 Goal: Keep frame metrics usable when a qualified GPU Trace export has no action/regime rows.
@@ -201,6 +187,8 @@ Scope: Accept producer-qualified header-only event/regime tables; make metadata,
 Acceptance: Retained header shapes and frame rows parse; stand-in jobs, restart, queries and comparisons preserve provenance and never fabricate zero counters or durations.
 Notes: Authorized by the owner on 2026-10-15. Step C; complete before new live profiling. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
 ```
+
+## Pending
 
 ### R-021
 
@@ -229,6 +217,18 @@ Notes: Authorized by the owner on 2026-10-15. Step E; no private trace decoder, 
 ## Blocked
 
 ## Done
+
+### R-019
+
+```text
+Status: Done
+Area: core/capture/mcp/cli/test
+Title: Expose controlled per-job launch environments
+Goal: Reproduce explicit library/ICD/backend launch conditions through the existing job lifecycle.
+Scope: Add a bounded allowlisted environment overlay shared by capture, C++ capture, profile and ngm-capture; apply it to discovery/collection/export before reserved-directory isolation; retain requested/applied provenance.
+Acceptance: CPU stand-ins and actual stdio/HTTP prove propagation, validation, queued-job isolation, defaults, cleanup and unchanged resource-worker/parent environments; separately qualify the runtime fixture path.
+Notes: Authorized by the owner on 2026-10-15. Step B; first product increment completes at 0.4.3. All 32 serial CPU checks pass; actual stdio/HTTP/CLI and process-boundary propagation/isolation/refusal checks pass. Two independent selected-environment fixture baselines pass; three current Nsight capture attempts time out with confirmed cleanup. Fresh capture compatibility remains unqualified (I-038). Implementation/validation is pinned as bundle-2a69ab0ef0bd54fd2df1fdeadc6fc423; docs/LAUNCH_ENVIRONMENT.md records scope. Machine permissions/clocks are outside scope. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
 
 ### R-018
 

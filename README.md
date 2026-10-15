@@ -71,6 +71,9 @@ Captures and profiles run asynchronously and return job IDs. Saved artifacts
 remain available across server restarts, subject to retention settings.
 [Tool reference](docs/MCP.md#workflow-tools)
 
+Each capture/profile can specify validated library, Vulkan ICD, desktop-backend
+and layer settings through a [per-job launch environment](docs/LAUNCH_ENVIRONMENT.md).
+
 ## Getting started
 
 Building requires Linux, a C++20 compiler, CMake 3.25+, Ninja, Python 3, and the

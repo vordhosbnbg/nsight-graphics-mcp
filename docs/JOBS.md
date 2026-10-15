@@ -8,6 +8,13 @@ MCP status/cancellation, and a real Nsight capture through this lifecycle.
 
 ## Dispatch and ownership
 
+The 0.4.3 capture service freezes validated per-job
+[launch environments](LAUNCH_ENVIRONMENT.md) at submission. It rechecks selected
+ICD/library identities before any process launch, then applies the overlay to
+discovery, collection and exports while preserving reserved-directory isolation.
+Selection hashing uses the job's cancellation token and remaining deadline.
+Requested and applied environments are retained separately, including failures.
+
 Submit a `JobRequest` with a unique capture ID, configured GPU key, absolute
 `steady_clock` deadline, and worker callable. The deadline includes queue time;
 the request default is 30 seconds from construction. The default GPU key is

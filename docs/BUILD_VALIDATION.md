@@ -1339,3 +1339,46 @@ for new Codex server processes includes the separately installed verified worker
 existing connections keep their startup arguments. Detailed evidence, pins, exact
 operator paths and the initial safe store-initialization refusal are recorded in
 [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) and I-037.
+
+## 0.4.3 per-job launch environments, 2026-10-15
+
+The GCC Debug source build passes **32/32 CPU checks**, no skips, with
+`ctest --preset linux-gcc-debug -j 1` in **312.14 seconds**. The initial aggregate
+also passed 32/32 before the final cancellation/deadline guard. A four-way rerun
+then passed 31/32: the profiling workflow's queued five-second request expired
+under concurrent filesystem-heavy checks. The final documented serial run passes
+that check in 9.72 seconds without changing its assertions or timeouts. The failed
+parallel log is retained alongside the passing final run.
+
+New checks cover the bounded allowlist, manifest/library identities, per-job
+propagation through all discovery/graphics/C++/profile/export processes, queue
+isolation, reserved HOME/XDG/temp paths, absent-key defaults, parent isolation,
+selection mutation refusal, cancellation/deadlines and the actual capture CLI.
+Actual stdio and HTTP requests exercise the shared schemas. The resource-reader
+checks still enforce the worker's empty environment. ELF linkage and staged
+installation checks pass with the new module and documentation.
+
+Hardware probes use **0.4.3**, matching **Nsight 2026.3.1.0/build 38722833**,
+RTX 3080 Ti, kernel driver **615.71.09**, KDE Wayland with the fixture's
+**XCB/Xwayland** backend, GCC 16.2.1, CMake 4.4.4 and the source-built debug shader
+bundle. The default NVML probe fails with library version 615.78; the explicitly
+selected retained 615.71 libraries report the correct GPU/driver. No machine
+settings or installed drivers/libraries are changed.
+
+Two independent fresh 192×128/seed-42/frame-2 application baselines pass with the
+selected environment and retained GLSL/SPIR-V/build identities. Three fresh MCP
+capture attempts reach Nsight connection and select the intended driver library
+but time out after 120 seconds, including a controlled run without the layer
+filter. All confirm owned cleanup, release the GPU reservation and retain pinned
+failed bundles. **No fresh Nsight capture compatibility is qualified by these
+probes.** No SDL Wayland application or profiling permission change is exercised.
+See I-038 and [LAUNCH_ENVIRONMENT.md](LAUNCH_ENVIRONMENT.md).
+
+The implementation, final CPU logs, failed parallel run, baseline readback,
+hardware transcripts/reports, exact selected paths/hashes and restart pin receipts
+are pinned as `bundle-2a69ab0ef0bd54fd2df1fdeadc6fc423` in the configured external
+artifact root. The three failed source captures remain independently pinned in
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/launch-nzs1_wiv/store`.
+The snapshot records its staged source patch against 7123808; subsequent profile
+compatibility work is excluded. Its importer is the existing installed 0.4.1
+connection, while all nested implementation/runtime reports identify 0.4.3.

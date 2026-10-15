@@ -82,6 +82,9 @@ Json query_capabilities(Client& client) {
     const auto report = result["structuredContent"];
     require(Json::parse(result["content"][0]["text"].get<std::string>()) == report, "text and structured result agree");
     require(report["server"]["version"] == ngm::project_version(), "capabilities use project version");
+    require(report.at("launch_environment").at("maximum_total_bytes") == 16384 &&
+                report.at("launch_environment").at("supported_keys").size() == 8,
+            "capabilities advertise bounded launch policy without executing a job");
     require(report["implemented_tools"] == Json::array({"capabilities",
                                                         "capture",
                                                         "capture_cpp",
@@ -378,9 +381,13 @@ void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
     expect_tool_error(
         call(client, "artifact_import", {{"source", scratch.path.string()}, {"required_outputs", {"../file"}}}));
     const Json valid_capture{{"executable", server}, {"working_directory", scratch.path.string()}};
-    const Json invalid_capture_fields{{"capture_frame", 1},        {"delimiter", "automatic"},
-                                      {"timeout_ms", 600001},      {"pin", 1},
-                                      {"arguments", "wrong-type"}, {"application_provenance", Json::object()}};
+    const Json invalid_capture_fields{{"capture_frame", 1},
+                                      {"delimiter", "automatic"},
+                                      {"timeout_ms", 600001},
+                                      {"pin", 1},
+                                      {"arguments", "wrong-type"},
+                                      {"application_provenance", Json::object()},
+                                      {"launch_environment", {{"LD_PRELOAD", "/untrusted"}}}};
     for(const auto& [name, value] : invalid_capture_fields.items()) {
         auto arguments = valid_capture;
         arguments[name] = value;
@@ -549,11 +556,13 @@ void workflow_check(const std::string& server, const std::string& standin, const
         if(wait) {
             argv.push_back("--wait");
         }
-        return Json{{"executable", target},
-                    {"arguments", argv},
-                    {"working_directory", scratch.path.string()},
-                    {"timeout_ms", 10000},
-                    {"capture_frame", 2}};
+        return Json{
+            {"executable", target},
+            {"arguments", argv},
+            {"launch_environment", {{"LD_LIBRARY_PATH", scratch.path.string()}, {"SDL_VIDEODRIVER", "wayland"}}},
+            {"working_directory", scratch.path.string()},
+            {"timeout_ms", 10000},
+            {"capture_frame", 2}};
     };
     const auto record1 = scratch.path / "target1.pid";
     auto first_arguments = capture_arguments(record1);
@@ -575,6 +584,9 @@ void workflow_check(const std::string& server, const std::string& standin, const
     const auto report = Json::parse(report_text["text"].get<std::string>());
     require(report["environment"]["XDG_DATA_DIRS"] == "/opt/ngm-test-driver/share:/usr/share",
             "MCP forwards the caller's explicit system data search path to capture");
+    require(report.at("environment").at("SDL_VIDEODRIVER") == "wayland" &&
+                report.at("launch_environment").at("requested") == first_arguments.at("launch_environment"),
+            "actual stdio capture accepts and retains the per-job overlay");
     require(report["evidence_origin"] == "nsight_capture" && report["backend"] == "documented_nsight_cli",
             "capture report labels its evidence origin");
     require(report["caller_provided_application_provenance"].empty(), "MCP does not inject expected diagnoses");
@@ -655,6 +667,13 @@ void workflow_check(const std::string& server, const std::string& standin, const
     require(cpp_job["state"] == "succeeded" && cpp_job["cleanup_confirmed"] == true,
             "C++ capture succeeds through the real MCP process boundary");
     const auto cpp_id = cpp["artifact_id"].get<std::string>();
+    const auto cpp_report =
+        Json::parse(successful_call(client, "artifact_read", {{"artifact_id", cpp_id}, {"path", "raw/report.json"}})
+                        .at("text")
+                        .get<std::string>());
+    require(cpp_report.at("launch_environment").at("requested") == cpp_arguments.at("launch_environment") &&
+                cpp_report.at("environment").at("SDL_VIDEODRIVER") == "wayland",
+            "actual stdio C++ capture propagates the shared launch overlay");
     const auto cpp_index =
         Json::parse(successful_call(client, "artifact_read",
                                     {{"artifact_id", cpp_id}, {"path", "derived/cpp-project.json"}})["text"]

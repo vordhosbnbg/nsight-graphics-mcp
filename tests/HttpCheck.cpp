@@ -290,6 +290,7 @@ int main(int argc, char** argv) {
                 args.push_back("--wait");
             return client.tool("capture", {{"executable", argv[3]},
                                            {"working_directory", scratch.path.string()},
+                                           {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
                                            {"arguments", args},
                                            {"timeout_ms", 20000},
                                            {"pin", true}});
@@ -297,6 +298,21 @@ int main(int argc, char** argv) {
         auto complete = capture(c, scratch.path / "first.pid", false);
         auto job = await_job(other, complete["identity"]["job_id"]);
         require(job["state"] == "succeeded" && job["cleanup_confirmed"].get<bool>(), "cross-client capture lifecycle");
+        const auto overlay_report = Json::parse(
+            other.tool("artifact_read", {{"artifact_id", complete.at("artifact_id")}, {"path", "raw/report.json"}})
+                .at("text")
+                .get<std::string>());
+        require(overlay_report.at("environment").at("SDL_VIDEODRIVER") == "x11" &&
+                    overlay_report.at("launch_environment").at("requested").at("SDL_VIDEODRIVER") == "x11",
+                "actual HTTP capture accepts and retains the same job overlay");
+        const auto invalid_overlay =
+            other.rpc("tools/call", {{"name", "capture"},
+                                     {"arguments",
+                                      {{"executable", argv[3]},
+                                       {"working_directory", scratch.path.string()},
+                                       {"launch_environment", {{"LD_PRELOAD", "/untrusted"}}}}}});
+        require(invalid_overlay.at("result").at("isError") == true,
+                "HTTP rejects keys outside the shared launch allowlist");
         gone(scratch.path / "first.pid");
         auto waiting = capture(c, scratch.path / "wait.pid", true);
         wait_record(scratch.path / "wait.pid");

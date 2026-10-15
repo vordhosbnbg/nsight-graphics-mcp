@@ -1350,3 +1350,40 @@ records the commands, observations, preliminary workload and retention reference
   root; see RESOURCE_QUERIES.md for the independent source/read pins.
 - **Revisit:** If the retained-validation setup changes, initialize the store
   before copying bundles. This is a probe setup error, not a reader limitation.
+
+### I-038 — Matching-driver fixture baseline passes but current capture times out
+
+- **Context:** Per-job environment implementation 0.4.3 on 2026-10-15;
+  Nsight 2026.3.1.0/build 38722833, RTX 3080 Ti, kernel driver 615.71.09,
+  KDE Wayland / XCB/Xwayland, GCC 16.2.1 and CMake 4.4.4. Default `nvidia-smi`
+  fails with an NVML 615.78 / kernel-driver mismatch; a process-local
+  `LD_LIBRARY_PATH` selecting the retained 615.71 files makes that query succeed.
+- **Reproduction:** Build `ngm_launch_environment_integration` and invoke it with
+  explicit server/fixture/shader/Nsight/store/report paths and the retained overlay
+  JSON. It requests the reference fixture, seed 42, 192×128, presented interval 2,
+  fresh target ending at application frame 20, timeout 120000 ms. The overlay
+  supplies the existing matching driver directory/ICD, QT XCB, SDL Wayland and
+  explicit unwanted-layer controls. The final probe removes only
+  `VK_LOADER_LAYERS_DISABLE`. No system setting is changed.
+- **Expected/observed:** Two independent frame-2 standalone fixture baselines
+  complete and retain valid readback on NVIDIA 615.71.09 / XCB. All three fresh
+  MCP capture attempts report Nsight connection, and loader diagnostics select
+  `libGLX_nvidia.so.615.71.09`, but produce no capture before the deadline.
+  Each ends `timed_out` with `cleanup_confirmed=true`, no GPU reservation or
+  quarantine, and a pinned failed bundle. Removing the layer filter does not
+  resolve the observation. No fresh capture support, root cause, universal
+  unavailability or regression relative to an equivalent older-server run is
+  established. The older 2026.2 installation is no longer present locally.
+- **Evidence:** Snapshot `bundle-2a69ab0ef0bd54fd2df1fdeadc6fc423` is pinned in
+  the configured external artifact root. It includes application baselines,
+  loader/tool logs, exact arguments, environment/ICD/library hashes, build/shader
+  identities and MCP transcripts. Failed source bundles
+  `bundle-7a2bfdbfd496de3972e1a8055c1a7761`,
+  `bundle-dedb9d7bf9faaeda09c73ca930ab8638` and
+  `bundle-05301c2042ae9de1731f6ee408520962` remain independently pinned in the
+  external launch-validation store; restart receipts verify their pins.
+- **Revisit:** Reproduce through another matching documented Nsight toolchain or
+  a newly documented capture interface; compare an independently controlled
+  capture invocation and the same selected environment. Any driver/session or
+  permission changes require a separate explicit owner decision. Continue
+  retained-source and CPU capability work without advertising a fresh capture.

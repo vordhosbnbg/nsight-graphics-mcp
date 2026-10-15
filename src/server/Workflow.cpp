@@ -40,6 +40,15 @@ Schema object_schema(Json properties = Json::object(), Json required = Json::arr
             {"required", std::move(required)},
             {"additionalProperties", false}};
 }
+Schema launch_environment_schema() {
+    Json properties = Json::object();
+    const auto policy = launch_environment_policy();
+    for(const auto& key : policy.at("supported_keys"))
+        properties[key.get<std::string>()] = string_schema(4096, 1);
+    auto result = object_schema(std::move(properties));
+    result["maxProperties"] = 8;
+    return result;
+}
 Schema nullable(Schema value) {
     value["type"] = Json::array({value["type"], "null"});
     return value;
@@ -562,6 +571,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
     auto profile_input = object_schema({{"executable", string_schema(4096, 1)},
                                         {"working_directory", string_schema(4096, 1)},
                                         {"arguments", array_schema(string_schema(4096), 256)},
+                                        {"launch_environment", launch_environment_schema()},
                                         {"settings", settings_input},
                                         {"timeout_ms", integer_schema(1, 600000)},
                                         {"pin", boolean_schema()},
@@ -584,6 +594,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  request.executable = absolute_path(arguments.at("executable"), true);
                  request.working_directory = absolute_path(arguments.at("working_directory"));
                  request.arguments = arguments.value("arguments", std::vector<std::string>{});
+                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
                  request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
                  request.pin = arguments.value("pin", false);
                  request.application_output_option = arguments.value("application_output_option", "");
@@ -758,6 +769,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
     add_tool(tools, "capture",
              object_schema({{"executable", string_schema(4096, 1)},
                             {"arguments", array_schema(string_schema(4096), 256)},
+                            {"launch_environment", launch_environment_schema()},
                             {"working_directory", string_schema(4096, 1)},
                             {"capture_frame", integer_schema(2)},
                             {"delimiter",
@@ -784,6 +796,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  request.executable = absolute_path(arguments.at("executable"), true);
                  request.working_directory = absolute_path(arguments.at("working_directory"));
                  request.arguments = arguments.value("arguments", std::vector<std::string>{});
+                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
                  request.capture_frame = arguments.value("capture_frame", std::uint64_t{2});
                  request.delimiter = parse_capture_delimiter(arguments.value("delimiter", "present"));
                  request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
@@ -799,6 +812,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
     add_tool(tools, "capture_cpp",
              object_schema({{"executable", string_schema(4096, 1)},
                             {"arguments", array_schema(string_schema(4096), 256)},
+                            {"launch_environment", launch_environment_schema()},
                             {"working_directory", string_schema(4096, 1)},
                             {"wait_frames", integer_schema(2, 1000000)},
                             {"timeout_ms", integer_schema(1, 600000)},
@@ -820,6 +834,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  request.executable = absolute_path(arguments.at("executable"), true);
                  request.working_directory = absolute_path(arguments.at("working_directory"));
                  request.arguments = arguments.value("arguments", std::vector<std::string>{});
+                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
                  request.cpp_wait_frames = arguments.value("wait_frames", std::uint64_t{2});
                  request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
                  request.pin = arguments.value("pin", false);

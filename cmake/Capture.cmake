@@ -1,5 +1,6 @@
 function(ngm_add_capture)
-    add_library(ngm_capture STATIC "${PROJECT_SOURCE_DIR}/src/capture/CaptureService.cpp")
+    add_library(ngm_capture STATIC "${PROJECT_SOURCE_DIR}/src/capture/CaptureService.cpp"
+        "${PROJECT_SOURCE_DIR}/src/capture/LaunchEnvironment.cpp")
     target_link_libraries(ngm_capture PUBLIC ngm_artifacts ngm_nsight ngm_core)
     ngm_first_party(ngm_capture)
     add_executable(ngm-capture "${PROJECT_SOURCE_DIR}/src/capture/Main.cpp")
@@ -8,6 +9,8 @@ function(ngm_add_capture)
 endfunction()
 
 function(ngm_add_capture_checks)
+    ngm_add_check(ngm_launch_environment_check SOURCES "${PROJECT_SOURCE_DIR}/tests/LaunchEnvironmentCheck.cpp"
+        LIBRARIES ngm_capture)
     ngm_add_check(ngm_profile_compare_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ProfileCompareCheck.cpp"
         LIBRARIES ngm_capture ngm_inspection
         ARGS "$<TARGET_FILE:ngm_nsight_standin>" "$<TARGET_FILE:nsight-graphics-mcp>"
@@ -18,5 +21,6 @@ function(ngm_add_capture_checks)
         DEPENDS ngm_nsight_standin nsight-graphics-mcp)
     ngm_add_check(ngm_capture_service_check SOURCES "${PROJECT_SOURCE_DIR}/tests/CaptureServiceCheck.cpp"
         LIBRARIES ngm_capture
-        ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
+        ARGS "$<TARGET_FILE:ngm_nsight_standin>" "$<TARGET_FILE:ngm-capture>"
+        DEPENDS ngm_nsight_standin ngm-capture)
 endfunction()
