@@ -2190,3 +2190,96 @@ I-043–I-045 remain explicit limitations with revisit conditions, not new pendi
 priorities. No fresh game run, new two-release state/timing qualification,
 hydration extension, installation, publication or machine-setting change is
 implied by group completion.
+
+## 0.5.1 fresh Graphics Capture reliability (R-023), 2026-10-15
+
+R-023 completes on the measured **Nsight 2026.3.1.0/build 38722833** path at
+**0.5.1**, retaining **29 tools**. The host is Linux
+**7.2.7-zen1-1-zen**, RTX **3080 Ti**, kernel driver **615.71.09**, KDE
+Wayland/Xwayland with the fixture's **XCB** backend, GCC **16.2.1**, CMake
+**4.4.4** and Ninja **1.13.2**. The explicit existing matching-library/ICD overlay
+is the one retained by the earlier launch investigation; SDK control is unused.
+No driver, display, permission, clock, installed library or user-server change
+is made.
+
+The initial **0.5.0** reproduction passes its independent application baseline
+but times out after **120211 ms**. Read-only owned-process observations show
+the injected fixture waiting for its Zenity low-space warning: about **5.4 GB**
+is available, below the tool's recommended **20 GB**. The warning and installed
+help document `--no-low-disk-space-check`. The adapter now supplies it only when
+advertised; retained 2026.2 help lacks it and the CPU legacy branch rejects an
+unknown flag. Managed quota/publication failures and existing job cleanup still
+apply. I-046 retains the diagnosis; no cause is assigned retroactively to
+I-038's earlier attempts without child-state evidence.
+
+The current C++ `ngm_launch_environment_integration` freezes server, fixture
+and shader inputs and accepts `--scenario reference|shader-error`. Its explicit
+server/fixture/shaders/Nsight/store/report/overlay invocation runs three separate
+MCP cases, each with a fresh standalone frame-2 baseline:
+
+| Case | Capture job time | Independently pinned source |
+| --- | ---: | --- |
+| Reference | 6655 ms | `bundle-644cc39112ddd32696ce24823764ca97` |
+| Reference repeat | 6354 ms | `bundle-4163726d809bb9b09cc1758f7d0399d2` |
+| Shader fault | 6537 ms | `bundle-7b77529e3352f19296bd669906110bfa` |
+
+All captures and five exports per capture succeed; owned cleanup and released
+GPU reservations verify. Target PIDs **3549142**, **3549323** and **3549516**
+are distinct. Independent Pillow RGB8 decoding gives exact screenshot versus
+application-readback equality for every pixel in all three cases. References
+repeat exactly and the faulty image differs. These are actual source-server
+MCP captures, not stand-ins or embedded images presented as GPU replay output.
+
+Source store:
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/roadmap-resolution-aytro126/graphics-fixed-store`.
+The failed original **bundle-1dae31356d8a009e11c1befd3e684be3** is separately
+pinned in the adjacent `graphics-current-store`.
+
+The verified build/check sequence includes:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_nsight_check_run ngm_capture_service_check_run ngm-capture nsight-graphics-mcp ngm_launch_environment_integration
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+cmake --build --preset linux-gcc-debug --target ngm_mcp_check_run ngm_http_check_run
+```
+
+The serial aggregate passes **36/36 CPU checks**, no skips, in **354.85 s**
+(354.83 s summed test time). Its new low-space stand-in blocks without the
+documented control and the legacy help branch rejects sending it. An initial
+focused run caught the new test launches changing an existing two-target count;
+the additional cases were moved after that assertion before the passing aggregate.
+
+The aggregate precedes a final narrow schema correction. The independent actual
+result audit found the pre-existing missing `producer.api_identification` output
+property (I-049). The common metadata/event/object schema now declares the bounded
+two-value discriminator. Focused actual-process MCP and HTTP checks then pass in
+**27.26 s / 4.30 s**, including closed-member/discriminant regression checks.
+The final server passes full JSON Schema 2020-12 validation for **20 actual
+tool results** in five server processes. Two graphics-store processes return
+identical metadata and complete/pinned source state; two failed-store processes
+preserve the failed pin. A fifth process validates the alternate discriminator
+through metadata/events/objects on retained compute
+`bundle-1a3778da489d8ddd8f09e8099946db65`; that GPU collection retains its **0.3.0**
+identity. All **192** audited source files remain byte-identical.
+
+The GPU collection server precedes that schema-only correction; qualification
+retains both collection and final-server binary hashes/bytes rather than
+relabeling the earlier collection. No new GPU collection occurs after the
+correction. The ordinary CPU suite remains separate from hardware qualification;
+the 2026.2 branch is CPU/help compatibility, not a new second-release GPU claim.
+
+Complete/pinned qualification **bundle-ab49ccec89e6f4584051359b650e7f41** is in the
+configured central store. All **407** source/imported payload hashes and lengths
+verify; the bundle reports complete, pinned and no active use. It retains exact
+source/diff/submodule identities, both server binaries, fixture/harness/CLI,
+raw case and audit transcripts, independent baselines, process observations,
+CPU/focused receipts and I-047/I-048's private replay-probe build corrections.
+Its importer is the installed **0.4.1** process; payloads identify tested
+**0.5.1** binaries and the original **0.5.0** failed run. Publication receipts and
+working orchestration are under the external `roadmap-resolution-aytro126` root.
+
+One separately pinned private matching-tool replay succeeds as
+`bundle-1ed49923b28aa4c6c8dff50ebf85d95d` in `replay-store`, with initialization
+and execution-engine completion plus successful process exit. This is preliminary
+R-027 evidence; product replay integration and independent rendered-output/
+repeatability qualification remain In Progress. R-024–R-026 are still Pending.

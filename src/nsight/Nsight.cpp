@@ -455,6 +455,13 @@ NsightOperationResult run_nsight_capture(const NsightInstallation& installation,
                              delimiter,
                              "--terminate-after-capture",
                              "--no-bundle-replayer"};
+        // Recent tools block the injected target on a desktop warning below a
+        // fixed free-space threshold. Jobs already own their output, deadlines
+        // and publication failures; use the documented unattended control when
+        // advertised, without sending an unknown option to older releases.
+        if(installation.capture.documented_options.contains("--no-low-disk-space-check")) {
+            process.arguments.emplace_back("--no-low-disk-space-check");
+        }
         if(!arguments.empty()) {
             process.arguments.push_back("--args=" + arguments);
         }

@@ -28,8 +28,14 @@ void save(const fs::path& path, const Json& json) {
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     return ngm::check::run([&] {
-        require(argc == 8, "SERVER FIXTURE SHADERS NSIGHT_ROOT STORE REPORT_ROOT LAUNCH_ENVIRONMENT_JSON required");
-        const auto server = fs::canonical(argv[1]), fixture = fs::canonical(argv[2]), shaders = fs::canonical(argv[3]);
+        require(argc == 8 || argc == 10, "SERVER FIXTURE SHADERS NSIGHT_ROOT STORE REPORT_ROOT LAUNCH_ENVIRONMENT_JSON "
+                                         "[--scenario reference|shader-error] required");
+        const auto source_server = fs::canonical(argv[1]), source_fixture = fs::canonical(argv[2]);
+        const auto source_shaders = fs::canonical(argv[3]);
+        const std::string scenario = argc == 10 ? argv[9] : "reference";
+        require((argc == 8 || std::string_view(argv[8]) == "--scenario") &&
+                    (scenario == "reference" || scenario == "shader-error"),
+                "select a qualified basic capture scenario");
         const auto installation = fs::canonical(argv[4]), store = fs::absolute(argv[5]), output = fs::absolute(argv[6]);
         const auto overlay_file = fs::canonical(argv[7]);
         const auto overlay = Json::parse(ngm::read_regular_file(overlay_file, 32768)).get<ngm::LaunchEnvironment>();
@@ -38,16 +44,32 @@ int main(int argc, char** argv) {
         auto pattern = (output / "launch-environment-XXXXXX").string();
         require(mkdtemp(pattern.data()), "isolated hardware validation directory");
         const fs::path run(pattern);
+        fs::create_directory(run / "inputs");
+        const auto server = run / "inputs/nsight-graphics-mcp";
+        const auto fixture = run / "inputs/ngm-vulkan-fixture";
+        const auto shaders = run / "inputs/shaders";
+        fs::copy_file(source_server, server);
+        fs::copy_file(source_fixture, fixture);
+        fs::copy(source_shaders, shaders, fs::copy_options::recursive);
+        for(const auto& executable : {server, fixture})
+            fs::permissions(executable, fs::perms::owner_read | fs::perms::owner_exec, fs::perm_options::replace);
         fs::copy_file(__FILE__, run / "LaunchEnvironmentIntegration.cpp");
         fs::copy_file(overlay_file, run / "launch-environment.json");
         Json report{
             {"status", "running"},
             {"project_version", ngm::project_version()},
+            {"scenario", scenario},
             {"evidence_origin", "hardware_launch_environment_mcp_validation"},
             {"scope", "Fresh XCB/Xwayland Vulkan fixture capture; does not qualify SDL Wayland, "
                       "profiling permission, new draw state or driver machine settings"},
-            {"server", {{"path", server.string()}, {"sha256", ngm::sha256_file(server)}}},
-            {"fixture", {{"path", fixture.string()}, {"sha256", ngm::sha256_file(fixture)}}},
+            {"server",
+             {{"source_path", source_server.string()},
+              {"path", server.string()},
+              {"sha256", ngm::sha256_file(server)}}},
+            {"fixture",
+             {{"source_path", source_fixture.string()},
+              {"path", fixture.string()},
+              {"sha256", ngm::sha256_file(fixture)}}},
             {"harness_sha256", ngm::sha256_file("/proc/self/exe")},
             {"shader_provenance", Json::parse(ngm::read_regular_file(shaders / "provenance.json", 1024 * 1024))},
             {"launch_environment", overlay},
@@ -78,7 +100,7 @@ int main(int argc, char** argv) {
             ngm::ProcessOptions baseline;
             baseline.executable = fixture;
             baseline.working_directory = run;
-            baseline.arguments = {"--scenario",   "reference",
+            baseline.arguments = {"--scenario",   scenario,
                                   "--seed",       "42",
                                   "--width",      "192",
                                   "--height",     "128",
@@ -141,7 +163,7 @@ int main(int argc, char** argv) {
                 call("capture", {{"executable", fixture.string()},
                                  {"working_directory", run.string()},
                                  {"arguments",
-                                  {"--scenario", "reference", "--seed", "42", "--width", "192", "--height", "128",
+                                  {"--scenario", scenario, "--seed", "42", "--width", "192", "--height", "128",
                                    "--frame", "20", "--shader-dir", shaders.string()}},
                                  {"capture_frame", 2},
                                  {"timeout_ms", 120000},

@@ -71,6 +71,26 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+The owner accepted **R-023–R-027** on **2026-10-15** in this priority order:
+restore fresh Graphics Capture reliability; expose proven descriptor contents/
+execution-time values; associate timings with draw occurrences; qualify counter
+meaning/application attribution; qualify standalone GPU replay. Implementation
+of all five is authorized. **R-023 completes at 0.5.1**; **R-024–R-026 are Pending**,
+and **R-027 is In Progress**. Follow docs/ROADMAP.md for evidence dependencies
+and acceptance. R-024–R-026 require documented evidence before any
+new execution-time or physical attribution capability can be claimed.
+
+R-023's matching 2026.3 reference/repeat/fault captures pass with exact frame-2
+application-readback pixels, distinct targets, cleanup and restart pins. The
+adapter conditionally uses the documented low-space warning control (I-046).
+The 36-check serial CPU aggregate passes before a final producer-schema repair
+(I-049); focused MCP/HTTP checks and 20 actual schema-valid results then pass.
+All 407 qualification payloads verify in pinned
+`bundle-ab49ccec89e6f4584051359b650e7f41`. See docs/BUILD_VALIDATION.md. Original
+I-038 causes and new 2026.2 GPU support remain unproven. R-027 has one successful
+private replay probe; product integration and rendered-output verification are
+still required. No machine setting or installed server/worker is changed.
+
 The **R-018–R-022 capability follow-up group completes at 0.5.0** with **29
 tools**. Reader activation, launch controls, empty-table compatibility, bounded
 recorded state/push bytes/descriptor bindings and unique exported marker queries
@@ -85,8 +105,9 @@ complete/pinned; 14 earlier qualification/failure snapshots and 87 native bundle
 retain their verified payloads/pins. Final qualification is pinned as
 `bundle-bc107b133c527aa81f11c17fa93c9743`. No new GPU collection occurs at 0.5.0; each earlier
 run keeps its exact tool/build identity. Installed server **0.4.1** and configured
-optional worker **0.4.2** remain unchanged. All accepted items are Done; do not
-invent further priorities. The notes below are versioned qualification history.
+optional worker **0.4.2** remain unchanged. R-018–R-022 remain Done within their
+accepted scope; R-023–R-027 are the accepted follow-ups above. Do not invent
+additional priorities. The notes below are versioned qualification history.
 
 R-022's repeated control assessment completes at **0.4.11**, retaining **29
 tools**. The opt-in C++ runner mode collects four alternate-order off/on pairs

@@ -185,6 +185,9 @@ int main(int argc, char** argv) {
             if(environment("NGM_OMIT_CAPTURE_NO_BUNDLE_REPLAYER") != "1") {
                 std::cout << " --no-bundle-replayer";
             }
+            if(environment("NGM_PROFILE_OLD_RELEASE") != "1") {
+                std::cout << " --no-low-disk-space-check";
+            }
             std::cout << '\n';
         } else {
             std::cout << "NVIDIA Nsight Graphics Replayer CLI Tool\n--version --help";
@@ -402,6 +405,12 @@ int main(int argc, char** argv) {
         return 0;
     }
     if(capture) {
+        if(has(arguments, "--no-low-disk-space-check") && environment("NGM_PROFILE_OLD_RELEASE") == "1") {
+            return 81;
+        }
+        if(mode == "low-disk-dialog" && !has(arguments, "--no-low-disk-space-check")) {
+            hang();
+        }
         if(!has(arguments, "--terminate-after-capture") || !has(arguments, "--no-bundle-replayer") ||
            value(arguments, "--capture-frame").empty() || value(arguments, "--frame-count").empty() ||
            (!has(arguments, "--delimiter-present") && !has(arguments, "--delimiter-vk-frame-boundary-ext") &&

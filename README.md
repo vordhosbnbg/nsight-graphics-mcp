@@ -15,6 +15,11 @@ controlled launches, retained reader activation, bounded recorded draw state
 and exported marker ranges. Execution-time values and isolated draw counters
 remain unavailable under the documented evidence limits.
 
+The **0.5.1** capture fix prevents the qualified 2026.3 tool's low-space warning
+from blocking unattended jobs. Fresh reference/repeat/fault captures and exact
+readback comparisons pass; [validation details](docs/BUILD_VALIDATION.md#051-fresh-graphics-capture-reliability-r-023-2026-10-15)
+retain the tested environment and evidence.
+
 ## Example workflows
 
 **Diagnose a rendering defect**

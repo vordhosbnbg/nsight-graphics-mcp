@@ -88,6 +88,9 @@ The opt-in `ngm_launch_environment_integration` C++ executable takes explicit
 server, fixture, shader, Nsight, external managed-store, report-root and overlay
 JSON paths. It first runs an independent fresh fixture baseline with the same
 selected environment, then attempts a seeded 192×128 frame-2 capture through MCP.
+At 0.5.1, it freezes server/fixture/shader inputs and accepts optional
+`--scenario reference|shader-error`, allowing separate reference/repeat/fault
+runs with the same validated overlay.
 It retains
 executable/shader identities, requested/applied selections, metadata, cleanup
 and a persistent source pin. Its scope is the fixture's XCB/Xwayland backend;
@@ -106,3 +109,14 @@ fresh Nsight capture compatibility remains unqualified. SDL Wayland and fresh
 profiling remain separate checks. I-038 records the exact scope and revisit gate.
 The complete implementation/validation snapshot is pinned as
 `bundle-2a69ab0ef0bd54fd2df1fdeadc6fc423` in the configured external artifact root.
+
+### Current capture follow-up, 0.5.1
+
+R-023 reproduces a blocked low-space warning in I-046 and qualifies the
+help-gated unattended capture control. Reference/repeat/fault MCP captures now
+pass on matching 2026.3 tools with the same selected driver environment; every
+exported screenshot exactly matches its separate frame-2 application readback.
+Source pins and metadata survive restart. Qualification is pinned as
+`bundle-ab49ccec89e6f4584051359b650e7f41`; see BUILD_VALIDATION.md. This establishes
+the current measured path without assigning the same cause to I-038's earlier
+unobserved timeouts or extending support to SDL Wayland or a new 2026.2 run.

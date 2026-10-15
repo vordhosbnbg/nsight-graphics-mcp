@@ -1628,3 +1628,98 @@ assessment stays open.
   NVIDIA's GPU Trace guide states that collection includes other GPU activity;
   that alone does not establish the cause of this particular difference. No
   private trace decoder or inferred frame-to-draw division is selected.
+
+### I-046 — Fresh Graphics Capture waits for a low-space warning
+
+- **Context:** R-023, 2026-10-15, pre-fix **0.5.0**, matching Nsight
+  **2026.3.1.0/build 38722833**, RTX 3080 Ti / kernel driver **615.71.09**,
+  KDE Wayland/Xwayland-XCB and the retained matching-library/ICD overlay.
+- **Reproduction:** The C++ `ngm_launch_environment_integration` runs an
+  independent seed-42/192×128/frame-2 baseline, then submits the reference
+  capture at presented interval 2 with a 120000 ms deadline. Exact invocation,
+  original harness source and MCP transcript are retained in the qualification.
+- **Expected/observed:** The application baseline passes. The injected target
+  connects but sleeps in `do_wait`; its owned child is Zenity with the low-space
+  warning. Timestamped PID/parent/start-time observations retain the exact
+  command line: approximately **5.4 GB** is available, below Nsight's **20 GB**
+  recommendation, and the message specifies `--no-low-disk-space-check`.
+  No dialog is clicked. The job times out after **120211 ms**, confirms owned
+  cleanup and releases its GPU reservation.
+- **Evidence/retention:** Failed native **bundle-1dae31356d8a009e11c1befd3e684be3**
+  is independently pinned under
+  `/home/vordhosbn/.local/share/nsight-graphics-mcp/roadmap-resolution-aytro126/graphics-current-store`.
+  Complete/pinned **bundle-ab49ccec89e6f4584051359b650e7f41** in the configured
+  central store retains the process observation, failed report/transcript,
+  original harness and successful qualification. All 407 payloads verify.
+- **Resolution:** At **0.5.1**, the adapter adds the exact documented flag only
+  when selected-tool help advertises it. Three fresh reference/repeat/fault MCP
+  captures pass in 6.354–6.655 seconds; every screenshot exactly matches its
+  independent frame-2 application readback, distinct targets and restart pins
+  verify. The retained 2026.2 help lacks the flag, and the CPU legacy-control
+  case preserves that invocation. Managed quotas, publication errors and job
+  cleanup remain enforced; no machine setting changes.
+- **Revisit:** A different blocking warning or changed CLI control requires its
+  own observed diagnosis. This establishes the cause of this run, not of I-038's
+  three earlier timeouts without retained child-state observations. See
+  BUILD_VALIDATION.md for final-schema correction and exact qualification scope.
+
+### I-047 — Standalone replay probe uses implicit JSON/string comparisons
+
+- **Context:** R-027 private C++ probe, 0.5.1 project libraries, GCC 16.2.1,
+  pinned nlohmann/json configuration, 2026-10-15.
+- **Reproduction/observation:** The retained first compiler invocation compares
+  typed tool-version/build strings directly with JSON values. Compilation fails
+  because that string-left overload is unavailable. No probe executable or
+  Nsight/GPU operation runs.
+- **Resolution:** Extract explicit `std::string` values before comparison.
+  This corrects the compilation error; I-048 records the separate subsequent
+  link error. Neither is evidence of an unavailable replay interface.
+- **Evidence/retention:** Exact source, argv and compiler stdout/stderr are under
+  `raw/imported/investigations/failed-replay-build-I047/` in complete/pinned
+  **bundle-ab49ccec89e6f4584051359b650e7f41**.
+- **Revisit:** Retest explicit types if the JSON/compiler contract changes.
+
+### I-048 — Standalone replay probe omits the launch-validation archive
+
+- **Context:** Same private 0.5.1 replay probe as I-047, after its source type
+  correction; GCC 16.2.1 and the actual project static-library layout.
+- **Reproduction/observation:** The retained direct compiler/link invocation
+  includes artifacts, Nsight and core archives but omits `ngm_capture`, which
+  contains `LaunchEnvironment.cpp`. Linking fails with the unresolved
+  `validate_launch_environment` symbol. No Nsight/GPU operation runs.
+- **Resolution:** Link the existing capture archive before its dependencies,
+  following `cmake/Capture.cmake`. The probe then compiles and one actual
+  matching 2026.3 replay completes; R-027 still requires product integration
+  and independent rendered-output/repeatability qualification.
+- **Evidence/retention:** Failed source, argv and link diagnostics are under
+  `raw/imported/investigations/failed-replay-build-I048/` in complete/pinned
+  **bundle-ab49ccec89e6f4584051359b650e7f41**. The successful private replay is
+  independently complete/pinned as **bundle-1ed49923b28aa4c6c8dff50ebf85d95d**
+  in the isolated `roadmap-resolution-aytro126/replay-store`.
+- **Revisit:** Keep future probe targets linked through the declared CMake
+  dependency graph; a link omission establishes no Nsight compatibility limit.
+
+### I-049 — Actual capture metadata violates its advertised producer schema
+
+- **Context:** R-023's independent retained-result audit, 0.5.1 development
+  server and actual fresh 2026.3 captures, 2026-10-15. No new GPU operation.
+- **Reproduction/observation:** Retrieve `tools/list`, then validate the actual
+  `capture_metadata` structured result with JSON Schema 2020-12. Its producer
+  contains `api_identification`, which the shared closed output schema omits;
+  validation fails on the additional property. The field already exists in
+  graphics and compute results; this is a product schema defect, not a capture
+  failure or invalid raw export. The saved response and saved schema reproduce it.
+- **Resolution:** Add the required bounded two-value discriminator to the
+  common metadata/event/object schema. CPU MCP checks now check closed-object
+  members and discriminants against actual advertised schemas. Final focused
+  MCP/HTTP checks pass. Full JSON Schema validation passes **20** actual results
+  across five server processes, including the ordinary graphics discriminator
+  and the retained compute frame-boundary discriminator. Capture metadata and
+  source/failed pins remain stable across restart.
+- **Evidence/retention:** Original schema/transcript, failed audit and source are
+  under `raw/imported/investigations/failed-schema-I049/`; final verifiers,
+  transcripts and receipts are in complete/pinned
+  **bundle-ab49ccec89e6f4584051359b650e7f41**. The compute collection keeps its
+  original 0.3.0 identity; this audit does not qualify a new compute GPU run.
+- **Revisit:** Any future producer field/value change must preserve agreement
+  between actual results and the shared stdio/HTTP output contract.

@@ -220,6 +220,18 @@ int main(int argc, char** argv) {
                     repeated.process.cleanup_confirmed,
                 "existing captures/logs are not replaced");
 
+        auto low_disk = capture_options(scratch.path, target, "low disk capture");
+        low_disk.context.environment["NGM_STANDIN_MODE"] = "low-disk-dialog";
+        require_success(ngm::run_nsight_capture(installation, low_disk));
+
+        const auto legacy =
+            inspect(root, scratch.path / "legacy low disk inspection", {{"NGM_PROFILE_OLD_RELEASE", "1"}});
+        require(legacy.interface_ready && legacy.capture.version == "2026.2.0.0",
+                "legacy capture help without the optional disk-warning control remains available");
+        auto legacy_capture = capture_options(scratch.path, target, "legacy low disk capture");
+        legacy_capture.context.environment["NGM_PROFILE_OLD_RELEASE"] = "1";
+        require_success(ngm::run_nsight_capture(legacy, legacy_capture));
+
         const auto replay_failure_installation =
             inspect(root, scratch.path / "replay runtime failure inspection", {{"NGM_STANDIN_REPLAY_MODE", "fail"}});
         require(replay_failure_installation.interface_ready && replay_failure_installation.cleanup_confirmed,

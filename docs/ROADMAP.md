@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The owner-authorized R-018–R-022 capability follow-up group completes at 0.5.0. Reader activation, launch controls, header-only compatibility, bounded recorded state/push bytes/descriptor bindings and unique marker queries are qualified within their evidence scopes. Conditional reports retain unavailable execution-time values/GPU correspondence, isolated draw counters, physical normalization and causal overhead correction. All 36 CPU checks and 691 actual final-server tool results pass; source pins, payloads and restart behavior verify. All accepted items are Done. The shared stdio/HTTP surface has 29 tools.**
+Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay is In Progress; R-024–R-026 remain Pending in their accepted priority order and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface remains 29 tools; installed server/worker configuration is unchanged.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -100,6 +100,13 @@ performance analysis, and a persistent Streamable HTTP service follow the visual
 
 ## Implementation Sequence
 
+After the 0.5.0 capability follow-up, the owner accepted R-023–R-027 in the
+priority order recorded on each item. Required evidence dependencies can affect
+execution order: R-024 needs proven captured-event identity, and R-026 needs
+R-025 for any draw-level attribution. The completed R-018–R-022 items retain
+their original conditional scope; the new items require actual capability
+improvements before completion. The first-release sequence below is history.
+
 The R-013/R-005/R-003 build/basic-fixture group is complete at 0.1.0.
 The capture/evidence group completes at 0.2.0 after reviewed CPU checks and
 real basic capture/export matrices on two matching Nsight releases. Early R-006
@@ -176,12 +183,73 @@ Item conventions:
 
 ## In Progress
 
+### R-027
+
+```text
+Status: In Progress
+Area: replay/capture/platform/test
+Title: Qualify standalone GPU replay
+Goal: Render retained captures reproducibly without launching the original application again.
+Scope: Isolate the initialization stalls in I-007/I-009/I-010/I-011 through matching documented replay tools and controlled environments; implement the demonstrated correction in the supervised replay path and retain explicit version support.
+Acceptance: Actual GPU replay completes for retained correct/faulty captures and demonstrates repeatable rendered output at equivalent inputs. Each advertised release has its own matching-tool pass; metadata-export success cannot substitute for GPU replay. Failure, deadline, cancellation and shutdown checks confirm bounded owned-process cleanup. Exact capture/tool/GPU/driver/desktop identities, logs, comparisons and persistent evidence pins are retained; an initialization-timeout report alone does not complete the item.
+Notes: Priority 5, accepted by the owner on 2026-10-15. Both measured Nsight 2026.3 and 2026.2 replay paths stalled; serial initialization and nonblocking incompatibility controls did not resolve them. Recheck each available matching release and report unsupported/unavailable versions explicitly. Existing capture/export qualification stays separate; replay success does not itself establish new state exports or replay-based performance measurement. Use documented interfaces only and preserve the existing machine-setting policy. A private 0.5.1 C++ probe now completes one matching 2026.3 replay with explicit driver selection; native bundle-1ed49923b28aa4c6c8dff50ebf85d95d is complete/pinned in the isolated replay store. This is preliminary process/GPU evidence: product replay integration, repeatability and independent rendered-output qualification remain unfinished. I-047/I-048 preserve probe compilation/link corrections.
+```
+
+
 ## Pending
+
+### R-024
+
+```text
+Status: Pending
+Area: inspection/capture/mcp/test
+Title: Expose proven descriptor contents and execution-time values
+Goal: Establish which descriptor resources and typed uniform/material values a selected captured draw actually used.
+Scope: Qualify a documented selected-event evidence path, resource/range/write lifetimes and type/layout schemas; implement bounded queries with per-field provenance and explicit unsupported coverage. Preserve the distinction between recorded bindings or uploaded bytes and execution-time values.
+Acceptance: Independent fixture oracles verify descriptor contents, resource ranges and typed values at selected draw occurrences, including updates between draws. Fresh capture/rebuild/recapture, bounded MCP results, exact source/tool/reader identities and restart/pin checks pass. Unknown lifetime, shader selection or type evidence refuses rather than inferring a value; a limitation report alone does not complete the item.
+Notes: Priority 2, accepted by the owner on 2026-10-15. Follow-up to I-039 and the completed conditional R-021 assessment; see docs/DRAW_STATE_FEASIBILITY.md. Requires proven captured-event identity from R-025 or an independently qualified state interface before execution-time claims. The current five-file worker exception is unchanged; a wider proprietary helper closure still requires a separate owner decision. Missing documented evidence remains an explicit prerequisite, not a promised backend capability.
+```
+
+### R-025
+
+```text
+Status: Pending
+Area: profile/inspection/capture/mcp/test
+Title: Associate timings with captured draw occurrences
+Goal: Identify the draw, submission and occurrence to which a reported GPU timing belongs, including repeated markers and reused recordings.
+Scope: Qualify documented action/queue/submission/sample identities and any capture-to-profile correspondence, then add bounded correlation queries for demonstrated producer-specific scopes. Preserve the existing unique single-frame marker-range contract.
+Acceptance: Direct/indexed draws, nested/repeated and multi-draw markers, reused command buffers and multiple collected intervals have independent occurrence/timestamp validation. Results retain unambiguous original identities, units and source provenance through restart. Ambiguous or unsupported joins refuse; row order, equal counts and matching numeric IDs alone never establish correspondence. Actual new correlation is required for completion.
+Notes: Priority 3, accepted by the owner on 2026-10-15. Follow-up to I-043, I-039 and the completed conditional R-022 assessment; see docs/PROFILE_SCOPE_FEASIBILITY.md. Stable documented execution identifiers or an equivalently demonstrated association are required. Existing profile_marker support does not resolve this item. Supports R-024 and draw-level work in R-026; neither is a prerequisite for this investigation.
+```
+
+### R-026
+
+```text
+Status: Pending
+Area: profile/analysis/mcp/test
+Title: Qualify hardware counter meaning and application attribution
+Goal: Make supported counters trustworthy evidence of application work with verified scope, units, scaling and aggregation.
+Scope: Investigate I-045's differing totals for equivalent fixture API inputs; establish version/architecture-qualified documented definitions and independently validate application attribution on repeated controlled workloads. Expose physical or draw/fragment interpretations only where demonstrated, preserving raw cells and unavailable values.
+Acceptance: Independent new-input workloads verify each advertised counter's units, normalization, aggregation and application boundary, and explain or bound the observed equivalent-workload differences. Draw-level claims require R-025 correlation; fragment/depth claims require stage/scope evidence. Raw zero and unavailable cells remain distinct, all samples are retained, and results/pins survive restart. An unresolved attribution report does not satisfy completion.
+Notes: Priority 4, accepted by the owner on 2026-10-15. Follow-up to I-045 and I-043; see docs/PROFILE_SCOPE_FEASIBILITY.md and docs/PROFILE_OVERHEAD.md. No assumed API-count equivalence, frame-to-draw division or attribution to background GPU activity without evidence. R-025 is required for draw-level attribution, not for investigating frame-level meaning. No implicit clock, permission or background-process changes; causal overhead correction (I-044) is outside this item's scope.
+```
 
 
 ## Blocked
 
 ## Done
+
+### R-023
+
+```text
+Status: Done
+Area: capture/platform/test
+Title: Restore reliable fresh Graphics Capture
+Goal: Make the current unattended Graphics Capture path reliably produce inspectable captures from fresh Vulkan application launches.
+Scope: Reproduce I-038 with the explicit matching-driver environment; isolate the connection timeout using controlled documented CLI launches and implement the demonstrated backend, launch or prerequisite correction. Keep the separately working C++ capture path qualified independently.
+Acceptance: Fresh reference, repeated-reference and faulty fixture captures complete with matching tools, readable exports and independently verified selected-frame images; reference repeats agree and the fault differs. Timeout/cancellation/shutdown checks preserve owned cleanup and GPU reservations. Exact runtime/build identities, failed and successful evidence, source pins and restart checks are retained.
+Notes: Priority 1, accepted by the owner on 2026-10-15. Follow-up to I-038 and R-019; historical R-001 qualification remains intact. The default NVML mismatch has a process-local workaround, but matching-library capture attempts still time out; neither a server regression nor the underlying cause is established. Driver, desktop and permission changes are not implicit prerequisites authorized by this item. Completed at 0.5.1 on 2026-10-15. I-046 identifies an owned low-space dialog in a fresh 0.5.0 reproduction; the adapter now supplies the exact help-advertised unattended control, preserving the older interface without it. Three fresh 2026.3 MCP captures complete in 6.354–6.655 seconds, with distinct targets and exact frame-2 application-readback pixels. All 36 serial CPU checks pass before the final narrow producer-schema correction (I-049); focused MCP/HTTP checks and 20 actual schema-valid retained results then pass, including graphics/compute producer variants, four capture-store restarts and unchanged pins/payloads. Complete qualification bundle-ab49ccec89e6f4584051359b650e7f41 is pinned with all 407 payloads verified. See docs/BUILD_VALIDATION.md. This does not retroactively establish the cause of I-038 or new 2026.2 GPU support.
+```
 
 ### R-022
 

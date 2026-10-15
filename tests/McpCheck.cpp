@@ -311,6 +311,36 @@ Json successful_call(Client& client, const char* name, Json arguments = Json::ob
             "workflow text and structured results agree");
     return result["structuredContent"];
 }
+
+// Check closed objects and discriminants against the actual advertised schema.
+// This is deliberately narrower than a complete JSON Schema implementation.
+void require_schema_members(const Json& value, const Json& schema) {
+    if(schema.contains("enum")) {
+        const auto& allowed = schema.at("enum");
+        require(std::find(allowed.begin(), allowed.end(), value) != allowed.end(),
+                "result discriminant is allowed by its advertised schema");
+    }
+    if(value.is_object()) {
+        if(schema.contains("required"))
+            for(const auto& name : schema.at("required"))
+                require(value.contains(name.get<std::string>()), "required result member exists");
+        const auto properties = schema.value("properties", Json::object());
+        const auto additional = schema.value("additionalProperties", Json(true));
+        for(const auto& [name, member] : value.items()) {
+            if(properties.contains(name)) {
+                require_schema_members(member, properties.at(name));
+            } else if(additional.is_boolean()) {
+                require(additional.get<bool>(), "result member is declared in its closed schema: " + name);
+            } else if(additional.is_object()) {
+                require_schema_members(member, additional);
+            }
+        }
+    } else if(value.is_array() && schema.contains("items")) {
+        for(const auto& member : value)
+            require_schema_members(member, schema.at("items"));
+    }
+}
+
 Json await_job(Client& client, const std::string& id) {
     const auto deadline = Clock::now() + 10s;
     while(Clock::now() < deadline) {
@@ -593,7 +623,15 @@ void workflow_check(const std::string& server, const std::string& standin, const
     require(report["evidence_origin"] == "nsight_capture" && report["backend"] == "documented_nsight_cli",
             "capture report labels its evidence origin");
     require(report["caller_provided_application_provenance"].empty(), "MCP does not inject expected diagnoses");
+    const auto inspection_tools = client.request(2, "tools/list").at("result").at("tools");
+    const auto validate_inspection = [&](const char* name, const Json& value) {
+        const auto tool = std::find_if(inspection_tools.begin(), inspection_tools.end(),
+                                       [name](const Json& entry) { return entry.at("name") == name; });
+        require(tool != inspection_tools.end(), "inspection schema is advertised");
+        require_schema_members(value, tool->at("outputSchema"));
+    };
     const auto metadata = successful_call(client, "capture_metadata", {{"capture_id", first_id}});
+    validate_inspection("capture_metadata", metadata);
     require(metadata["capture_id"] == first_id && metadata["metadata"]["metadata_version"] == 1 &&
                 metadata["producer"]["capture_tool"]["version"] == "2026.3.1.0" &&
                 metadata["producer"]["metadata_nsight_version"] == "2026.3.1" &&
@@ -604,6 +642,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
                 !metadata["metadata"].contains("process_command_line"),
             "ordinary inspection omits process environment and command line");
     const auto events = successful_call(client, "capture_events", {{"capture_id", first_id}, {"limit", 1}});
+    validate_inspection("capture_events", events);
     require(events["events"].size() == 1 && events["total"] == 3 && events["next_offset"] == 1 &&
                 events["events"][0]["event_index"] == 10,
             "event inventory uses export-order offsets rather than noncontiguous IDs");
@@ -612,6 +651,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
                 later_events["events"][0]["sequence_id"].is_null(),
             "event pagination and optional IDs are explicit");
     const auto objects = successful_call(client, "capture_objects", {{"capture_id", first_id}});
+    validate_inspection("capture_objects", objects);
     require(objects["objects"].size() == 1 && objects["objects"][0]["uid"] == 7 &&
                 objects["objects"][0]["access_flags"] == 32 && objects["next_offset"].is_null(),
             "capture-scoped object inventory retains opaque access values");

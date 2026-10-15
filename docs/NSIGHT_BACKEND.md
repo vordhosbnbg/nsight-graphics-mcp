@@ -38,6 +38,15 @@ the documented experimental frame-boundary/graphics-capture-API alternatives
 must separately establish that their application emits those boundaries. A
 workload without its selected delimiter cannot be captured by this path.
 
+At **0.5.1**, capture adds the documented `--no-low-disk-space-check` only when
+that exact flag is advertised by the selected tool. The current 2026.3 tool
+otherwise blocks its injected target on a desktop warning below its recommended
+free-space threshold (I-046). The retained 2026.2 help does not advertise this
+flag, so its invocation stays unchanged. Job deadlines, process cleanup,
+managed-artifact quotas, output validation and filesystem errors still apply;
+this control changes no host settings. Three fresh 2026.3 captures pass with
+exact standalone-readback pixels; BUILD_VALIDATION.md records the qualification.
+
 The process executable and working directory are independent argv values and
 can contain spaces. The current `--args` adapter joins only nonempty ASCII
 tokens containing letters, digits, `_`, `-`, `.`, `/`, `:`, `=`, `,`, `+`, `@`, or
