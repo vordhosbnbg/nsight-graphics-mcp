@@ -1848,3 +1848,98 @@ direct/indexed draw or marker-occurrence correlation, repeated/nested/reused
 cases, independent timestamp/overhead sanity and counter scopes remain to be
 qualified. No draw-local metric, fragment-only interpretation, duplicate-column
 statistic/frame identity or new two-release support follows from this slice.
+
+## 0.4.9 graphics timing qualification workloads, 2026-10-15
+
+This R-022 slice adds three graphics timing scenarios and an opt-in C++ matrix
+runner. It retains **28 tools**, artifact/index version 1, the thirteen-shader
+bundle and existing dependencies. No product timing/counter query is added.
+[PROFILE_CORRELATION.md](PROFILE_CORRELATION.md) defines the actual workload,
+timestamp scope, predeclared tolerance and remaining query qualification.
+
+Source is based on **7342514**, with tested 0.4.9 changes explicitly dirty.
+The host remains GCC **16.2.1**, CMake **4.4.4**, Ninja **1.13.2**, Linux
+**7.2.7-zen1-1-zen**, RTX **3080 Ti** / driver **615.71.09**, requested Vulkan
+**1.3** on the recorded **1.4.351** device, KDE Wayland with XCB/Xwayland.
+Diagnostic GLSL/SPIR-V and exact executable/compiler/driver/desktop/overlay
+identities are retained. No profiling permission, clock, driver or display
+setting is changed; before/after capability files and ACLs match.
+
+The verified build/collection commands are:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_profile_correlation_integration
+/absolute/build/tests/ngm_profile_correlation_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/build/ngm-vulkan-fixture \
+  /absolute/build/shaders/fixture /absolute/Nsight-installation \
+  /absolute/validation-parent /absolute/launch-environment.json
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+The final serial aggregate passes **35/35 CPU checks, zero skipped, in 353.28 s**
+(353.26 s summed CPU-test time). It runs after native collection, with no GPU
+matrix concurrent. Fixture contract coverage includes all three timing scenarios,
+fresh/existing witness paths and pre-display rejection without fabricated timing
+evidence. Scoped formatting and whitespace checks pass. Current server, fixture
+and harness hashes still match the successful native report; no first-party code
+changes follow the aggregate.
+
+All **six baselines** and **fifteen fresh matching 2026.3.1.0/build 38722833
+profiles** pass. The three validation baselines have synchronization validation
+active and clean. Selected images agree exactly across direct/indexed/reused
+cases within each final-frame input. The independent audit checks **400**
+timestamped submissions, actual begin-label parent/occurrence identities,
+direct/indexed arguments and query conversions/wrap bounds. The selected-frame
+readback label remains outside the timed scene. GPU timestamps have **64** valid
+bits and a **1 ns** period.
+
+For the three one-frame profiles, exported marker trees match actual API inputs.
+Nsight versus private scene totals differ by **32 ns**, **64 ns** and **160 ns**
+for direct, indexed and reused aggregate respectively, at most **0.024%**. All
+pass the predeclared **max(0.025 ms, 25%)** whole-scene tolerance. Per-action
+on/off observations remain descriptive/inconclusive under uncontrolled clocks,
+desktop load and one fresh launch per matrix condition. They are not causal
+overhead or speedup claims. All samples and their scope are retained.
+
+The native source store is
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/correlation-final-7h9rhq73/profile-correlation-IqjCBy/store`.
+All fifteen source profiles are independently pinned; the report lists every
+request/ID. The single-frame profiles used for the numerical sanity check are:
+
+| Case | Pinned source |
+| --- | --- |
+| Direct | `bundle-044dab66242bb5eeac71fd3f1c8c7be5` |
+| Indexed | `bundle-9ace4501580edf645c9ff7a2b1146578` |
+| Reused recording | `bundle-5c9adcfd691099021e4611056bdab72d` |
+
+Identical metadata/event pages and source pins pass after a fresh server process.
+All **1,615** native tool results pass their advertised JSON Schema 2020-12
+contracts and text/structured parity: 15 profiles, 1510 job-status results and
+30 each of artifact info, profile metadata and profile metrics. Raw-table hashes,
+finite/unavailable positions, marker paths and actual API witnesses are audited
+independently from product parsing. I-043 records missing action/occurrence/sample
+keys and counter-scope limits; no missing identities are fabricated.
+
+I-042 preserves the private verifier's initial false rejection of the valid
+eleventh selected-frame readback marker. That application exits 0 and no Nsight
+job starts. The corrected full matrix above is a fresh run. An earlier exploratory
+fifteen-profile path-only witness matrix remains separately identified and pinned
+at its source; it is superseded for marker-occurrence qualification.
+
+The consolidated qualification snapshot is complete/pinned as
+**bundle-40d1c8f983a49246a26d5294f20636bb**, reported as **15,725,753 bytes / 199
+files**, including **75** raw text exports and a **24-file** first-party source
+snapshot. All 199 imported files match their source hashes; current source and
+tested binary identities match, and released usage/pin state are checked.
+It retains final raw-export identities, reports, transcripts/schemas, exact
+commands, independent audit/verifier, private witnesses, image references,
+source diff/snapshots and the final CPU receipt. It is selected evidence rather
+than a complete native-bundle backup or typed profile import. The generic
+importer remains installed **0.4.1**; payload identities bind tested **0.4.9**
+binaries. No installed/live-server update is implied.
+
+**R-022 remains In Progress.** The next product slice is the bounded unique
+single-frame marker query with explicit ambiguity/scope refusals. General draw
+IDs, queue/submission correspondence, multi-column frame identity, isolated
+draw counters and physical counter scaling remain unqualified. New support on
+2026.2 remains unqualified; that matching installation is absent locally.

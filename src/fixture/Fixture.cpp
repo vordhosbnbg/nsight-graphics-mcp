@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -31,7 +33,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 27> scenarios{"reference",
+constexpr std::array<std::string_view, 30> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -57,7 +59,10 @@ constexpr std::array<std::string_view, 27> scenarios{"reference",
                                                      "state-constants",
                                                      "state-constants-reuse",
                                                      "state-descriptors",
-                                                     "state-descriptors-reuse"};
+                                                     "state-descriptors-reuse",
+                                                     "timing-direct",
+                                                     "timing-indexed",
+                                                     "timing-reuse"};
 constexpr std::array<std::string_view, 13> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
@@ -83,6 +88,7 @@ struct Workload {
     bool constants = false;
     bool descriptor_state = false;
     bool reuse_commands = false;
+    bool timing = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
     std::uint32_t instance_count = 1;
@@ -96,11 +102,13 @@ Workload workload(std::string_view scenario) {
     result.indirect = combined || scenario == "indirect-reference" || scenario == "indirect-parameter-error";
     result.state = scenario.starts_with("state-");
     result.dynamic_state = scenario == "state-dynamic" || scenario == "state-count";
-    result.indexed = scenario == "state-indexed";
+    result.timing = scenario.starts_with("timing-");
+    result.indexed = scenario == "state-indexed" || scenario == "timing-indexed" || scenario == "timing-reuse";
     result.dynamic_count = scenario == "state-count";
     result.constants = scenario.starts_with("state-constants");
     result.descriptor_state = scenario.starts_with("state-descriptors");
-    result.reuse_commands = scenario == "state-constants-reuse" || scenario == "state-descriptors-reuse";
+    result.reuse_commands =
+        scenario == "state-constants-reuse" || scenario == "state-descriptors-reuse" || scenario == "timing-reuse";
     result.channel_order = scenario == "pass-output-error" || scenario == "combined-pass-error" ? 1u : 0u;
     result.resource_xor = scenario == "resource-selection-error" || scenario == "combined-resource-error" ? 1u : 0u;
     result.instance_count =
@@ -126,8 +134,10 @@ Json workload_metadata(std::string_view scenario) {
         {"dynamic_viewport_scissor_count", selected.dynamic_count},
         {"partial_push_constants", selected.constants},
         {"descriptor_state_validation", selected.descriptor_state},
+        {"timing_validation", selected.timing},
         {"submissions_per_frame", selected.reuse_commands ? 2 : 1},
-        {"draws_per_submission", selected.constants          ? 3
+        {"draws_per_submission", selected.timing             ? 6
+                                 : selected.constants        ? 3
                                  : selected.descriptor_state ? 5
                                                              : 1},
         {"render_pass_count", selected.multipass ? 2 : 1},
@@ -455,7 +465,10 @@ public:
                 submit.pCommandBuffers = &command_;
                 submit.signalSemaphoreCount = occurrence + 1 == repetitions ? 1u : 0u;
                 submit.pSignalSemaphores = &present_ready_[image_index];
+                const auto submitted_at = std::chrono::steady_clock::now();
                 check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
+                if(timing_queries_)
+                    collect_timing(frame, occurrence, submitted_at);
                 if(!options_.state_witness.empty()) {
                     state_witness_["submissions"].push_back({{"frame", frame},
                                                              {"label", "frame." + std::to_string(frame)},
@@ -758,6 +771,7 @@ private:
                 physical_ = candidate;
                 graphics_family_ = *graphics;
                 present_family_ = *present;
+                timestamp_bits_ = families[*graphics].timestampValidBits;
                 const auto has = [&](const char* extension) {
                     return std::any_of(extensions.begin(), extensions.end(), [&](const auto& available) {
                         return std::strcmp(available.extensionName, extension) == 0;
@@ -1543,6 +1557,33 @@ private:
     }
 
     void create_commands() {
+        if(workload_.timing && (!debug_utils_ || !vkCmdBeginDebugUtilsLabelEXT || !vkCmdEndDebugUtilsLabelEXT))
+            throw Unsupported("Timing workloads require VK_EXT_debug_utils command labels");
+        if(!options_.timing_witness.empty()) {
+            if(timestamp_bits_ < 36 || timestamp_bits_ > 64 || !std::isfinite(properties_.limits.timestampPeriod) ||
+               properties_.limits.timestampPeriod <= 0)
+                throw Unsupported("Timing witness requires a graphics queue with valid Vulkan timestamps");
+            auto queries = vk_struct<VkQueryPoolCreateInfo>(VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO);
+            queries.queryType = VK_QUERY_TYPE_TIMESTAMP;
+            queries.queryCount = 2;
+            check(vkCreateQueryPool(device_, &queries, nullptr, &timing_queries_), "creating timing witness queries");
+            timing_witness_ = {
+                {"schema_version", 1},
+                {"evidence_origin", "private_fixture_timestamps"},
+                {"project_version", ngm::project_version()},
+                {"executable_sha256", ngm::sha256_file("/proc/self/exe")},
+                {"shader_manifest_sha256", ngm::sha256_file(options_.shader_directory / "provenance.json")},
+                {"gpu", gpu_metadata()},
+                {"scenario", options_.scenario},
+                {"timestamp_valid_bits", timestamp_bits_},
+                {"timestamp_period_ns", properties_.limits.timestampPeriod},
+                {"stage", "BOTTOM_OF_PIPE at both scene boundaries"},
+                {"scope", "Incremental whole graphics-pass envelope, including clear/pipeline work. "
+                          "Not an isolated draw duration or Nsight evidence. Host fence/read/write "
+                          "cadence and timestamp commands are part of this validation workload."},
+                {"submissions", Json::array()}};
+            write_json(options_.timing_witness, timing_witness_);
+        }
         auto pool = vk_struct<VkCommandPoolCreateInfo>(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
         pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         pool.queueFamilyIndex = graphics_family_;
@@ -1584,6 +1625,8 @@ private:
     }
 
     void begin_label(const std::string& text) {
+        if(!options_.timing_witness.empty())
+            timing_path_.push_back(text);
         if(debug_utils_ && vkCmdBeginDebugUtilsLabelEXT) {
             auto label = vk_struct<VkDebugUtilsLabelEXT>(VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT);
             label.pLabelName = text.c_str();
@@ -1592,12 +1635,29 @@ private:
             label.color[2] = 1.0f;
             label.color[3] = 1.0f;
             vkCmdBeginDebugUtilsLabelEXT(command_, &label);
+            if(timing_queries_) {
+                const auto ordinal = timing_markers_.size();
+                timing_markers_.push_back(
+                    {{"ordinal", ordinal},
+                     {"name", text},
+                     {"parent_ordinal", timing_stack_.empty() ? Json(nullptr) : Json(timing_stack_.back())},
+                     {"path", timing_path_}});
+                timing_stack_.push_back(ordinal);
+            }
         }
     }
 
     void end_label() {
         if(debug_utils_ && vkCmdEndDebugUtilsLabelEXT) {
             vkCmdEndDebugUtilsLabelEXT(command_);
+        }
+        if(!options_.timing_witness.empty()) {
+            if(timing_path_.empty())
+                throw std::logic_error("unbalanced private timing label witness");
+            timing_path_.pop_back();
+            if(timing_stack_.empty())
+                throw std::logic_error("unbalanced private timing marker occurrence");
+            timing_stack_.pop_back();
         }
     }
 
@@ -1607,7 +1667,13 @@ private:
                                                : VkCommandBufferUsageFlags{VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
         constant_draws_ = Json::array();
         descriptor_binds_ = descriptor_draws_ = Json::array();
+        timing_draws_ = Json::array();
+        timing_markers_ = Json::array();
+        timing_path_.clear();
+        timing_stack_.clear();
         check(vkBeginCommandBuffer(command_, &begin), "beginning frame commands");
+        if(timing_queries_)
+            vkCmdResetQueryPool(command_, timing_queries_, 0, 2);
         begin_label("frame." + std::to_string(frame));
         if(workload_.multipass) {
             auto image = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
@@ -1624,6 +1690,8 @@ private:
                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &image);
         }
         begin_label(workload_.multipass ? "scene.offscreen" : "scene.raster");
+        if(timing_queries_)
+            vkCmdWriteTimestamp(command_, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timing_queries_, 0);
         VkClearValue clear{};
         clear.color.float32[0] = 0.03125f;
         clear.color.float32[1] = 0.0625f;
@@ -1686,7 +1754,9 @@ private:
             vkCmdPushConstants(command_, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                static_cast<std::uint32_t>(sizeof(selection)), selection.data());
         }
-        if(workload_.descriptor_state) {
+        if(workload_.timing) {
+            record_timing();
+        } else if(workload_.descriptor_state) {
             record_descriptors();
         } else if(workload_.constants) {
             record_constants();
@@ -1699,6 +1769,8 @@ private:
             vkCmdDraw(command_, 3, 1, 0, 0);
         }
         vkCmdEndRenderPass(command_);
+        if(timing_queries_)
+            vkCmdWriteTimestamp(command_, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timing_queries_, 1);
         end_label();
         if(workload_.multipass) {
             auto sample = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
@@ -1764,6 +1836,81 @@ private:
                              &barrier);
         end_label();
         check(vkEndCommandBuffer(command_), "ending frame commands");
+    }
+
+    void record_timing() {
+        unsigned ordinal = 0;
+        const auto draw = [&](std::uint32_t instances) {
+            const bool indexed = workload_.indexed && (!workload_.reuse_commands || ordinal % 2 == 1);
+            if(indexed) {
+                vkCmdBindIndexBuffer(command_, indices_.handle, 0, VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(command_, 3, instances, 0, 0, 0);
+            } else
+                vkCmdDraw(command_, 3, instances, 0, 0);
+            if(timing_queries_)
+                timing_draws_.push_back({{"ordinal", ordinal},
+                                         {"command", indexed ? "vkCmdDrawIndexed" : "vkCmdDraw"},
+                                         {"count", 3},
+                                         {"instance_count", instances},
+                                         {"marker_ordinal", timing_stack_.back()},
+                                         {"marker_path", timing_path_}});
+            ++ordinal;
+        };
+        begin_label("timing.batch");
+        begin_label("branch.a");
+        begin_label("unique.first");
+        draw(8);
+        end_label();
+        for(const auto instances : {16u, 32u}) {
+            begin_label("repeat");
+            draw(instances);
+            end_label();
+        }
+        end_label();
+        begin_label("branch.b");
+        begin_label("repeat");
+        draw(64);
+        end_label();
+        begin_label("unique.pair");
+        draw(128);
+        draw(128);
+        end_label();
+        end_label();
+        end_label();
+    }
+
+    void collect_timing(std::uint32_t frame, std::uint32_t occurrence,
+                        std::chrono::steady_clock::time_point submitted_at) {
+        check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns), "waiting for timing witness");
+        const auto host_ns =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - submitted_at)
+                .count();
+        const auto period = properties_.limits.timestampPeriod;
+        if(static_cast<long double>(host_ns) >= std::ldexp(static_cast<long double>(period), timestamp_bits_))
+            throw std::runtime_error("Timing witness may contain multiple timestamp wraps");
+        std::array<std::uint64_t, 2> timestamps{};
+        check(vkGetQueryPoolResults(device_, timing_queries_, 0, 2, sizeof(timestamps), timestamps.data(),
+                                    sizeof(std::uint64_t), VK_QUERY_RESULT_64_BIT),
+              "reading timing witness");
+        const auto mask = timestamp_bits_ == 64 ? UINT64_MAX : (std::uint64_t{1} << timestamp_bits_) - 1;
+        if(timestamps[0] > mask || timestamps[1] > mask)
+            throw std::runtime_error("Timing witness has bits outside the queue's valid range");
+        const auto ticks = (timestamps[1] - timestamps[0]) & mask;
+        const auto ns = static_cast<double>(ticks) * period;
+        if(!std::isfinite(ns) || ns <= 0)
+            throw std::runtime_error("Timing witness has no positive finite scene duration");
+        timing_witness_["submissions"].push_back({{"frame", frame},
+                                                  {"submission_occurrence", occurrence},
+                                                  {"queue_family", graphics_family_},
+                                                  {"command_buffer_handle", handle_bits(command_)},
+                                                  {"timestamp_start", timestamps[0]},
+                                                  {"timestamp_end", timestamps[1]},
+                                                  {"elapsed_ticks", ticks},
+                                                  {"duration_ns", ns},
+                                                  {"host_submit_wait_ns", host_ns},
+                                                  {"draws", timing_draws_},
+                                                  {"markers", timing_markers_}});
+        write_json(options_.timing_witness, timing_witness_);
     }
 
     void record_descriptors() {
@@ -1914,6 +2061,8 @@ private:
             // Without maintenance1, per-image semaphore reuse remains valid,
             // but WaitIdle alone cannot formally prove safe WSI teardown.
             vkDeviceWaitIdle(device_);
+            if(timing_queries_)
+                vkDestroyQueryPool(device_, timing_queries_, nullptr);
             if(command_pool_) {
                 vkDestroyCommandPool(device_, command_pool_, nullptr);
             }
@@ -2041,6 +2190,11 @@ private:
     Json shader_witness_ = Json::object();
     Json constant_draws_ = Json::array();
     Json descriptor_binds_ = Json::array(), descriptor_draws_ = Json::array();
+    Json timing_witness_, timing_draws_, timing_markers_;
+    std::vector<std::string> timing_path_;
+    std::vector<std::size_t> timing_stack_;
+    VkQueryPool timing_queries_ = VK_NULL_HANDLE;
+    std::uint32_t timestamp_bits_ = 0;
     VkDeviceSize descriptor_stride_ = 0;
     VkDescriptorSetLayout compatible_descriptor_layout_ = VK_NULL_HANDLE,
                           incompatible_descriptor_layout_ = VK_NULL_HANDLE;
@@ -2142,6 +2296,8 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.shader_directory = value;
         } else if(option == "--state-witness") {
             options.state_witness = value;
+        } else if(option == "--timing-witness") {
+            options.timing_witness = value;
         } else {
             throw std::invalid_argument("unknown option " + std::string(option));
         }
@@ -2177,6 +2333,20 @@ Options parse_arguments(std::span<const char* const> arguments) {
                .starts_with(options.output.lexically_normal().string() + "/"))
             throw std::invalid_argument(
                 "state witness requires a state scenario, a fresh file and a destination outside application output");
+    }
+    if(seen.contains("--timing-witness") && options.timing_witness.empty())
+        throw std::invalid_argument("timing witness path must not be empty");
+    if(!options.timing_witness.empty()) {
+        options.timing_witness = std::filesystem::absolute(options.timing_witness).lexically_normal();
+        const auto parent = std::filesystem::canonical(options.timing_witness.parent_path());
+        if(!options.scenario.starts_with("timing-") || std::filesystem::exists(options.timing_witness) ||
+           std::filesystem::exists(options.timing_witness.string() + ".tmp") ||
+           options.timing_witness == options.output.lexically_normal() ||
+           (parent / options.timing_witness.filename())
+               .string()
+               .starts_with(options.output.lexically_normal().string() + "/"))
+            throw std::invalid_argument(
+                "timing witness requires a timing scenario, a fresh file and a destination outside application output");
     }
     if(options.sdk_first_boundary_frame &&
        (options.frame < 2 || *options.sdk_first_boundary_frame > options.frame - 2)) {

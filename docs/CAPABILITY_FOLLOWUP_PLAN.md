@@ -50,6 +50,19 @@ Qualification is pinned as `bundle-193d06c97b109c55fb8a30e35f12b8f9`, with both
 native source profiles independently pinned. The installed/live server remains
 0.4.1; these results bind the source-built 0.4.8 binaries.
 
+At **0.4.9**, step E's graphics timing workloads and export assessment pass six
+baselines, fifteen fresh 2026.3 profiles, 400 independent timestamp/API submission
+checks, 1,615 schema-validated MCP results and all 35 serial CPU checks. Nested/
+repeated markers, direct/indexed draws and reused recordings expose a qualified
+single-frame unique-marker candidate and concrete wider identity/scope limits.
+Scene totals agree within 32–160 ns under the predeclared tolerance; causal
+instrumentation overhead remains inconclusive. No new product query is added.
+R-022 stays In Progress for the bounded marker query and remaining scope/overhead
+qualification. See [PROFILE_CORRELATION.md](PROFILE_CORRELATION.md), I-042/I-043
+and BUILD_VALIDATION.md for exact identities and retained evidence.
+The complete qualification is pinned as
+`bundle-40d1c8f983a49246a26d5294f20636bb`, with native sources independently pinned.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

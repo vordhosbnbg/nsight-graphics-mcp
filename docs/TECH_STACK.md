@@ -9,6 +9,16 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.9 graphics timing slice uses the existing Vulkan/volk fixture and process/
+MCP harness. An explicit private witness adds a two-query timestamp pool and
+records actual API marker occurrences and calls; default launches create no pool.
+The independent audit reads documented text exports and private fixture records,
+without decoding native traces or feeding expectations into product queries.
+Single-frame unique full-path associations are a candidate for the next bounded
+query; repeated paths and unidentified sample columns require refusals. Hardware
+counter scaling and isolated draw scope remain unresolved. No new dependency or
+production helper source is selected. See PROFILE_CORRELATION.md.
+
 The 0.4.8 collection-control slice keeps the existing C++ job/adapter/inspection
 boundaries and adds no dependency. Nullable settings preserve tool defaults;
 retained argv and reproduction fields distinguish requests from observations.

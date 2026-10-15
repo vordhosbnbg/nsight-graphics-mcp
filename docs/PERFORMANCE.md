@@ -10,6 +10,13 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+The **0.4.9** graphics timing matrix adds private fixture/API/timestamp validation
+for direct/indexed draws, nested/repeated labels and reused recordings. Fifteen
+fresh profiles pass, with single-frame scene units/timing sanity verified.
+This is validation infrastructure; bounded marker queries and the remaining
+R-022 scope/overhead work stay In Progress. See
+[PROFILE_CORRELATION.md](PROFILE_CORRELATION.md) for observed export limits.
+
 The **0.4.8** follow-up adds nullable per-action/HES collection controls and
 requested/exported verification. It preserves qualified 2026.3 literal regime
 `nan` cells as null/unavailable, retaining adjacent finite measurements and

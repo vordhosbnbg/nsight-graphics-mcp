@@ -9,9 +9,9 @@ per-launch boundary controls pass the basic two-release matrix at 0.2.2; see
 Source inspection remains separate work.
 
 R-008 adds three no-presentation compute scenarios and numerical readback; see
-[COMPUTE.md](COMPUTE.md). The shared shader bundle now includes seven graphics
-three correctness compute shaders, and (at 0.3.5) two performance compute shaders.
-Override bundles must contain all twelve shader pairs and their per-shader
+[COMPUTE.md](COMPUTE.md). The shared shader bundle now includes eight graphics,
+three correctness compute shaders, and two performance compute shaders.
+Override bundles must contain all thirteen shader pairs and their per-shader
 compilation profile/arguments; rebuild older bundles before use. The graphics behavior below is unchanged.
 
 Build the normal GCC Debug preset, then launch an isolated experiment:
@@ -36,6 +36,11 @@ a new directory instead of the runner's `--output-root`. It can run independentl
 of both the MCP server and experiment runner. Missing display/device prerequisites
 fail explicitly. Requested API features and readback-capable UNORM swapchain
 formats are checked; the fixture does not silently render a different workload.
+
+The separate [graphics timing matrix](PROFILE_CORRELATION.md) adds direct/indexed
+and reused-command-buffer timing scenarios with an explicit private API/timestamp
+witness. Its C++ hardware runner keeps that validation evidence separate from
+Nsight exports and ordinary CPU checks.
 
 ## Performance compute workloads
 

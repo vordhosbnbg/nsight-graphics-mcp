@@ -75,6 +75,8 @@ add_dependencies(ngm_capture_integration nsight-graphics-mcp ngm-vulkan-fixture)
 ngm_add_hardware_check(ngm_draw_state_integration SOURCES DrawStateIntegration.cpp LIBRARIES ngm_capture ngm_inspection)
 ngm_add_hardware_check(ngm_profile_controls_integration SOURCES ProfileControlsIntegration.cpp LIBRARIES ngm_capture ngm_inspection)
 add_dependencies(ngm_profile_controls_integration nsight-graphics-mcp ngm-vulkan-fixture)
+ngm_add_hardware_check(ngm_profile_correlation_integration SOURCES ProfileCorrelationIntegration.cpp LIBRARIES ngm_capture ngm_inspection)
+add_dependencies(ngm_profile_correlation_integration nsight-graphics-mcp ngm-vulkan-fixture)
 ngm_add_hardware_check(ngm_cpp_capture_integration SOURCES CppCaptureIntegration.cpp LIBRARIES ngm_capture
     ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "$<TARGET_FILE:ngm-vulkan-fixture>" "${NGM_FIXTURE_SHADER_OUTPUT_DIR}"
         "${NGM_NSIGHT_ROOT}" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_CAPTURE_VALIDATION_ROOT}"

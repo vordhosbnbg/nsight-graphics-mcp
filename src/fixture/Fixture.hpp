@@ -19,6 +19,7 @@ struct Options {
     std::filesystem::path shader_directory;
     // Private validation harness output, outside the captured application tree.
     std::filesystem::path state_witness;
+    std::filesystem::path timing_witness;
     std::optional<std::uint32_t> sdk_first_boundary_frame;
     std::optional<std::uint32_t> warmup;
     bool compute_frame_boundary = false;

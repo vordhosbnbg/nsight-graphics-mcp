@@ -71,6 +71,21 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+The R-022 graphics timing fixture/assessment slice completes at **0.4.9** with
+the existing **28-tool** surface. Three new direct/indexed/reuse scenarios have
+an explicit private API-marker/timestamp witness; no new product query is added.
+All **35 CPU checks**, six baselines and fifteen fresh matching 2026.3 profiles
+pass. Independent audit verifies 400 timestamped submissions, exact marker inputs,
+32–160 ns scene timing agreement within the predeclared tolerance, 1,615 actual
+MCP schemas and restart pins. See docs/PROFILE_CORRELATION.md and
+docs/BUILD_VALIDATION.md. R-022 remains In Progress for the bounded unique
+single-frame marker query and remaining scope/overhead qualification. Repeated
+paths, missing action/queue/submission/sample IDs and counter scaling stay
+explicit limits (I-043); I-042 preserves the corrected private harness failure.
+No permission, clock, driver, display or proprietary helper policy changes occur.
+Qualification is pinned as `bundle-40d1c8f983a49246a26d5294f20636bb`; all fifteen
+native profile bundles remain independently pinned in the external source store.
+
 The first R-022 slice completes at **0.4.8**, retaining **28 tools**. Profiles
 accept nullable per-action/HES controls with exact retained requests and exported
 timing verification; active HES state remains unverified. Qualified literal `nan`

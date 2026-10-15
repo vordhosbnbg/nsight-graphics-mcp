@@ -1508,3 +1508,61 @@ identical metadata and complete/pinned status through a clean server restart;
 four additional results pass actual output schemas. The failed restart transcript
 and isolation record accompany the complete/pinned final qualification
 **bundle-193d06c97b109c55fb8a30e35f12b8f9**.
+
+### I-042 — Private timing harness omitted the selected-frame readback marker
+
+- **Context:** R-022 graphics timing fixture, 0.4.9 development based on
+  **7342514**, RTX 3080 Ti / driver 615.71.09, KDE Wayland/Xwayland, 2026-10-15.
+- **Reproduction:** Run `ngm_profile_correlation_integration` with its explicit
+  server/fixture/shaders/Nsight/output-parent/launch-overlay paths. Its first
+  synchronization-validated `timing-direct` baseline presents frames 0–3.
+- **Expected/observed:** The application exits 0 with cleanup confirmed. Frames
+  0–2 record ten marker begins. Frame 3 also records `application.readback`,
+  outside the timed scene, so it has eleven. The new private verifier incorrectly
+  requires exactly ten and rejects that valid final-frame witness before any
+  Nsight job starts. This is a harness error, not a tool/export failure.
+- **Evidence/retention:** Complete/pinned **bundle-82dec3538e6ddf767ff4276b4842aa8f**
+  retains exact code/binary identities, failed report, application result,
+  raw timestamp/marker witness, layer settings/logs and unchanged permission
+  observations. Source directory is `correlation-final-nwprkz0f/profile-correlation-aGlG0u`.
+- **Correction/revisit:** Permit the additional marker only with its exact
+  readback name, root parent and two-component path. Preserve the distinct
+  repeated-marker and two-draw-marker assertions. Revisit if selected-frame
+  readback labels change; fresh qualification is recorded separately.
+
+### I-043 — Timing and regime exports omit general action/occurrence keys
+
+- **Context:** R-022 final 0.4.9 graphics matrix, matching Nsight
+  **2026.3.1.0/build 38722833**, RTX 3080 Ti / 615.71.09, KDE Wayland/Xwayland.
+  All six baselines and fifteen native profiles succeed.
+- **Reproduction:** Run the C++ `ngm_profile_correlation_integration` matrix at
+  seed 42, 1024×512 with its explicit matching-driver overlay. Inspect exact
+  event/regime exports, actual API marker occurrences and timestamp witnesses;
+  compare timing off/on, frame/submit intervals and one-frame controls.
+- **Expected/observed:** A general draw/marker/counter association needs original
+  action or unambiguous occurrence/sample identity. Even with per-action timing
+  enabled, the event export contains marker rows without API draw IDs or queue/
+  submission keys. Direct/indexed three-frame cases have 10 event rows × three
+  identical `time_ms` headers, versus 30 regime rows × 438 metric columns.
+  Reuse repeats complete marker paths. Three submit intervals in reuse yield
+  ten event rows × two columns, rather than three identified submit samples.
+  Raw positions remain valid but do not resolve those identities.
+- **Narrow supported finding:** One-frame nonreuse profiles match actual marker
+  API inputs and allow unique exact full-path associations except the repeated
+  sibling path. Scene timing agrees with independent timestamps within 32/64 ns;
+  the reused aggregate agrees within 160 ns. Repeated paths remain ambiguous
+  for cross-table occurrence joins. A marker can contain two draw calls.
+  `fe__draw_count.sum` reports 10/10/17 versus 6/6/12 application calls in the
+  single-frame cases. Cause and API-count equivalence are not established;
+  instructions/counters are not assigned isolated-draw or fragment-only scope.
+- **Evidence/retention:** PROFILE_CORRELATION.md and BUILD_VALIDATION.md identify
+  complete/pinned final qualification **bundle-40d1c8f983a49246a26d5294f20636bb**.
+  All fifteen service-produced source profiles
+  are independently pinned in `correlation-final-7h9rhq73/profile-correlation-IqjCBy/store`.
+  The independent audit retains exact table hashes, paths, duplicate counts,
+  raw hardware metrics, private API/timestamp records and schema checks.
+- **Revisit:** Implement the authorized bounded unique single-frame marker
+  query with explicit ambiguity/scope refusals. Wider action/occurrence or
+  physical counter claims need documented export identifiers/definitions and
+  independent new-input qualification; a new documented NVIDIA interface may
+  provide that evidence. No private trace decoding or GUI backend is selected.
