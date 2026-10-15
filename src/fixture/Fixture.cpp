@@ -33,6 +33,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
+constexpr std::uint32_t timing_draw_count = 6, timing_max_queries = 2 + 2 * timing_draw_count;
 constexpr std::array<std::string_view, 30> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
@@ -465,10 +466,20 @@ public:
                 submit.pCommandBuffers = &command_;
                 submit.signalSemaphoreCount = occurrence + 1 == repetitions ? 1u : 0u;
                 submit.pSignalSemaphores = &present_ready_[image_index];
+                std::string queue_label;
+                if(options_.timing_draw_witness) {
+                    queue_label = "ngm.fixture.queue." + std::to_string(graphics_family_) + ".frame." +
+                                  std::to_string(frame) + ".submission." + std::to_string(occurrence);
+                    auto label = vk_struct<VkDebugUtilsLabelEXT>(VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT);
+                    label.pLabelName = queue_label.c_str();
+                    vkQueueBeginDebugUtilsLabelEXT(graphics_queue_, &label);
+                }
                 const auto submitted_at = std::chrono::steady_clock::now();
                 check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
+                if(options_.timing_draw_witness)
+                    vkQueueEndDebugUtilsLabelEXT(graphics_queue_);
                 if(timing_queries_)
-                    collect_timing(frame, occurrence, submitted_at);
+                    collect_timing(frame, occurrence, submitted_at, queue_label);
                 if(!options_.state_witness.empty()) {
                     state_witness_["submissions"].push_back({{"frame", frame},
                                                              {"label", "frame." + std::to_string(frame)},
@@ -1556,16 +1567,22 @@ private:
         }
     }
 
+    std::uint32_t timing_query_count() const {
+        return options_.timing_draw_witness ? timing_max_queries : 2u;
+    }
+
     void create_commands() {
         if(workload_.timing && (!debug_utils_ || !vkCmdBeginDebugUtilsLabelEXT || !vkCmdEndDebugUtilsLabelEXT))
             throw Unsupported("Timing workloads require VK_EXT_debug_utils command labels");
+        if(options_.timing_draw_witness && (!vkQueueBeginDebugUtilsLabelEXT || !vkQueueEndDebugUtilsLabelEXT))
+            throw Unsupported("Per-draw timing witness requires VK_EXT_debug_utils queue labels");
         if(!options_.timing_witness.empty()) {
             if(timestamp_bits_ < 36 || timestamp_bits_ > 64 || !std::isfinite(properties_.limits.timestampPeriod) ||
                properties_.limits.timestampPeriod <= 0)
                 throw Unsupported("Timing witness requires a graphics queue with valid Vulkan timestamps");
             auto queries = vk_struct<VkQueryPoolCreateInfo>(VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO);
             queries.queryType = VK_QUERY_TYPE_TIMESTAMP;
-            queries.queryCount = 2;
+            queries.queryCount = timing_query_count();
             check(vkCreateQueryPool(device_, &queries, nullptr, &timing_queries_), "creating timing witness queries");
             timing_witness_ = {
                 {"schema_version", 1},
@@ -1582,6 +1599,20 @@ private:
                           "Not an isolated draw duration or Nsight evidence. Host fence/read/write "
                           "cadence and timestamp commands are part of this validation workload."},
                 {"submissions", Json::array()}};
+            if(options_.timing_draw_witness) {
+                timing_witness_["schema_version"] = 2;
+                timing_witness_["query_count"] = timing_query_count();
+                timing_witness_["stage"] = "BOTTOM_OF_PIPE before/after each labelled call and scene";
+                timing_witness_["scope"] =
+                    "Independent application timestamps around each one-call label, including indexed-bind state, "
+                    "plus the whole scene. Queue labels distinguish frame/submission occurrences. These are "
+                    "instrumented application envelopes, not Nsight evidence or isolated shader costs. Saved "
+                    "replay execution is a separate run; it does not execute this application's witness I/O.";
+                timing_witness_["inputs"] = {{"seed", options_.seed},
+                                             {"width", options_.width},
+                                             {"height", options_.height},
+                                             {"frame", options_.frame}};
+            }
             write_json(options_.timing_witness, timing_witness_);
         }
         auto pool = vk_struct<VkCommandPoolCreateInfo>(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
@@ -1673,7 +1704,7 @@ private:
         timing_stack_.clear();
         check(vkBeginCommandBuffer(command_, &begin), "beginning frame commands");
         if(timing_queries_)
-            vkCmdResetQueryPool(command_, timing_queries_, 0, 2);
+            vkCmdResetQueryPool(command_, timing_queries_, 0, timing_query_count());
         begin_label("frame." + std::to_string(frame));
         if(workload_.multipass) {
             auto image = vk_struct<VkImageMemoryBarrier>(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
@@ -1841,6 +1872,12 @@ private:
     void record_timing() {
         unsigned ordinal = 0;
         const auto draw = [&](std::uint32_t instances) {
+            if(ordinal >= timing_draw_count)
+                throw std::logic_error("timing workload exceeds its query allocation");
+            if(options_.timing_draw_witness) {
+                vkCmdWriteTimestamp(command_, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timing_queries_, 2 + ordinal * 2);
+                begin_label("ngm.fixture.draw." + std::to_string(ordinal));
+            }
             const bool indexed = workload_.indexed && (!workload_.reuse_commands || ordinal % 2 == 1);
             if(indexed) {
                 vkCmdBindIndexBuffer(command_, indices_.handle, 0, VK_INDEX_TYPE_UINT32);
@@ -1854,6 +1891,10 @@ private:
                                          {"instance_count", instances},
                                          {"marker_ordinal", timing_stack_.back()},
                                          {"marker_path", timing_path_}});
+            if(options_.timing_draw_witness) {
+                end_label();
+                vkCmdWriteTimestamp(command_, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timing_queries_, 3 + ordinal * 2);
+            }
             ++ordinal;
         };
         begin_label("timing.batch");
@@ -1877,10 +1918,12 @@ private:
         end_label();
         end_label();
         end_label();
+        if(ordinal != timing_draw_count)
+            throw std::logic_error("timing workload did not fill its query allocation");
     }
 
     void collect_timing(std::uint32_t frame, std::uint32_t occurrence,
-                        std::chrono::steady_clock::time_point submitted_at) {
+                        std::chrono::steady_clock::time_point submitted_at, const std::string& queue_label) {
         check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns), "waiting for timing witness");
         const auto host_ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - submitted_at)
@@ -1888,28 +1931,58 @@ private:
         const auto period = properties_.limits.timestampPeriod;
         if(static_cast<long double>(host_ns) >= std::ldexp(static_cast<long double>(period), timestamp_bits_))
             throw std::runtime_error("Timing witness may contain multiple timestamp wraps");
-        std::array<std::uint64_t, 2> timestamps{};
-        check(vkGetQueryPoolResults(device_, timing_queries_, 0, 2, sizeof(timestamps), timestamps.data(),
-                                    sizeof(std::uint64_t), VK_QUERY_RESULT_64_BIT),
+        std::array<std::uint64_t, timing_max_queries> timestamps{};
+        const auto count = timing_query_count();
+        check(vkGetQueryPoolResults(device_, timing_queries_, 0, count, count * sizeof(std::uint64_t),
+                                    timestamps.data(), sizeof(std::uint64_t), VK_QUERY_RESULT_64_BIT),
               "reading timing witness");
         const auto mask = timestamp_bits_ == 64 ? UINT64_MAX : (std::uint64_t{1} << timestamp_bits_) - 1;
-        if(timestamps[0] > mask || timestamps[1] > mask)
-            throw std::runtime_error("Timing witness has bits outside the queue's valid range");
+        for(std::size_t i = 0; i < count; ++i)
+            if(timestamps[i] > mask)
+                throw std::runtime_error("Timing witness has bits outside the queue's valid range");
         const auto ticks = (timestamps[1] - timestamps[0]) & mask;
         const auto ns = static_cast<double>(ticks) * period;
         if(!std::isfinite(ns) || ns <= 0)
             throw std::runtime_error("Timing witness has no positive finite scene duration");
-        timing_witness_["submissions"].push_back({{"frame", frame},
-                                                  {"submission_occurrence", occurrence},
-                                                  {"queue_family", graphics_family_},
-                                                  {"command_buffer_handle", handle_bits(command_)},
-                                                  {"timestamp_start", timestamps[0]},
-                                                  {"timestamp_end", timestamps[1]},
-                                                  {"elapsed_ticks", ticks},
-                                                  {"duration_ns", ns},
-                                                  {"host_submit_wait_ns", host_ns},
-                                                  {"draws", timing_draws_},
-                                                  {"markers", timing_markers_}});
+        auto draws = timing_draws_;
+        if(options_.timing_draw_witness) {
+            if(draws.size() != timing_draw_count)
+                throw std::logic_error("timing witness lost a recorded draw");
+            std::uint64_t previous_end = 0;
+            for(std::size_t i = 0; i < draws.size(); ++i) {
+                const auto begin = timestamps[2 + 2 * i], end = timestamps[3 + 2 * i];
+                const auto from_scene = (begin - timestamps[0]) & mask;
+                const auto until_scene = (end - timestamps[0]) & mask;
+                if(from_scene < previous_end || until_scene < from_scene || until_scene > ticks)
+                    throw std::runtime_error("per-draw timestamp order escapes the scene envelope");
+                const auto elapsed = (end - begin) & mask;
+                const auto duration = static_cast<double>(elapsed) * period;
+                if(!std::isfinite(duration))
+                    throw std::runtime_error("per-draw timestamp duration is not finite");
+                auto& draw = draws[i];
+                draw["query_start"] = 2 + 2 * i;
+                draw["query_end"] = 3 + 2 * i;
+                draw["timestamp_start"] = begin;
+                draw["timestamp_end"] = end;
+                draw["elapsed_ticks"] = elapsed;
+                draw["duration_ns"] = duration;
+                previous_end = until_scene;
+            }
+        }
+        Json submission{{"frame", frame},
+                        {"submission_occurrence", occurrence},
+                        {"queue_family", graphics_family_},
+                        {"command_buffer_handle", handle_bits(command_)},
+                        {"timestamp_start", timestamps[0]},
+                        {"timestamp_end", timestamps[1]},
+                        {"elapsed_ticks", ticks},
+                        {"duration_ns", ns},
+                        {"host_submit_wait_ns", host_ns},
+                        {"draws", std::move(draws)},
+                        {"markers", timing_markers_}};
+        if(options_.timing_draw_witness)
+            submission["queue_label"] = queue_label;
+        timing_witness_["submissions"].push_back(std::move(submission));
         write_json(options_.timing_witness, timing_witness_);
     }
 
@@ -2298,6 +2371,10 @@ Options parse_arguments(std::span<const char* const> arguments) {
             options.state_witness = value;
         } else if(option == "--timing-witness") {
             options.timing_witness = value;
+        } else if(option == "--timing-scope") {
+            if(value != "scene" && value != "draw")
+                throw std::invalid_argument("timing scope must be scene or draw");
+            options.timing_draw_witness = value == "draw";
         } else {
             throw std::invalid_argument("unknown option " + std::string(option));
         }
@@ -2336,6 +2413,8 @@ Options parse_arguments(std::span<const char* const> arguments) {
     }
     if(seen.contains("--timing-witness") && options.timing_witness.empty())
         throw std::invalid_argument("timing witness path must not be empty");
+    if(seen.contains("--timing-scope") && options.timing_witness.empty())
+        throw std::invalid_argument("timing scope requires --timing-witness");
     if(!options.timing_witness.empty()) {
         options.timing_witness = std::filesystem::absolute(options.timing_witness).lexically_normal();
         const auto parent = std::filesystem::canonical(options.timing_witness.parent_path());
@@ -2388,6 +2467,8 @@ void run(const Options& options) {
                   {"display", environment("DISPLAY")},
                   {"session_type", environment("XDG_SESSION_TYPE")},
                   {"wayland_display", environment("WAYLAND_DISPLAY")}}}};
+    if(!options.timing_witness.empty())
+        result["inputs"]["timing_witness_scope"] = options.timing_draw_witness ? "draw" : "scene";
     SdkControl sdk(options.sdk_first_boundary_frame, options.output / "sdk-control.json");
     Renderer renderer(options, sdk);
     try {

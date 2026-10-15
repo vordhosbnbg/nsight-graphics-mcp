@@ -199,19 +199,31 @@ int main(int argc, char** argv) {
         require(rejected.at("workload").at("required_api_features").empty(),
                 "basic rendering never requires optional bindless features");
         for(const auto* scenario : {"timing-direct", "timing-indexed", "timing-reuse"}) {
-            auto timing = make_case(executable, scratch.path, std::string("timing input ") + scenario);
-            copy_bundle(built_shaders, timing.shaders);
-            set_argument(timing, "--scenario", scenario);
-            const auto witness = timing.process.working_directory / "private-timing.json";
-            timing.process.arguments.insert(timing.process.arguments.end(), {"--timing-witness", witness.string()});
-            require_failure(timing, 3, "DISPLAY is unset");
-            const auto record = Json::parse(ngm::read_regular_file(timing.output / "result.json", 1024 * 1024));
-            require(record.at("workload").at("timing_validation") == true &&
-                        record.at("workload").at("draws_per_submission") == 6 &&
-                        record.at("workload").at("submissions_per_frame") ==
-                            (std::string_view(scenario) == "timing-reuse" ? 2 : 1) &&
-                        !fs::exists(witness),
-                    "timing scenario metadata does not claim GPU timestamps before display initialization");
+            for(const bool per_draw : {false, true}) {
+                auto timing = make_case(executable, scratch.path,
+                                        std::string("timing input ") + scenario + (per_draw ? " draw" : " scene"));
+                copy_bundle(built_shaders, timing.shaders);
+                set_argument(timing, "--scenario", scenario);
+                const auto witness = timing.process.working_directory / "private-timing.json";
+                timing.process.arguments.insert(timing.process.arguments.end(), {"--timing-witness", witness.string()});
+                if(per_draw)
+                    timing.process.arguments.insert(timing.process.arguments.end(), {"--timing-scope", "draw"});
+                require_failure(timing, 3, "DISPLAY is unset");
+                const auto record = Json::parse(ngm::read_regular_file(timing.output / "result.json", 1024 * 1024));
+                require(record.at("workload").at("timing_validation") == true &&
+                            record.at("workload").at("draws_per_submission") == 6 &&
+                            record.at("workload").at("submissions_per_frame") ==
+                                (std::string_view(scenario) == "timing-reuse" ? 2 : 1) &&
+                            record.at("inputs").at("timing_witness_scope") == (per_draw ? "draw" : "scene") &&
+                            !fs::exists(witness),
+                        "timing scope metadata does not claim GPU timestamps before display initialization");
+            }
+        }
+        for(const auto* scope : {"draw", "scene", "invalid"}) {
+            auto invalid = make_case(executable, scratch.path, std::string("invalid timing scope ") + scope);
+            invalid.process.arguments.insert(invalid.process.arguments.end(), {"--timing-scope", scope});
+            require_failure(invalid, 2, "timing scope", false);
+            require(!fs::exists(invalid.output), "unusable timing scope refuses before output creation");
         }
         for(const bool wrong_scenario : {false, true}) {
             auto invalid = make_case(executable, scratch.path,

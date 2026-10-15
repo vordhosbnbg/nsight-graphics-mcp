@@ -2248,3 +2248,48 @@ ancestor **bundle-d95a9298e94a1dfc4b1e598bc2445d3f**. The new slice qualifies
 retained literal draw-range association, with original numeric event IDs and
 independent per-draw timestamp acceptance still unavailable. R-025 stays In
 Progress; no new GPU work or machine-policy change occurs in this reader slice.
+
+### I-074 — New timestamp validation finds its old runtime overlay removed
+
+- **Context/reproduce:** After the committed 0.5.5 reader qualification, the
+  uncommitted 0.5.6 per-draw fixture passes its focused CPU contract check. Its
+  GPU preflight reuses the earlier process-local 615.71.09 runtime paths from
+  `replay-default.json`; both the directory and ICD JSON are now absent.
+- **Observed:** Preflight refuses before launching a fixture or Nsight job.
+  A separate default `nvidia-smi` query exits 18 with a driver/library version
+  mismatch: NVML is 615.78, while `/proc/driver/nvidia/version` still reports
+  kernel driver 615.71.09. This does not invalidate the retained offline reader
+  qualification or establish a new capture/profiling failure. Existing device/
+  trace capability nodes remain readable; no access grant or machine setting
+  is changed.
+- **Evidence/retention:** `r025-draw-witness-first-preflight.json`,
+  `r025-draw-witness-default-driver.json` and
+  `r025-draw-witness-capability-access.json` retain exact observations in the
+  unfinished timestamp slice's external working evidence. Its qualification
+  publication remains pending.
+- **Recovery/revisit:** Recreate the already selected matching runtime in an
+  ignored validation directory using the
+  [official 615.71.09 archive and checksum](https://download.nvidia.com/XFree86/Linux-x86_64/615.71.09/)
+  and documented extraction-only operation. Select those files explicitly for
+  test processes, with no installer, global driver, display or permission
+  change. Verify the checksum, chosen library/ICD identities and an actual
+  standalone baseline before attempting serial Nsight validation. A matching
+  version string alone does not qualify this new runtime selection.
+
+### I-075 — Standalone direct-draw baseline rejects a desktop-resized window
+
+- **Context/reproduce:** The first 0.5.6 timestamp baseline plan uses
+  `timing-direct`, seed 73, 160×96, final frame 5 and `--timing-scope draw`.
+  The verified private 615.71.09 runtime is selected explicitly.
+- **Observed:** After device creation, the fixture reports that the desktop
+  resized the requested window, exits 3/unsupported and confirms owned cleanup.
+  No timestamp witness is created. The preceding 192×128 scene/default and
+  draw/reuse controls pass; all 96 per-call records validate independently and
+  their images are byte-identical. No Nsight profile has been attempted.
+- **Evidence/retention:** `r025-draw-witness-baselines` retains the original
+  plan, requests, receipts, partial audit, successful witnesses and unsupported
+  case logs/result. These belong to the unfinished timestamp qualification.
+- **Revisit/control:** Use a new explicitly recorded 224×160 direct-draw input
+  in a fresh run. Keep the original unsupported case distinct; do not silently
+  resize a workload or relax its pixel/timestamp acceptance. No display setting
+  or machine policy change is needed.

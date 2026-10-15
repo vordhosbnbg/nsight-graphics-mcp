@@ -28,18 +28,19 @@ unqualified.
 
 The **0.5.3** [capture interval option](docs/MULTI_INTERVAL_CAPTURE.md) retains
 several consecutive intervals in one file on the qualified matching 2026.3 path.
-Raw range metadata is available; draw timing correlation remains in development.
+Raw range metadata is available, with qualified draw association described below.
 
 At **0.5.4**, [same-input timing evidence collection](docs/REPLAY_TIMING.md)
 collects generated C++ and a selected-interval GPU Trace from a retained capture.
-The collection has its own source/trigger checks; draw timing correlation still
-requires independent validation.
+The collection has its own source/trigger checks, separate from the association query.
 
 At **0.5.5**, `capture_draw_timings` associates unique same-input literal marker
 ranges with submitted direct/indexed source calls. It checks every source
 interval and preserves raw replay durations, provenance and ambiguity refusals.
-Independent per-draw timestamp acceptance remains part of the unfinished R-025
-work; original live performance and physical counter meanings are unavailable.
+At **0.5.6**, independent per-draw timestamps, new direct/indexed/reused inputs
+and a shader edit/rebuild/recapture repair complete **R-025** on the measured
+2026.3 path. See [draw timing validation](docs/DRAW_TIMING_VALIDATION.md).
+Original live performance and physical counter meanings remain unavailable.
 
 ## Example workflows
 

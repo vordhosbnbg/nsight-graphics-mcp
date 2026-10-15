@@ -2573,3 +2573,85 @@ imported payload lengths and SHA-256 match. It also checks all 704 input files
 against the separately pinned 0.5.4 ancestor snapshot, avoiding duplicate raw
 capture history. `artifact_info` confirms complete/pinned/not in use. The code
 snapshot precedes only this final documentation/pin bookkeeping.
+
+## 0.5.6 independent draw timing and repair, R-025 completion, 2026-10-15
+
+The optional fixture `--timing-scope draw` adds six per-call timestamp pairs and
+unique queue/submission/leaf labels; default scene witnesses retain their earlier
+schema. Product queries remain at **32 tools**, without requiring application
+witnesses. [DRAW_TIMING_VALIDATION.md](DRAW_TIMING_VALIDATION.md) records the
+settings, numeric policy, producer scope and actual repair. New qualification is
+matching **2026.3.1.0/build 38722833**, **RTX 3080 Ti**, kernel driver **615.71.09**,
+KDE Wayland/Xwayland and GCC **16.2.1**. No new 2026.2 GPU qualification is claimed.
+
+The final GCC Debug `ngm_check_all` aggregate passes **40/40 CPU checks** in
+**402.41 seconds** with `CTEST_PARALLEL_LEVEL=1`. The expanded fixture contract
+passes in **54.06 seconds**, replay timing inspection in **10.58**, correlation
+in **0.16**, MCP in **28.98** and HTTP in **6.81**. No code changes follow this run.
+The frozen fixture SHA-256 is
+`fc850d54025fd504bd2c77d33eef5637241744579130c7180228b63f558b515e`;
+the server is
+`06ed9b55e47325539bd7be459301b57b0c66af516ab28154415f0c2fd195d287`.
+Both match the final built binaries. The source-built glslang executable is
+`0148c5f3673bcb25dbecd96d701731824d71e45b95ca7d4c61bab75609530371`.
+
+All actual GPU operations run serially with isolated configurations and owned
+cleanup. Five fresh application cases pass **294** independent wide-integer/
+Decimal per-call timestamp checks. Scene/draw instrumentation produces identical
+reference pixels. Four fresh live profiles compare **36** leaf ranges to Vulkan
+queries from the **same live execution**, with **0–32 ns** error under the
+previously declared `256 ns + 5% + two timestamp ticks` tolerance. These are unit/
+envelope checks, separate from saved replay costs and shader-only cost claims.
+All four profile bundles are complete/pinned and two restarts preserve values.
+
+Four fresh Graphics Captures and six analyses pass **48** original literal-path/
+source-parameter associations: six direct, six indexed and 36 mixed/reused calls
+across three intervals. The scene-only ambiguity control returns two available
+and four unavailable calls. Two restarts preserve results and all ten native
+pins. Original numeric capture event IDs remain null. The live timestamp checks
+and saved replay durations are distinct executions.
+
+An actual source repair uses `timing-reuse`, seed **987**, **256×160**, frame **9**.
+MCP source pages tie the recorded draw's pipeline to fragment-module/resource
+creation within each ordinary C++ capture. The unchanged exact five-file worker
+extracts **1,356 bytes** matching each rebuilt fragment module. Captured debug
+source reveals `palette.tint.bgr`; editing it to `.rgb`, rebuilding with pinned
+source-built glslang (`-V --target-env vulkan1.3 -g -Od`) and recapturing repairs
+**12,286** differing pixels/max-channel **75** to **zero/zero** against an
+independent correct frame-9 reference. All twelve draw associations pass before/
+after with equal literal paths/call parameters and distinct capture references.
+Two additional restarts preserve timing, image, resource and pin results.
+Numeric pipeline/module IDs are scoped to each capture; cross-capture numeric
+equality is not used. Typed descriptor or execution-time values are not inferred.
+Before SPIR-V SHA-256 is
+`e951bdc426e1425c1a0bff42bc213f257552ba637d24171d2e40beeadb1254aa`;
+after is `b7dd0e0292ee9bf6ec8fd02730c677e2e74ff68b8915e5b680b1650878cb77d5`.
+
+Actual successful results total **1,327**: 362 live-profile, 586 saved-input,
+160 before repair, 159 after, ten source-review results per variant and 40 repair
+restart results. Every result passes its advertised input/output schemas. The
+repair store has thirteen complete/pinned bundles, including four restart shader
+reads. Together the three stores retain **27 native bundles / 2,152 files**.
+
+I-074 retains the deleted previous process-local runtime and default
+615.78.08-userspace/615.71.09-kernel NVML failure. A fresh private extraction of
+the official **615.71.09** runtime restores matching per-job selection; the
+published archive SHA-256 and all 32 selected library identities are retained.
+The installer is never run and no system driver is replaced. I-075 preserves the
+desktop's unsupported 160×96 sizing control and confirmed cleanup; the explicit
+224×160 replacement passes. Existing readable profiler/trace capability nodes
+match before/after exactly. Permissions, desktop settings, clocks and installed
+server/worker configuration remain unchanged.
+
+Complete/pinned **bundle-168c040e6fa84e7efd645b16a5413735** retains **329** payloads
+(**83,527,614 bytes**), including exact source/patch/submodule identities and a
+lossless **2,640-member** experiment/prerequisite archive. Every native manifest
+file and pin is preserved, including configuration files and GPU cache payloads.
+The archive's explicit per-member size/SHA-256 inventory supports temporary
+GPU-free extraction; the imported portable verifier passes all member hashes,
+27 native manifests/pins, 1,327 schemas, timestamp/call/raw-table comparisons,
+captured shader bytes and exact repair pixels. Every imported payload agrees
+with its source hash/length; `artifact_info` confirms complete/pinned/not in use.
+The code snapshot precedes only final documentation/pin bookkeeping. The installed
+**0.4.1** importer remains distinct from the tested **0.5.6** source/binaries and
+unchanged **0.4.2** worker. **R-025 is Done**; R-024 and R-026 remain open.

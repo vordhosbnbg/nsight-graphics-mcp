@@ -20,6 +20,7 @@ struct Options {
     // Private validation harness output, outside the captured application tree.
     std::filesystem::path state_witness;
     std::filesystem::path timing_witness;
+    bool timing_draw_witness = false;
     std::optional<std::uint32_t> sdk_first_boundary_frame;
     std::optional<std::uint32_t> warmup;
     bool compute_frame_boundary = false;

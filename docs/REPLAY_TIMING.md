@@ -2,14 +2,17 @@
 
 At **0.5.4**, `capture_analyze_timing` adds a shared stdio/HTTP operation for
 collecting generated C++ and GPU Trace evidence from one retained Graphics
-Capture. This is an R-025 implementation slice; **R-025 remains In Progress**.
+Capture. This is the R-025 collection foundation.
 A successful collection does not itself associate a draw with a timing.
 
 At **0.5.5**, `capture_draw_timings` adds a read-only, bounded association query
 over retained analyses. It returns unique literal marker ranges containing one
 submitted direct/indexed source call, with the raw exported replay duration.
-**R-025 remains In Progress** for independent per-draw timestamps, new-input
-qualification and the complete source-edit/rebuild/recapture acceptance.
+At **0.5.6**, [independent per-draw timestamps, new inputs and the actual shader
+repair workflow](DRAW_TIMING_VALIDATION.md) complete **R-025** on the measured
+matching 2026.3 producer. Original numeric capture IDs and original live cost
+remain unavailable; the qualified association uses original literal paths,
+source/input hashes and generated-C++ submission selections.
 
 ## Collect an analysis
 
@@ -122,7 +125,7 @@ Results provide:
 
 These selection identifiers belong to the **generated C++ snapshot**.
 `original_capture_event_id` is null. Original numeric Graphics Capture IDs,
-unannotated draw correspondence, independently validated per-draw timestamps,
+unannotated draw correspondence,
 original live performance and physical counter normalization remain unavailable.
 The range includes state packets, replay and instrumentation; its time is not
 an isolated shader cost. Different interval analyses use separate fresh replay
@@ -161,3 +164,16 @@ including the new success/failure controls, exact source and eight compressed
 executable identities. Its imported verifier checks all 58 schemas, 14 refusals,
 48 call/path/raw-time matches and stable references against the already pinned
 0.5.4 input snapshot. No raw input history is duplicated or unpinned.
+
+The **0.5.6 completion qualification** adds 294 independent application-only
+per-draw checks, 36 same-live-profile Vulkan/Nsight timestamp comparisons with
+0–32 ns error under the predeclared tolerance, 48 fresh saved-input associations
+and an ambiguity control returning two available/four unavailable draws. An
+actual fragment-source edit, source-built shader compilation and fresh capture
+repair changes 12,286 differing pixels to zero; all twelve draw associations
+and exact captured shader bytes pass before/after and after two restarts.
+All 40 CPU checks and 1,327 actual schema-valid results pass. Complete/pinned
+**bundle-168c040e6fa84e7efd645b16a5413735** retains 329 verified payloads,
+including a lossless archive of all 2,640 snapshot members and 27 native pins;
+its imported portable verifier passes. See [DRAW_TIMING_VALIDATION.md](DRAW_TIMING_VALIDATION.md)
+for settings, source domains, units and remaining limits.

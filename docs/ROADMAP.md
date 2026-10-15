@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay completes at 0.5.2 on its measured matching 2026.3 path; R-025 draw timing correlation is In Progress; R-024 and R-026 remain Pending and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface now has 32 tools, including bounded same-input draw-range association at 0.5.5; independent per-draw timestamp acceptance remains unfinished and installed server/worker configuration is unchanged.**
+Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1, R-027 standalone GPU replay at 0.5.2, and R-025 draw timing association at 0.5.6, each within its measured matching 2026.3 scope. R-024 descriptor/execution-time values is In Progress; R-026 counter meaning/application attribution remains Pending. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface has 32 tools; original numeric capture IDs, original live cost and physical counter interpretation remain unavailable. Installed server/worker configuration is unchanged.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -183,24 +183,10 @@ Item conventions:
 
 ## In Progress
 
-### R-025
-
-```text
-Status: In Progress
-Area: profile/inspection/capture/mcp/test
-Title: Associate timings with captured draw occurrences
-Goal: Identify the draw, submission and occurrence to which a reported GPU timing belongs, including repeated markers and reused recordings.
-Scope: Qualify documented action/queue/submission/sample identities and any capture-to-profile correspondence, then add bounded correlation queries for demonstrated producer-specific scopes. Preserve the existing unique single-frame marker-range contract.
-Acceptance: Direct/indexed draws, nested/repeated and multi-draw markers, reused command buffers and multiple collected intervals have independent occurrence/timestamp validation. Results retain unambiguous original identities, units and source provenance through restart. Ambiguous or unsupported joins refuse; row order, equal counts and matching numeric IDs alone never establish correspondence. Actual new correlation is required for completion.
-Notes: Priority 3, accepted by the owner on 2026-10-15. Follow-up to I-043, I-039 and the completed conditional R-022 assessment; see docs/PROFILE_SCOPE_FEASIBILITY.md. Stable documented execution identifiers or an equivalently demonstrated association are required. Existing profile_marker support does not resolve this item. Supports R-024 and draw-level work in R-026; neither is a prerequisite for this investigation. Private queue/draw label probes now preserve unique submission and leaf paths, and profiling/generated C++ from the same saved input preserves original labels. Live multi-interval timing columns still repeat first-frame paths; the raw regime table separately contains all three interval paths. Replay-pass triggers and startup failures require distinct qualification. The 0.5.3 multi-interval capture foundation passes all 37 final CPU checks (368.46 seconds), serial MCP/CLI exact image checks, replay/range identity checks, 154 actual schema-valid results and restarts. Both raw captured_frame/captured_frames strings are exposed without inferred IDs. Complete/pinned bundle-487017236ba14e318c20a04bbc66dd5a retains all 2082 verified payloads and 21 native pins, with exact collection/final build identities. See docs/MULTI_INTERVAL_CAPTURE.md and docs/BUILD_VALIDATION.md. At 0.5.4, source-leased same-input C++/GPU Trace collection is implemented for qualified source counts one/three; four final-build actual MCP jobs pass with 353 schema-valid results and two restarts per source. Per-phase trigger/settings/hash checks, partial failure evidence and shared owned cleanup remain explicit. I-062–I-065 retain parser, termination, harness and C++ entry failures; see docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md. All 38 final CPU checks pass in 382.75 seconds; complete/pinned bundle-d95a9298e94a1dfc4b1e598bc2445d3f retains 2302 verified payloads and 15 native pins, with imported verification passing. At 0.5.5, capture_draw_timings validates a complete one/three-interval group, follows primary submitted call/marker paths and returns bounded raw replay times only for unique one-call ranges. It preserves source/trace hashes and generated-C++ selections; original numeric capture IDs, original live cost and physical counters remain unavailable. All 40 CPU checks pass in 413.34 seconds; 58 actual schema-valid results, 14 expected refusals, five stdio/HTTP starts and 704 unchanged native payloads verify 36 three-interval plus 12 single-interval associations against fixture API witnesses and raw tables. Complete/pinned bundle-975763dfe5b2d8a5bbc97f0219e6ccec retains all 483 new verified payloads and eight compressed executable identities; its imported verifier passes against the already pinned 0.5.4 input snapshot. I-067–I-073 retain reader and check-setup failures. Independent per-draw timestamps, new-input qualification and the complete source-edit/rebuild/recapture acceptance remain unfinished; R-025 stays In Progress.
-```
-
-## Pending
-
 ### R-024
 
 ```text
-Status: Pending
+Status: In Progress
 Area: inspection/capture/mcp/test
 Title: Expose proven descriptor contents and execution-time values
 Goal: Establish which descriptor resources and typed uniform/material values a selected captured draw actually used.
@@ -208,6 +194,8 @@ Scope: Qualify a documented selected-event evidence path, resource/range/write l
 Acceptance: Independent fixture oracles verify descriptor contents, resource ranges and typed values at selected draw occurrences, including updates between draws. Fresh capture/rebuild/recapture, bounded MCP results, exact source/tool/reader identities and restart/pin checks pass. Unknown lifetime, shader selection or type evidence refuses rather than inferring a value; a limitation report alone does not complete the item.
 Notes: Priority 2, accepted by the owner on 2026-10-15. Follow-up to I-039 and the completed conditional R-021 assessment; see docs/DRAW_STATE_FEASIBILITY.md. Requires proven captured-event identity from R-025 or an independently qualified state interface before execution-time claims. The current five-file worker exception is unchanged; a wider proprietary helper closure still requires a separate owner decision. Missing documented evidence remains an explicit prerequisite, not a promised backend capability.
 ```
+
+## Pending
 
 ### R-026
 
@@ -226,6 +214,18 @@ Notes: Priority 4, accepted by the owner on 2026-10-15. Follow-up to I-045 and I
 
 ## Done
 
+### R-025
+
+```text
+Status: Done
+Area: profile/inspection/capture/mcp/test
+Title: Associate timings with captured draw occurrences
+Goal: Identify the draw, submission and occurrence to which a reported GPU timing belongs, including repeated markers and reused recordings.
+Scope: Qualify documented action/queue/submission/sample identities and any capture-to-profile correspondence, then add bounded correlation queries for demonstrated producer-specific scopes. Preserve the existing unique single-frame marker-range contract.
+Acceptance: Direct/indexed draws, nested/repeated and multi-draw markers, reused command buffers and multiple collected intervals have independent occurrence/timestamp validation. Results retain unambiguous original identities, units and source provenance through restart. Ambiguous or unsupported joins refuse; row order, equal counts and matching numeric IDs alone never establish correspondence. Actual new correlation is required for completion.
+Notes: Priority 3, accepted by the owner on 2026-10-15. Follow-up to I-043/I-039 and conditional R-022; supports R-024 and draw-level R-026. Completed at 0.5.6 on Nsight 2026.3.1.0/build 38722833, RTX 3080 Ti/615.71.09/KDE Wayland-Xwayland. The 0.5.3–0.5.5 foundations collect one/three saved intervals and qualify unique one-call original literal paths with generated-C++ submission selections; ambiguous/repeated/multi-draw paths refuse. New acceptance independently validates 294 application per-draw timestamps, 36 same-live-profile comparisons at 0–32 ns error under the predeclared tolerance, and 48 fresh direct/indexed/reused associations across three intervals. Scene-only controls yield two available/four unavailable draws. Actual fragment-source edit/build/recapture repairs 12,286 differing pixels to zero; exact captured shader bytes and all twelve associations pass before/after and through two restarts. All 40 CPU checks pass in 402.41 seconds; 1,327 actual schema-valid results pass. Complete/pinned bundle-168c040e6fa84e7efd645b16a5413735 retains 329 verified payloads, including a lossless 2,640-member snapshot of all 27 native pins; its imported portable verifier passes. Earlier qualification bundles remain pinned. Original numeric capture IDs, unannotated correspondence, original live cost and physical counters remain unavailable; saved replay timings are separate executions. See docs/DRAW_TIMING_VALIDATION.md, docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md. I-074/I-075 preserve runtime/desktop failures. No machine policy, wider helper closure or installed server/worker configuration changes.
+```
+
 ### R-027
 
 ```text
@@ -235,7 +235,7 @@ Title: Qualify standalone GPU replay
 Goal: Render retained captures reproducibly without launching the original application again.
 Scope: Isolate the initialization stalls in I-007/I-009/I-010/I-011 through matching documented replay tools and controlled environments; implement the demonstrated correction in the supervised replay path and retain explicit version support.
 Acceptance: Actual GPU replay completes for retained correct/faulty captures and demonstrates repeatable rendered output at equivalent inputs. Each advertised release has its own matching-tool pass; metadata-export success cannot substitute for GPU replay. Failure, deadline, cancellation and shutdown checks confirm bounded owned-process cleanup. Exact capture/tool/GPU/driver/desktop identities, logs, comparisons and persistent evidence pins are retained; an initialization-timeout report alone does not complete the item.
-Notes: Priority 5, accepted by the owner on 2026-10-15. Completed at 0.5.2 on the measured matching 2026.3.1.0/build 38722833 desktop path with explicit matching-driver library/ICD selection; the historical stall causes are not retroactively established and 2026.2 GPU replay remains unqualified. The new replay tool shares stdio/HTTP, the GPU coordinator, source leases/snapshots, typed completions and failure publication. All 37 serial CPU checks pass (381.19 seconds). Three actual MCP replay jobs pass; execution-phase cancellation, deadline and EOF shutdown each confirm cleanup. All 515 actual results validate against advertised schemas; source hashes and two restarts preserve reports/pins. Earlier 0.5.1 output probes independently establish exact fixture frame-1 healthy/repeated/faulty pixels and a no-blit negative control, distinct from the source's embedded frame-2 screenshot (I-050/I-051); no generic frame/event/timing inference is made. Final complete/pinned bundle-1c59130aafc0cb1a946cd9e0c4da869c retains all 741 verified payloads, nine independently pinned native bundles and the earlier probe evidence. The installed importer remains 0.4.1; the tested binary/source is 0.5.2. See docs/REPLAY.md and docs/BUILD_VALIDATION.md; I-047/I-048/I-052 retain development corrections. R-024–R-026 remain Pending and need actual documented evidence improvements.
+Notes: Priority 5, accepted by the owner on 2026-10-15. Completed at 0.5.2 on the measured matching 2026.3.1.0/build 38722833 desktop path with explicit matching-driver library/ICD selection; the historical stall causes are not retroactively established and 2026.2 GPU replay remains unqualified. The new replay tool shares stdio/HTTP, the GPU coordinator, source leases/snapshots, typed completions and failure publication. All 37 serial CPU checks pass (381.19 seconds). Three actual MCP replay jobs pass; execution-phase cancellation, deadline and EOF shutdown each confirm cleanup. All 515 actual results validate against advertised schemas; source hashes and two restarts preserve reports/pins. Earlier 0.5.1 output probes independently establish exact fixture frame-1 healthy/repeated/faulty pixels and a no-blit negative control, distinct from the source's embedded frame-2 screenshot (I-050/I-051); no generic frame/event/timing inference is made. Final complete/pinned bundle-1c59130aafc0cb1a946cd9e0c4da869c retains all 741 verified payloads, nine independently pinned native bundles and the earlier probe evidence. The installed importer remains 0.4.1; the tested binary/source is 0.5.2. See docs/REPLAY.md and docs/BUILD_VALIDATION.md; I-047/I-048/I-052 retain development corrections. At that 0.5.2 milestone R-024–R-026 were Pending; their current status is recorded above.
 ```
 
 ### R-023

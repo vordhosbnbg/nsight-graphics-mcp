@@ -76,7 +76,7 @@ restore fresh Graphics Capture reliability; expose proven descriptor contents/
 execution-time values; associate timings with draw occurrences; qualify counter
 meaning/application attribution; qualify standalone GPU replay. Implementation
 of all five is authorized. **R-023 completes at 0.5.1** and **R-027 at 0.5.2**;
-**R-025 is In Progress; R-024 and R-026 remain Pending**. Follow docs/ROADMAP.md for evidence dependencies
+**R-025 completes at 0.5.6; R-024 is In Progress and R-026 remains Pending**. Follow docs/ROADMAP.md for evidence dependencies
 and acceptance. R-024–R-026 require documented evidence before any
 new execution-time or physical attribution capability can be claimed.
 
@@ -103,16 +103,32 @@ See docs/REPLAY.md and docs/BUILD_VALIDATION.md. New 2026.2 replay support,
 general pixel/frame/event correspondence and timing accuracy are not claimed.
 No machine setting or installed server/worker is changed.
 
+The **0.5.6 R-025 completion** qualifies original literal-path/source-call
+association with independent per-draw timestamps and an actual shader repair.
+The surface stays **32 tools**. All **40 CPU checks** pass in **402.41 seconds**;
+**1,327** actual schemas, **294** application per-draw checks, **36** same-live
+comparisons (0–32 ns error), **48** new saved-call associations and ambiguity
+refusals pass. Actual source edit/build/recapture changes **12,286** differing
+pixels to **zero**; all twelve associations and exact captured shader bytes
+survive two restarts. Complete/pinned
+**bundle-168c040e6fa84e7efd645b16a5413735** retains **329** verified payloads,
+including a lossless **2,640-member** snapshot with all **27 native pins**;
+its imported portable verifier passes. See docs/DRAW_TIMING_VALIDATION.md.
+Original numeric capture IDs, original live cost and physical counter meanings
+remain unavailable. R-024 is next; R-026 remains Pending. I-074/I-075 retain
+runtime/desktop failures; a fresh process-local matching runtime replaces a
+deleted overlay without changing the installed driver, permissions or clocks.
+The installed 0.4.1 server and exact five-file 0.4.2 worker stay unchanged.
+The following slice records retain their historical scope and build identities.
+
 The **0.5.3 R-025 foundation** adds bounded consecutive Graphics Capture intervals
 through core/MCP/CLI and preserves raw plural range metadata. Defaults remain one;
 counts above one are qualified only on matching 2026.3. All **37 final CPU checks**,
 serial MCP/CLI exact image checks, replay and **154** actual schemas/restarts pass.
 All **2,082** payloads and **21** native pins verify in complete/pinned
 **bundle-487017236ba14e318c20a04bbc66dd5a**. See docs/MULTI_INTERVAL_CAPTURE.md.
-Private same-input replay profiling/literal-label probes are promising, but no
-public draw timing correlation query or independent per-draw timestamp acceptance
-exists yet. R-025 stays In Progress; R-024 and R-026 remain Pending. The surface
-stays 30 tools; installed configuration, helper closure and machine policies are
+At this 0.5.3 milestone, public draw association and independent per-draw
+timestamps were still unfinished; the surface then had 30 tools; installed configuration, helper closure and machine policies are
 unchanged. I-053–I-061 preserve failures and corrected serial qualification.
 
 The **0.5.5 R-025 association slice** brings the shared surface to **32 tools**.
@@ -122,9 +138,8 @@ All **40 CPU checks** pass in **413.34 seconds**. Offline retained-data qualific
 passes **58** actual schemas and **14** refusals across three stdio/two HTTP starts,
 with **48** API-witness/raw-table matches and **704** unchanged native payloads.
 Original numeric capture IDs, live cost and physical counter meaning remain
-unavailable. Independent per-draw timestamps, new-input qualification and the
-full repair workflow remain unfinished; **R-025 stays In Progress**, R-024/R-026
-Pending. See docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md. I-067–I-073
+unavailable. At this 0.5.5 milestone, independent per-draw timestamps, new-input
+qualification and the full repair workflow were still unfinished. See docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md. I-067–I-073
 retain the reader and check-setup failures. Complete/pinned
 **bundle-975763dfe5b2d8a5bbc97f0219e6ccec** retains **483** verified payloads;
 its imported verifier also checks the already pinned 0.5.4 input snapshot.
