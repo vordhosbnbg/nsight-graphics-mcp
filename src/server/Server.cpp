@@ -101,7 +101,9 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
              "establish observed GPU event state or descriptor/material contents. Push coverage tracks partial writes "
              "and compatible layouts; explicit read_push_constants resolves opaque input bytes through the matching "
              "configured reader, with retained provenance and bounded shared deadline. No shader-type reflection is "
-             "inferred."}}},
+             "inferred. Recorded descriptor-set identities and ordered dynamic offsets require qualified allocations, "
+             "layouts and compatible binds; write contents, effective buffer addresses and shader access remain "
+             "unavailable."}}},
           {"resource_bytes",
            {{"available", storage && (!options.resource_workers.nsight_2026_3.empty() ||
                                       !options.resource_workers.nsight_2026_2.empty())},

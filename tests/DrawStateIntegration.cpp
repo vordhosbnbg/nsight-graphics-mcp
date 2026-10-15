@@ -85,9 +85,9 @@ void inspect_retained(const fs::path& run) {
         require(draw.at("function") ==
                     "VulkanReplay_" + submitted->at("draw").at("command").get<std::string>().substr(2),
                 "indexed/direct API draw command");
-        require(state.at("shaders").at("value").size() == 2 && state.at("descriptors").at("status") == "unavailable" &&
+        require(state.at("shaders").at("value").size() == 2 &&
                     state.at("uniform_material_values").at("status") == "unavailable",
-                "two module identities and explicit remaining scope");
+                "two module identities and explicit execution-value limitation");
     }
     results["status"] = "pass";
     save(run / "recorded-state.json", results);
@@ -418,9 +418,15 @@ void verify_push_mcp(const fs::path& server, const fs::path& worker, const fs::p
 }
 } // namespace
 
+#include "DescriptorStateIntegration.hpp"
+
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     return ngm::check::run([&] {
+        if(argc == 4 && std::string_view(argv[1]) == "--verify-descriptors") {
+            verify_descriptors_mcp(fs::canonical(argv[2]), fs::canonical(argv[3]));
+            return;
+        }
         if(argc == 3 && std::string_view(argv[1]) == "--inspect-retained") {
             inspect_retained(fs::canonical(argv[2]));
             return;
@@ -434,8 +440,9 @@ int main(int argc, char** argv) {
             return;
         }
         const bool constants = argc == 7 && std::string_view(argv[6]) == "--constants";
-        require(argc == 6 || constants,
-                "FIXTURE SHADERS NSIGHT_ROOT OUTPUT_ROOT LAUNCH_ENVIRONMENT_JSON [--constants] required");
+        const bool descriptors = argc == 7 && std::string_view(argv[6]) == "--descriptors";
+        require(argc == 6 || constants || descriptors,
+                "FIXTURE SHADERS NSIGHT_ROOT OUTPUT_ROOT LAUNCH_ENVIRONMENT_JSON [--constants|--descriptors] required");
         const auto fixture = fs::canonical(argv[1]), shaders = fs::canonical(argv[2]);
         const auto nsight = fs::canonical(argv[3]), output = fs::absolute(argv[4]);
         const auto overlay = load(fs::canonical(argv[5])).get<ngm::LaunchEnvironment>();
@@ -465,8 +472,9 @@ int main(int argc, char** argv) {
         ngm::CaptureService service(options);
         try {
             const std::vector<const char*> scenarios =
-                constants ? std::vector<const char*>{"state-constants", "state-constants-reuse"}
-                          : std::vector<const char*>{"state-static", "state-dynamic", "state-indexed", "state-count"};
+                descriptors ? std::vector<const char*>{"state-descriptors", "state-descriptors-reuse"}
+                : constants ? std::vector<const char*>{"state-constants", "state-constants-reuse"}
+                            : std::vector<const char*>{"state-static", "state-dynamic", "state-indexed", "state-count"};
             for(const auto* scenario : scenarios) {
                 const auto directory = run / scenario;
                 fs::create_directory(directory);

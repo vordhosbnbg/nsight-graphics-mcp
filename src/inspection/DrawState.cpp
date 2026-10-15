@@ -1,5 +1,6 @@
 #include "ngm/DrawState.hpp"
 #include "CppReplay.hpp"
+#include "DescriptorState.hpp"
 #include "PushState.hpp"
 #include "ReplayValues.hpp"
 #include "ngm/Inspection.hpp"
@@ -297,6 +298,7 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) 
     std::map<std::string, DynamicArray> arrays;
     std::set<std::uint64_t> events;
     PushState push;
+    DescriptorState descriptors;
     for(std::size_t at = 0; at < calls.size(); ++at) {
         const auto& c = calls[at];
         const auto& a = c.arguments;
@@ -375,6 +377,7 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) 
         }
         if(name == "VulkanReplay_CmdBindDescriptorSets") {
             arity(8);
+            descriptors.record(replay, c, recording.values);
             continue;
         }
         if(name == "VulkanReplay_CmdPushConstants") {
@@ -491,9 +494,11 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) 
                     value = unavailable("bound pipeline and active render pass differ; compatibility unqualified",
                                         "unsupported");
             }
-            for(const auto* key : {"descriptors", "uniform_material_values"})
-                state[key] = unavailable(
-                    "descriptor/layout/write lifetime and execution-value correspondence are not yet qualified");
+            state["uniform_material_values"] = unavailable(
+                "descriptor/layout/write lifetime and execution-value correspondence are not yet qualified");
+            state["descriptors"] =
+                current ? descriptors.at_draw(replay, current->identity.at("value").at("layout").get<std::string>())
+                        : unavailable("bound pipeline/layout unavailable");
             state["push_constants"] =
                 current ? push.at_draw(replay, current->identity.at("value").at("layout").get<std::string>())
                         : unavailable("bound pipeline/layout unavailable");

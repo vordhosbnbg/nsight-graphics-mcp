@@ -15,6 +15,13 @@ matching configured reader. `pin` requires the read option and protects its
 separate byte artifacts. No shader-type or post-GPU material interpretation is
 implied. This uses the same 28-tool surface and recorded-state profile v2.
 
+At **0.4.7**, `capture_draw_state` also returns qualified recorded descriptor
+set/allocation/layout identities and ordered dynamic-offset mappings. Its result
+profile becomes v3; source fingerprints from 0.4.5 remain eligible. Per-set
+coverage distinguishes compatible binds, missing state and disturbance. This
+requires no resource worker or derived byte artifacts; descriptor contents, effective buffer addresses and
+shader array access remain unavailable. The surface still has 28 tools.
+
 The visual release completes at **0.3.0**, preserving the 22-tool surface qualified
 at 0.2.12. [INSTALL.md](INSTALL.md) provides the exercised source-build and repair
 walkthrough; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates acceptance scope.

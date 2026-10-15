@@ -738,7 +738,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
     const auto& fields = state_value.at("execution").at("state");
     require(fields.at("depth_compare").at("value") == "VK_COMPARE_OP_LESS" &&
                 fields.at("cull_mode").at("value") == "VK_CULL_MODE_NONE" &&
-                fields.at("descriptors").at("status") == "unavailable",
+                fields.at("descriptors").at("status") == "unsupported",
             "dynamic state and explicit remaining coverage through MCP");
     require(fields.at("shaders").at("value")[0].at("serialized_byte_read").at("resource_ref").is_string(),
             "state shader links to existing opaque reader reference");
@@ -751,6 +751,22 @@ void workflow_check(const std::string& server, const std::string& standin, const
         call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}, {"pin", true}}),
         "pin requires read_push_constants");
     auto push_arguments = cpp_arguments;
+    auto descriptor_arguments = cpp_arguments;
+    descriptor_arguments["arguments"].push_back("--descriptor-cpp");
+    const auto descriptor_capture = successful_call(client, "capture_cpp", descriptor_arguments);
+    require(await_job(client, descriptor_capture["identity"]["job_id"])["state"] == "succeeded",
+            "synthetic descriptor capture");
+    const auto descriptor_id = descriptor_capture.at("artifact_id");
+    const auto descriptor_listing = successful_call(client, "capture_draw_executions", {{"capture_id", descriptor_id}});
+    require(descriptor_listing.at("executions_total") == 1, "typed descriptor selection");
+    const auto descriptor_ref = descriptor_listing.at("executions")[0].at("execution_ref");
+    const auto descriptor_value = successful_call(client, "capture_draw_state",
+                                                  {{"capture_id", descriptor_id}, {"execution_ref", descriptor_ref}});
+    const auto& descriptor_field = descriptor_value.at("execution").at("state").at("descriptors");
+    require(descriptor_field.at("status") == "qualified_recorded_state" && descriptor_field.at("value").size() == 3 &&
+                descriptor_field.at("value")[2].at("dynamic_offsets")[2].at("offset") == 290 &&
+                descriptor_field.at("coverage").at("contents").at("status") == "unavailable",
+            "typed recorded identities and offset mapping keep descriptor contents unavailable");
     push_arguments["arguments"].push_back("--push-cpp");
     const auto push_capture = successful_call(client, "capture_cpp", push_arguments);
     require(await_job(client, push_capture["identity"]["job_id"])["state"] == "succeeded", "synthetic push capture");
@@ -1096,6 +1112,8 @@ int target_main(int argc, char** argv) {
             // Selects only the stand-in's synthetic source fixture.
         } else if(argument == "--push-cpp") {
             // Selects only the stand-in's synthetic partial-constant fixture.
+        } else if(argument == "--descriptor-cpp") {
+            // Selects only the stand-in's synthetic descriptor fixture.
         } else {
             return 83;
         }

@@ -9,6 +9,15 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.7 descriptor slice remains a pure generated-source interpreter. It
+normalizes literal set definitions, joins explicit allocations, applies prefix/
+push-range compatibility and disturbance, and maps dynamic offsets by set,
+binding and array element. It shares qualified push-range identities with the
+existing tracker and adds no dependency or helper source. A separate C++ fixture
+oracle checks actual API inputs and exported debug-name/layout associations;
+those private expectations never enter product results. Descriptor contents,
+typed values and GPU execution correspondence remain feasibility work.
+
 The 0.4.6 push-constant slice adds a separate pure byte-write tracker and shares
 the bounded replay-value grammar with the raster interpreter. Pipeline-layout
 push ranges establish compatibility; opaque payloads use the unchanged confined

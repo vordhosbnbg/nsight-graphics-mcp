@@ -7,9 +7,14 @@ This is the first state slice of R-021; the broader effective-state objective
 remains open. Existing `capture_cpp_draws` retains its source-relationship contract.
 
 At **0.4.6**, the same tools add per-stage push-constant coverage and explicit
-opaque-byte reads. The recorded-state result profile is now `recorded-state-v2`;
+opaque-byte reads. That increment uses result profile `recorded-state-v2`;
 the artifact/index and input-fingerprint schemas remain version 1. Captures with
 0.4.5 capture-time fingerprints remain eligible. The tool count stays 28.
+
+At **0.4.7**, `capture_draw_state` also interprets recorded descriptor-set
+identities and dynamic offsets. The result profile becomes `recorded-state-v3`;
+artifact/index/input schemas and the 28-tool surface stay unchanged. Descriptor
+contents, shader array access and execution-time buffer values remain unavailable.
 
 ## Select and inspect
 
@@ -49,6 +54,7 @@ source references. The response's `input_files` supply their capture-time hashes
 | `viewports` | Arrays of `[x,y,width,height,minDepth,maxDepth]`. |
 | `scissors` | Arrays of `[x,y,width,height]`. |
 | `push_constants` | Layout-compatible per-stage writes and, when explicitly requested, reconstructed opaque bytes. |
+| `descriptors` | Compatible recorded set/allocation/layout identities and dynamic-offset mapping to binding/array element. Descriptor contents remain unavailable. |
 
 Available fields use `qualified_recorded_state`. Missing dynamic writes use
 `unavailable`; unqualified creation/lifetime forms use `unsupported`. The
@@ -106,6 +112,44 @@ the hash of the complete input payload from that read, even when a segment uses
 only part of it. These are recorded API input bytes. Shader usage, types, material
 meaning and captured GPU execution are not inferred. Descriptors and host/GPU-
 updated uniform buffers remain separate evidence problems.
+
+## Descriptor bindings and offsets
+
+Descriptor queries use the same listed execution reference and require no reader
+or extra option. The interpreter follows the [Khronos layout compatibility and
+descriptor binding rules](https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html).
+Compatibility compares normalized set definitions for the entire prefix through
+the selected set, plus identical push ranges. Disturbed slots retain the
+disturbing layout and cannot revive when a pipeline is rebound. Graphics and
+compute descriptor bind points have independent state.
+
+`descriptors.value` lists known set symbols, their allocation and binding layouts,
+and `dynamic_offsets` entries with `binding`, `array_element`, `offset` and
+`source_index`. Offsets follow set number, binding number and array-element order,
+regardless of declaration order. They are the recorded uint32 relative offsets;
+buffer base offsets, effective addresses, alignment and range validity are not
+established by this field.
+
+`coverage.sets` preserves per-set definitions, status, source evidence and known
+offsets. `bindings_complete` covers every layout-declared set, including unused
+sets; shader usage is not reflected. If a nonempty declared set lacks a compatible
+bind, the aggregate value is null and its status is `unavailable`, while known
+rows remain inspectable. This does not by itself establish whether the draw was
+valid. A pipeline layout declaring no sets is `not_applicable`.
+
+This slice accepts literal core set layouts with zero flags, no extension chain
+and no immutable samplers, plus explicit allocations and `CmdBindDescriptorSets`.
+Limits are eight sets, 64 bindings/256 descriptor elements per set, 64 elements
+per binding and 64 dynamic offsets per bind. Unknown relevant bind forms,
+allocation ambiguity, mismatched layouts and missing/extra offsets refuse
+descriptor coverage. Update-after-bind, variable counts, descriptor buffers,
+push descriptors and immutable sampler equivalence are unqualified.
+
+`coverage.contents` and `uniform_material_values` remain unavailable. Source
+binding identities do not establish descriptor writes/copies, the selected
+array element, live resource contents or types. Serialized descriptor hydration
+is outside the existing five-file reader closure; this slice adds no proprietary
+helper source or opaque-structure decoder.
 
 ## Grammar, refusals and bounds
 
@@ -188,10 +232,10 @@ server and checks stable fields/references/pins. `--inspect-retained RUN` runs
 only the pure witness comparison. Private `--state-witness` fixture output stays
 outside captured application evidence and never becomes a general product API.
 
-`descriptors` and `uniform_material_values` remain unavailable.
+Descriptor contents and `uniform_material_values` remain unavailable.
 Serialized initial resources cannot prove host/GPU-updated contents at a selected
-execution or actual bindless element access. Descriptor compatibility/write
-history, typed layouts and captured-execution
+execution or actual bindless element access. Descriptor write/copy history,
+typed resource values and captured-execution
 correspondence remain R-021 follow-up. No wider proprietary hydration closure is
 introduced. New state support on Nsight 2026.2 is unqualified and its state query
 refuses explicitly; historical two-release capabilities retain their original
@@ -209,3 +253,26 @@ pagination, identity, shader and restart/pin validation. Its 41 actual results
 pass their advertised JSON schemas. See BUILD_VALIDATION.md for retained evidence.
 The fixture's complete shader inventory is now 13 files, including the diagnostic
 push-consuming `state-constants.frag`.
+
+At 0.4.7, `state-descriptors` and `state-descriptors-reuse` each record five
+labelled draws with dynamic uniform/storage offsets, a descriptor array, a partial
+set rebind, identical layout definitions, disturbance and restoration. The second
+case submits the recording twice. Both fresh matching 2026.3 captures and normal
+baselines pass. The C++ verifier checks all 15 occurrences against private actual
+API inputs and independently audited exported names/layout associations. It also
+checks paging, unchanged artifact bytes, source pins and exact restart stability.
+All 46 state responses (110 tool results including storage checks) pass advertised
+JSON schemas. A partial descriptor-array update stays a private witness; product
+descriptor contents remain unavailable.
+
+Use the existing capture command with final argument `--descriptors`, followed by:
+
+```sh
+build/linux-gcc-debug/tests/ngm_draw_state_integration --verify-descriptors \
+  /absolute/nsight-graphics-mcp /absolute/returned/draw-state-run
+```
+
+The runner retains the private witness and an independent literal export audit;
+the product never consumes those expected values. See BUILD_VALIDATION.md for
+source identities and pinned qualification. R-021 remains In Progress for the
+contents/value and captured-execution feasibility outcome; R-022 stays Pending.

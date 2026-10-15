@@ -50,7 +50,6 @@ inline std::vector<ReplayValue> array(const ReplayValue& reference, const Replay
     if(reference.constructor == "NV_TO_ARRAY")
         result = reference.arguments;
     else if(reference.constructor == "NV_TO_STACK_PTR") {
-        require(reference.arguments.size() == 1, "invalid stack pointer helper");
         result = reference.arguments;
     } else if(reference.constructor == type)
         result = {reference};

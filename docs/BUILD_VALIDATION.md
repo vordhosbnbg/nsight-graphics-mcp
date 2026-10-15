@@ -1650,3 +1650,96 @@ seconds after query entry; existing source parsing bounds and owned-process
 cleanup remain separate. Missing, incompatible or unread bytes never become
 zero-filled values. Descriptor/offset/value assessment, new 2026.2 state support
 and R-022 timing/counters remain outside this completed increment.
+
+## 0.4.7 recorded descriptor bindings and offsets, 2026-10-15
+
+This R-021 increment adds compatible descriptor-set/allocation/layout identities
+and dynamic-offset mappings to `capture_draw_state`. The shared tool count stays
+**28**, the recorded-state result profile becomes **v3**, and artifact/index/input
+schemas remain version 1. It accepts existing 0.4.5 capture-time fingerprints.
+Descriptor contents, effective buffer addresses, shader array access, material
+types and GPU execution correspondence remain unavailable.
+
+Source is based on **224f0e1**, with the 0.4.7 changes recorded dirty. The tested
+host uses GCC **16.2.1** Debug, CMake **4.4.4**, Ninja **1.13.2**, Linux
+**7.2.7-zen1-1-zen**, RTX **3080 Ti**, driver **615.71.09**, Vulkan **1.4.351**,
+KDE Wayland and the fixture's XCB/Xwayland path (`DISPLAY=:1`). Matching Nsight
+**2026.3.1.0/build 38722833** performs documented Generate C++ Capture. The existing
+explicit per-job library/ICD overlay is retained. No dependency, shader inventory,
+proprietary helper closure or machine setting changes; descriptor queries need
+no resource worker.
+
+Validation commands:
+
+```sh
+cmake --preset linux-gcc-debug
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+cmake --build --preset linux-gcc-debug --target ngm_draw_state_integration
+build/linux-gcc-debug/tests/ngm_draw_state_integration \
+  /absolute/ngm-vulkan-fixture /absolute/shaders/fixture /absolute/Nsight-2026.3 \
+  /absolute/output-parent /absolute/launch-environment.json --descriptors
+build/linux-gcc-debug/tests/ngm_draw_state_integration --verify-descriptors \
+  /absolute/nsight-graphics-mcp /absolute/returned/draw-state-run
+```
+
+The fresh native capture runner uses seed **42**, **192×128**, application final
+frame **20** and C++ `wait_frames=2`. Both ordinary launches and both fresh
+captures succeed, with cleanup confirmed and GPU reservations released. Each
+recording has five labelled draws; the reuse case submits it twice with a fence
+wait and no rerecording. This is command-buffer reuse within a fresh target.
+
+External source store:
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/draw-state-pC6JVF/store`.
+
+| Case | Independently pinned source |
+| --- | --- |
+| state-descriptors | `bundle-160c221f248ae3873459eb60055300b0` |
+| state-descriptors-reuse | `bundle-f20b57b94ec9606cec85662623ab880e` |
+
+The private API witness retains actual set definitions, allocations, pipeline
+layouts, bind argument arrays, successful submission occurrences and a partial
+descriptor-array update. An independent literal export audit associates fixture
+debug names with source symbols and pipeline layout inputs. Native handles are
+not joined to source symbols by numeric equality. The product never consumes
+this private witness or audit.
+
+Dynamic offsets deliberately differ by set/binding/array element and layout
+declarations are out of binding-number order. Compatible partial rebinding
+preserves the other set. A changed set-zero definition disturbs the higher set;
+restoring the pipeline alone cannot revive it. The fixture shader uses only set
+zero, so draws with disturbed unused set one remain valid. Product coverage
+reports every declared set and does not infer shader usage or descriptor contents.
+
+The final serial aggregate passes **35/35 CPU checks without skips in 329.37
+seconds**, including `ngm_descriptor_state_check`, existing draw/push/source/read
+checks and actual stdio/HTTP process boundaries. The first full run caught an
+unaccepted descriptor flag in the fake test target; the corrected focused MCP
+check and final full run pass. Initial/focused/final logs are retained separately.
+Formatting and whitespace checks pass. No failed Nsight collection or extraction
+attempt occurs in this increment.
+
+The final C++ MCP verifier compares every available raster field, shader-stage/
+entry/module-size declaration, descriptor definition, allocation/bind identity
+and dynamic offset against the private API inputs for **15** recorded draw
+occurrences. The expected disturbed sets stay unavailable. It checks distinct
+references, exact selection, paging, unchanged completed artifact bytes, source
+pins and identical results after a fresh server process. All **46** state
+responses (**16** pages and **30** selections across both passes) pass their
+advertised JSON schemas. Including storage checks, all **110** tool results pass.
+These queries extract no serialized resources and create no read artifacts;
+capture-input fingerprint verification still reads the retained files.
+
+The consolidated qualification is pinned centrally as
+**bundle-b59b7343be911eec0e49b85ffe5767ef**, reported as **4,331,358 bytes / 46
+files**. It contains the final capture/query reports, transcript, source audit,
+schema results, initial/focused/final CPU logs, exact commands, code diff and a
+hash-verified **28-file** first-party source snapshot. Native source captures
+remain independently pinned in the external store above. The generic importer's
+metadata records the connected installed **0.4.1** server; the payload explicitly
+binds the tested **0.4.7** server, fixture and harness hashes. The import is not a
+service capture, and no installed/live-server upgrade is implied.
+
+R-021 remains In Progress for the descriptor contents/value and general
+captured-execution feasibility outcome. R-022 timing/counters stays Pending.
+New state support on 2026.2 remains unqualified. No broader state or value
+availability follows from this recorded binding capability.

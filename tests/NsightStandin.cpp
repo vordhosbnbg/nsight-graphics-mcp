@@ -1,4 +1,5 @@
 #include "CppEvidenceFixture.hpp"
+#include "DescriptorStateFixture.hpp"
 #include "DrawStateFixture.hpp"
 #include "PushStateFixture.hpp"
 #include <chrono>
@@ -293,12 +294,15 @@ int main(int argc, char** argv) {
             std::filesystem::path(value(arguments, "--output-dir")) / "CppCaptures/cpu-synthetic-project";
         std::filesystem::create_directories(project);
         const bool push_case = value(arguments, "--args").find("--push-cpp") != std::string::npos;
-        const bool state_case = push_case || value(arguments, "--args").find("--state-cpp") != std::string::npos;
+        const bool descriptor_case = value(arguments, "--args").find("--descriptor-cpp") != std::string::npos;
+        const bool state_case =
+            descriptor_case || push_case || value(arguments, "--args").find("--state-cpp") != std::string::npos;
         struct Source {
             std::string path, text;
         };
-        const auto state_sources =
-            push_case ? ngm::check::push::sources<Source>() : ngm::check::state::sources<Source>(true);
+        const auto state_sources = descriptor_case ? ngm::check::descriptor::sources<Source>()
+                                   : push_case     ? ngm::check::push::sources<Source>()
+                                                   : ngm::check::state::sources<Source>(true);
         for(const auto* file : {"CommandLists.h",        "ReplayProcedures.h",
                                 "FrameReset00.cpp",      "ReplayProcedures.cpp",
                                 "PerfMarkersReset.cpp",  "PerfMarkersSetup.cpp",

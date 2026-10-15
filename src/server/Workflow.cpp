@@ -335,6 +335,64 @@ Schema push_state_schema() {
          {"read_artifacts", array_schema(string_schema(39, 39), 8)}},
         {"status", "value", "reason", "evidence"});
 }
+Schema descriptor_state_schema() {
+    const auto span = resource_span_schema();
+    const auto evidence = object_schema({{"path", string_schema(512, 1)},
+                                         {"start_line", integer_schema(1, 4194304)},
+                                         {"end_line", integer_schema(1, 4194304)},
+                                         {"event_index", integer_schema()},
+                                         {"source", span}});
+    const auto offset = object_schema({{"binding", integer_schema(0, 4294967295ull)},
+                                       {"array_element", integer_schema(0, 63)},
+                                       {"offset", integer_schema(0, 4294967295ull)},
+                                       {"source_index", integer_schema(0, 63)}},
+                                      {"binding", "array_element", "offset", "source_index"});
+    const auto binding = object_schema({{"binding", integer_schema(0, 4294967295ull)},
+                                        {"descriptor_type", string_schema(64, 1)},
+                                        {"descriptor_count", integer_schema(1, 64)},
+                                        {"stage_mask", integer_schema(0, 2147483647)}},
+                                       {"binding", "descriptor_type", "descriptor_count", "stage_mask"});
+    const auto value =
+        object_schema({{"set", integer_schema(0, 7)},
+                       {"descriptor_set", string_schema(64, 1)},
+                       {"allocated_set_layout", string_schema(64, 1)},
+                       {"binding_layout", string_schema(64, 1)},
+                       {"dynamic_offsets", array_schema(offset, 64)}},
+                      {"set", "descriptor_set", "allocated_set_layout", "binding_layout", "dynamic_offsets"});
+    const auto status = Schema{{"type", "string"},
+                               {"enum", {"qualified_recorded_state", "unavailable", "unsupported", "not_applicable"}}};
+    const auto row =
+        object_schema({{"set", integer_schema(0, 7)},
+                       {"pipeline_set_layout", string_schema(64, 1)},
+                       {"layout_signature", string_schema(64, 64)},
+                       {"bindings", array_schema(binding, 64)},
+                       {"descriptor_set", nullable(string_schema(64, 1))},
+                       {"allocated_set_layout", nullable(string_schema(64, 1))},
+                       {"binding_layout", nullable(string_schema(64, 1))},
+                       {"dynamic_offsets", array_schema(offset, 64)},
+                       {"status", status},
+                       {"reason", nullable(string_schema(256, 1))},
+                       {"evidence", array_schema(evidence, 4)}},
+                      {"set", "pipeline_set_layout", "layout_signature", "bindings", "descriptor_set",
+                       "allocated_set_layout", "binding_layout", "dynamic_offsets", "status", "reason", "evidence"});
+    const auto contents = object_schema({{"status", {{"type", "string"}, {"enum", {"unavailable"}}}},
+                                         {"value", {{"type", "null"}}},
+                                         {"reason", string_schema(256, 1)},
+                                         {"evidence", array_schema(span, 0)}},
+                                        {"status", "value", "reason", "evidence"});
+    const auto coverage = object_schema({{"layout", string_schema(64, 1)},
+                                         {"bindings_complete", boolean_schema()},
+                                         {"sets", array_schema(row, 8)},
+                                         {"contents", contents},
+                                         {"shader_access", string_schema(160, 1)}},
+                                        {"layout", "bindings_complete", "sets", "contents", "shader_access"});
+    return object_schema({{"status", status},
+                          {"value", nullable(array_schema(value, 8))},
+                          {"reason", nullable(string_schema(256, 1))},
+                          {"evidence", array_schema(span, 1)},
+                          {"coverage", coverage}},
+                         {"status", "value", "reason", "evidence"});
+}
 Schema draw_execution_schema(bool include_state) {
     const auto span = resource_span_schema();
     const auto selection = object_schema({{"frame", integer_schema(0, 0)},
@@ -409,8 +467,8 @@ Schema draw_execution_schema(bool include_state) {
                                             {"evidence", array_schema(evidence, 0)}},
                                            {"status", "value", "reason", "evidence"});
         properties["push_constants"] = push_state_schema();
-        for(const auto* key : {"descriptors", "uniform_material_values"})
-            properties[key] = missing;
+        properties["descriptors"] = descriptor_state_schema();
+        properties["uniform_material_values"] = missing;
         Json required = Json::array();
         for(const auto& [key, unused] : properties.items()) {
             (void)unused;

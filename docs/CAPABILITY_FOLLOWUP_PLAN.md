@@ -21,6 +21,14 @@ explicit existing-reader calls, including partial writes and compatible layout
 rebindings. Descriptor contents, uniform/material interpretation and general
 captured-execution correspondence remain unqualified; R-021 remains In Progress.
 
+At **0.4.7**, step D adds recorded descriptor-set/allocation/layout identities,
+prefix/push-range compatibility, disturbance and dynamic-offset mappings. Two
+fresh matching 2026.3 captures cover partial set rebinding, descriptor arrays and
+reused command buffers; 15 occurrences pass private API comparisons and exact
+MCP restart checks. Descriptor contents, uniform/material values and general
+captured-execution correspondence still need their feasibility outcome. This
+does not extend the proprietary helper closure or complete R-021/R-022.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

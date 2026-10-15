@@ -4,6 +4,7 @@ function(ngm_add_inspection)
         "${PROJECT_SOURCE_DIR}/src/inspection/CppEvidence.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/DrawState.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/PushState.cpp"
+        "${PROJECT_SOURCE_DIR}/src/inspection/DescriptorState.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ResourceRead.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ProfileInspection.cpp")
     target_link_libraries(ngm_inspection PUBLIC ngm_artifacts ngm_nsight)
@@ -11,6 +12,7 @@ function(ngm_add_inspection)
 endfunction()
 
 function(ngm_add_inspection_checks)
+    ngm_add_check(ngm_descriptor_state_check SOURCES "${PROJECT_SOURCE_DIR}/tests/DescriptorStateCheck.cpp" LIBRARIES ngm_inspection)
     ngm_add_check(ngm_push_state_check SOURCES "${PROJECT_SOURCE_DIR}/tests/PushStateCheck.cpp" LIBRARIES ngm_inspection)
     target_include_directories(ngm_push_state_check PRIVATE "${PROJECT_SOURCE_DIR}/src/inspection")
     ngm_add_check(ngm_draw_state_check SOURCES "${PROJECT_SOURCE_DIR}/tests/DrawStateCheck.cpp" LIBRARIES ngm_inspection)

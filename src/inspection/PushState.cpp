@@ -87,6 +87,9 @@ Json missing(const std::string& reason, const char* status = "unavailable") {
     return {{"status", status}, {"value", nullptr}, {"reason", reason}, {"evidence", Json::array()}};
 }
 } // namespace
+std::string push_layout_signature(const CppReplay& replay, const std::string& name) {
+    return layout(replay, name).signature;
+}
 PushState::PushState() {
     for(auto& stage : bytes_)
         stage.fill(-1);

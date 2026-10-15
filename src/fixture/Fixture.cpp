@@ -31,7 +31,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 25> scenarios{"reference",
+constexpr std::array<std::string_view, 27> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -55,7 +55,9 @@ constexpr std::array<std::string_view, 25> scenarios{"reference",
                                                      "state-indexed",
                                                      "state-count",
                                                      "state-constants",
-                                                     "state-constants-reuse"};
+                                                     "state-constants-reuse",
+                                                     "state-descriptors",
+                                                     "state-descriptors-reuse"};
 constexpr std::array<std::string_view, 13> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
@@ -79,6 +81,7 @@ struct Workload {
     bool indexed = false;
     bool dynamic_count = false;
     bool constants = false;
+    bool descriptor_state = false;
     bool reuse_commands = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
@@ -96,7 +99,8 @@ Workload workload(std::string_view scenario) {
     result.indexed = scenario == "state-indexed";
     result.dynamic_count = scenario == "state-count";
     result.constants = scenario.starts_with("state-constants");
-    result.reuse_commands = scenario == "state-constants-reuse";
+    result.descriptor_state = scenario.starts_with("state-descriptors");
+    result.reuse_commands = scenario == "state-constants-reuse" || scenario == "state-descriptors-reuse";
     result.channel_order = scenario == "pass-output-error" || scenario == "combined-pass-error" ? 1u : 0u;
     result.resource_xor = scenario == "resource-selection-error" || scenario == "combined-resource-error" ? 1u : 0u;
     result.instance_count =
@@ -121,8 +125,11 @@ Json workload_metadata(std::string_view scenario) {
         {"dynamic_raster_depth_state", selected.dynamic_state},
         {"dynamic_viewport_scissor_count", selected.dynamic_count},
         {"partial_push_constants", selected.constants},
+        {"descriptor_state_validation", selected.descriptor_state},
         {"submissions_per_frame", selected.reuse_commands ? 2 : 1},
-        {"draws_per_submission", selected.constants ? 3 : 1},
+        {"draws_per_submission", selected.constants          ? 3
+                                 : selected.descriptor_state ? 5
+                                                             : 1},
         {"render_pass_count", selected.multipass ? 2 : 1},
         {"minimum_api_version", "1.3.0"},
         {"required_device_extensions", {"VK_KHR_swapchain"}},
@@ -456,6 +463,8 @@ public:
                                                              {"command_buffer_count", 1},
                                                              {"submission_occurrence", occurrence},
                                                              {"constant_draws", constant_draws_},
+                                                             {"descriptor_binds", descriptor_binds_},
+                                                             {"descriptor_draws", descriptor_draws_},
                                                              {"draw", draw_witness_}});
                     write_json(options_.state_witness, state_witness_);
                 }
@@ -1164,6 +1173,10 @@ private:
         }
         create_buffer(readback_, static_cast<VkDeviceSize>(extent_.width) * extent_.height * 4,
                       VK_BUFFER_USAGE_TRANSFER_DST_BIT, "fixture.application_readback");
+        if(workload_.descriptor_state) {
+            create_descriptor_fixture();
+            return;
+        }
         const auto palette_usage =
             workload_.bindless ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         create_buffer(palettes_[0], sizeof(float) * 4, palette_usage, "fixture.palette.primary");
@@ -1268,6 +1281,101 @@ private:
         return shader;
     }
 
+    void create_descriptor_fixture() {
+        const auto& limits = properties_.limits;
+        if(limits.maxBoundDescriptorSets < 2 || limits.maxDescriptorSetUniformBuffersDynamic < 6 ||
+           limits.maxDescriptorSetStorageBuffersDynamic < 2)
+            throw Unsupported(
+                "descriptor-state fixture requires two sets, six dynamic uniform and two dynamic storage descriptors");
+        descriptor_stride_ = std::max(
+            {VkDeviceSize{16}, limits.minUniformBufferOffsetAlignment, limits.minStorageBufferOffsetAlignment});
+        if(descriptor_stride_ > 1024U * 1024U)
+            throw Unsupported("descriptor-state alignment exceeds fixture bounds");
+        for(std::size_t i = 0; i < palettes_.size(); ++i)
+            create_buffer(palettes_[i], descriptor_stride_ * 16,
+                          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                          "fixture.descriptor.palette." + std::to_string(i));
+        std::array<VkDescriptorSetLayoutBinding, 3> bindings{
+            {{9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+             {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+             {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}}};
+        const std::array layouts{&descriptor_layout_, &compatible_descriptor_layout_, &incompatible_descriptor_layout_};
+        for(std::size_t n = 0; n < layouts.size(); ++n) {
+            if(n == 2)
+                bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            auto info = vk_struct<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+            info.bindingCount = static_cast<std::uint32_t>(bindings.size());
+            info.pBindings = bindings.data();
+            check(vkCreateDescriptorSetLayout(device_, &info, nullptr, layouts[n]), "creating descriptor-state layout");
+            if(!options_.state_witness.empty()) {
+                Json entries = Json::array();
+                for(const auto& b : bindings)
+                    entries.push_back({{"binding", b.binding},
+                                       {"descriptor_type", b.descriptorType},
+                                       {"descriptor_count", b.descriptorCount},
+                                       {"stage_mask", b.stageFlags}});
+                state_witness_["descriptor_layouts"].push_back(
+                    {{"handle", handle_bits(*layouts[n])}, {"bindings", entries}});
+            }
+            name(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, *layouts[n], "fixture.descriptors.layout." + std::to_string(n));
+        }
+        const std::array<VkDescriptorPoolSize, 2> sizes{
+            {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 12}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4}}};
+        auto pool = vk_struct<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
+        pool.maxSets = 4;
+        pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
+        pool.pPoolSizes = sizes.data();
+        check(vkCreateDescriptorPool(device_, &pool, nullptr, &descriptor_pool_), "creating descriptor-state pool");
+        const std::array set_layouts{descriptor_layout_, descriptor_layout_, compatible_descriptor_layout_,
+                                     incompatible_descriptor_layout_};
+        auto allocation = vk_struct<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
+        allocation.descriptorPool = descriptor_pool_;
+        allocation.descriptorSetCount = static_cast<std::uint32_t>(set_layouts.size());
+        allocation.pSetLayouts = set_layouts.data();
+        check(vkAllocateDescriptorSets(device_, &allocation, state_descriptors_.data()),
+              "allocating descriptor-state sets");
+        for(std::size_t n = 0; n < state_descriptors_.size(); ++n) {
+            const VkDescriptorBufferInfo buffer{palettes_[n % 2].handle, 0, sizeof(float) * 4};
+            const std::array infos{buffer, buffer};
+            std::array<VkWriteDescriptorSet, 3> writes{};
+            const std::array<std::uint32_t, 3> binding_numbers{0, 2, 9};
+            for(std::size_t i = 0; i < writes.size(); ++i) {
+                writes[i] = vk_struct<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+                writes[i].dstSet = state_descriptors_[n];
+                writes[i].dstBinding = binding_numbers[i];
+                writes[i].descriptorCount = i == 1 ? 2u : 1u;
+                writes[i].descriptorType =
+                    i == 2 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+                writes[i].pBufferInfo = infos.data();
+            }
+            vkUpdateDescriptorSets(device_, static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
+            if(!options_.state_witness.empty())
+                state_witness_["descriptor_allocations"].push_back({{"handle", handle_bits(state_descriptors_[n])},
+                                                                    {"layout_handle", handle_bits(set_layouts[n])},
+                                                                    {"buffer_handle", handle_bits(buffer.buffer)}});
+            name(VK_OBJECT_TYPE_DESCRIPTOR_SET, state_descriptors_[n], "fixture.descriptors.set." + std::to_string(n));
+        }
+        // Change just array element one. It is retained as private API evidence;
+        // the product must continue to report descriptor contents unavailable.
+        const VkDescriptorBufferInfo replacement{palettes_[1].handle, 0, sizeof(float) * 4};
+        auto partial = vk_struct<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+        partial.dstSet = state_descriptors_[0];
+        partial.dstBinding = 2;
+        partial.dstArrayElement = 1;
+        partial.descriptorCount = 1;
+        partial.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        partial.pBufferInfo = &replacement;
+        vkUpdateDescriptorSets(device_, 1, &partial, 0, nullptr);
+        if(!options_.state_witness.empty()) {
+            state_witness_["partial_descriptor_update"] = {{"set_handle", handle_bits(partial.dstSet)},
+                                                           {"binding", partial.dstBinding},
+                                                           {"array_element", partial.dstArrayElement},
+                                                           {"descriptor_count", partial.descriptorCount},
+                                                           {"buffer_handle", handle_bits(replacement.buffer)}};
+            state_witness_["descriptor_stride"] = descriptor_stride_;
+        }
+    }
+
     void make_pipeline(const std::string& vertex_file, const std::string& fragment_file,
                        VkDescriptorSetLayout descriptor_layout, std::uint32_t push_size, VkRenderPass render_pass,
                        VkPipelineLayout& pipeline_layout, VkPipeline& pipeline, const std::string& label) {
@@ -1281,8 +1389,11 @@ private:
         stages[1].module = load_shader(fragment_file);
         stages[1].pName = "main";
         auto layout = vk_struct<VkPipelineLayoutCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
-        layout.setLayoutCount = 1;
-        layout.pSetLayouts = &descriptor_layout;
+        const std::array state_layouts{descriptor_layout, descriptor_layout == incompatible_descriptor_layout_
+                                                              ? descriptor_layout_
+                                                              : descriptor_layout};
+        layout.setLayoutCount = workload_.descriptor_state ? 2u : 1u;
+        layout.pSetLayouts = workload_.descriptor_state ? state_layouts.data() : &descriptor_layout;
         const VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, push_size};
         if(push_size != 0) {
             layout.pushConstantRangeCount = 1;
@@ -1323,7 +1434,7 @@ private:
         auto depth = vk_struct<VkPipelineDepthStencilStateCreateInfo>(
             VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
         depth.depthTestEnable = depth.depthWriteEnable = workload_.dynamic_state ? VK_FALSE : VK_TRUE;
-        if(workload_.constants)
+        if(workload_.constants || workload_.descriptor_state)
             depth.depthWriteEnable = VK_FALSE;
         depth.depthCompareOp = workload_.dynamic_state ? VK_COMPARE_OP_GREATER : VK_COMPARE_OP_LESS;
         depth.maxDepthBounds = 1;
@@ -1383,6 +1494,9 @@ private:
                 {"dynamic_states", workload_.dynamic_state ? Json(dynamic_states) : Json::array()}};
             inputs["push_size"] = push_size;
             inputs["label"] = label;
+            inputs["descriptor_set_layouts"] = Json::array();
+            for(std::uint32_t n = 0; n < layout.setLayoutCount; ++n)
+                inputs["descriptor_set_layouts"].push_back(handle_bits(layout.pSetLayouts[n]));
             auto& witness_stages = inputs["stages"] = Json::array();
             for(const auto& stage : stages) {
                 auto module = shader_witness_.at(std::to_string(handle_bits(stage.module)));
@@ -1415,6 +1529,12 @@ private:
                           compatible_layout_, compatible_pipeline_, "fixture.constants.compatible");
             make_pipeline("scene.vert.spv", "state-constants.frag.spv", descriptor_layout_, 32, render_pass_,
                           incompatible_layout_, incompatible_pipeline_, "fixture.constants.incompatible");
+        }
+        if(workload_.descriptor_state) {
+            make_pipeline("scene.vert.spv", "scene.frag.spv", compatible_descriptor_layout_, 0, render_pass_,
+                          compatible_layout_, compatible_pipeline_, "fixture.descriptors.compatible");
+            make_pipeline("scene.vert.spv", "scene.frag.spv", incompatible_descriptor_layout_, 0, render_pass_,
+                          incompatible_layout_, incompatible_pipeline_, "fixture.descriptors.incompatible");
         }
         if(workload_.multipass) {
             make_pipeline("post.vert.spv", "post.frag.spv", post_descriptor_layout_, 4, render_pass_,
@@ -1456,7 +1576,9 @@ private:
         const std::array<float, 4> secondary{primary[2] * 0.25f, primary[0], primary[1] * 0.5f, 1.0f};
         const std::array values{primary, secondary};
         for(std::size_t i = 0; i < palettes_.size(); ++i) {
-            std::memcpy(palettes_[i].mapped, values[i].data(), sizeof(values[i]));
+            for(std::size_t n = 0; n < (workload_.descriptor_state ? 16u : 1u); ++n)
+                std::memcpy(static_cast<std::byte*>(palettes_[i].mapped) + n * descriptor_stride_, values[i].data(),
+                            sizeof(values[i]));
             flush_buffer(palettes_[i], "flushing palette memory");
         }
     }
@@ -1484,6 +1606,7 @@ private:
         begin.flags = workload_.reuse_commands ? VkCommandBufferUsageFlags{0}
                                                : VkCommandBufferUsageFlags{VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
         constant_draws_ = Json::array();
+        descriptor_binds_ = descriptor_draws_ = Json::array();
         check(vkBeginCommandBuffer(command_, &begin), "beginning frame commands");
         begin_label("frame." + std::to_string(frame));
         if(workload_.multipass) {
@@ -1555,14 +1678,17 @@ private:
                 {"scissor", {scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height}}};
         }
         const auto descriptor = descriptors_[options_.scenario == "binding-error" ? 1 : 0];
-        vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor, 0,
-                                nullptr);
+        if(!workload_.descriptor_state)
+            vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor, 0,
+                                    nullptr);
         if(workload_.bindless) {
             const std::array<std::uint32_t, 2> selection{workload_.resource_xor, (options_.seed ^ frame) & 1u};
             vkCmdPushConstants(command_, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                static_cast<std::uint32_t>(sizeof(selection)), selection.data());
         }
-        if(workload_.constants) {
+        if(workload_.descriptor_state) {
+            record_descriptors();
+        } else if(workload_.constants) {
             record_constants();
         } else if(workload_.indirect) {
             vkCmdDrawIndirect(command_, indirect_.handle, 0, 1, sizeof(VkDrawIndirectCommand));
@@ -1638,6 +1764,68 @@ private:
                              &barrier);
         end_label();
         check(vkEndCommandBuffer(command_), "ending frame commands");
+    }
+
+    void record_descriptors() {
+        const auto bind = [&](VkPipelineLayout layout, std::uint32_t first, std::vector<unsigned> indices,
+                              std::vector<unsigned> slots) {
+            std::vector<VkDescriptorSet> sets;
+            std::vector<std::uint32_t> offsets;
+            for(const auto index : indices)
+                sets.push_back(state_descriptors_.at(index));
+            for(const auto slot : slots)
+                offsets.push_back(static_cast<std::uint32_t>(slot * descriptor_stride_));
+            vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, first,
+                                    static_cast<std::uint32_t>(sets.size()), sets.data(),
+                                    static_cast<std::uint32_t>(offsets.size()), offsets.data());
+            Json handles = Json::array();
+            for(const auto set : sets)
+                handles.push_back(handle_bits(set));
+            descriptor_binds_.push_back({{"layout_handle", handle_bits(layout)},
+                                         {"first_set", first},
+                                         {"descriptor_handles", handles},
+                                         {"dynamic_offsets", offsets}});
+        };
+        const auto observe = [&](const char* label, VkPipeline pipeline, VkPipelineLayout layout,
+                                 std::array<int, 2> bind_indices) {
+            begin_label(label);
+            vkCmdDraw(command_, 3, 1, 0, 0);
+            Json expected = Json::array();
+            for(std::size_t n = 0; n < bind_indices.size(); ++n) {
+                Json item{{"set", n}, {"available", bind_indices[n] >= 0}};
+                if(bind_indices[n] >= 0) {
+                    const auto& actual = descriptor_binds_.at(static_cast<std::size_t>(bind_indices[n]));
+                    const auto index = n - actual.at("first_set").get<std::size_t>();
+                    Json offsets = Json::array();
+                    for(std::size_t i = 0; i < 4; ++i)
+                        offsets.push_back(actual.at("dynamic_offsets").at(index * 4 + i));
+                    item["descriptor_handle"] = actual.at("descriptor_handles").at(index);
+                    item["binding_layout_handle"] = actual.at("layout_handle");
+                    item["dynamic_offsets"] = offsets;
+                    item["bind_index"] = bind_indices[n];
+                }
+                expected.push_back(std::move(item));
+            }
+            descriptor_draws_.push_back({{"label", label},
+                                         {"pipeline_handle", handle_bits(pipeline)},
+                                         {"layout_handle", handle_bits(layout)},
+                                         {"expected_sets", expected}});
+            draw_witness_["bound_pipeline_handle"] = handle_bits(pipeline);
+            end_label();
+        };
+        bind(pipeline_layout_, 0, {0, 1}, {1, 2, 3, 4, 5, 6, 7, 8});
+        observe("descriptors.initial", pipeline_, pipeline_layout_, {0, 0});
+        bind(compatible_layout_, 1, {2}, {9, 10, 11, 12});
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, compatible_pipeline_);
+        observe("descriptors.partial", compatible_pipeline_, compatible_layout_, {0, 1});
+        bind(incompatible_layout_, 0, {3}, {2, 3, 4, 5});
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, incompatible_pipeline_);
+        observe("descriptors.disturbed", incompatible_pipeline_, incompatible_layout_, {2, -1});
+        bind(compatible_layout_, 0, {0}, {3, 4, 5, 6});
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, compatible_pipeline_);
+        observe("descriptors.prefix-restored", compatible_pipeline_, compatible_layout_, {3, -1});
+        bind(compatible_layout_, 1, {2}, {4, 5, 6, 7});
+        observe("descriptors.restored", compatible_pipeline_, compatible_layout_, {3, 4});
     }
 
     void record_constants() {
@@ -1772,6 +1960,10 @@ private:
             if(descriptor_layout_) {
                 vkDestroyDescriptorSetLayout(device_, descriptor_layout_, nullptr);
             }
+            if(compatible_descriptor_layout_)
+                vkDestroyDescriptorSetLayout(device_, compatible_descriptor_layout_, nullptr);
+            if(incompatible_descriptor_layout_)
+                vkDestroyDescriptorSetLayout(device_, incompatible_descriptor_layout_, nullptr);
             if(post_descriptor_layout_) {
                 vkDestroyDescriptorSetLayout(device_, post_descriptor_layout_, nullptr);
             }
@@ -1848,6 +2040,11 @@ private:
     Json draw_witness_;
     Json shader_witness_ = Json::object();
     Json constant_draws_ = Json::array();
+    Json descriptor_binds_ = Json::array(), descriptor_draws_ = Json::array();
+    VkDeviceSize descriptor_stride_ = 0;
+    VkDescriptorSetLayout compatible_descriptor_layout_ = VK_NULL_HANDLE,
+                          incompatible_descriptor_layout_ = VK_NULL_HANDLE;
+    std::array<VkDescriptorSet, 4> state_descriptors_{};
     xcb_connection_t* connection_ = nullptr;
     xcb_window_t window_ = XCB_WINDOW_NONE;
     VkInstance instance_ = VK_NULL_HANDLE;

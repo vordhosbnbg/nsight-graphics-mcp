@@ -232,7 +232,8 @@ int main(int argc, char** argv) {
         set_argument(invalid_scenario, "--scenario", "combined-unrecognized");
         require_failure(invalid_scenario, 2, "unknown scenario", false);
 
-        for(const auto* scenario : {"state-static", "state-dynamic", "state-indexed", "state-count"}) {
+        for(const auto* scenario : {"state-static", "state-dynamic", "state-indexed", "state-count", "state-constants",
+                                    "state-constants-reuse", "state-descriptors", "state-descriptors-reuse"}) {
             auto selected = make_case(executable, scratch.path, std::string("state input ") + scenario);
             copy_bundle(built_shaders, selected.shaders);
             set_argument(selected, "--scenario", scenario);

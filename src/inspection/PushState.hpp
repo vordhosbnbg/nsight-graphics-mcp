@@ -4,6 +4,8 @@
 #include <array>
 
 namespace ngm::detail {
+// Canonical qualified push-range identity used by descriptor layout compatibility.
+std::string push_layout_signature(const CppReplay& replay, const std::string& layout);
 class PushState {
 public:
     PushState();

@@ -71,6 +71,20 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-021's descriptor binding/offset slice completes at **0.4.7**, retaining **28
+tools**. `capture_draw_state` joins literal allocations/layouts, applies prefix
+and push-range compatibility/disturbance, and maps dynamic offsets by set,
+binding and array element. Descriptor contents, shader access and execution-time
+values remain unavailable. All **35 CPU checks** pass. Two fresh matching 2026.3
+captures cover partial rebinding, array offsets, disturbance/restoration and
+repeated submissions; the private C++ oracle checks 15 recorded occurrences and
+MCP restart stability. All **46** state responses pass advertised schemas.
+Qualification is pinned as `bundle-b59b7343be911eec0e49b85ffe5767ef`.
+See DRAW_STATE.md and BUILD_VALIDATION.md for the precise
+qualification and pinned evidence. R-021 remains In Progress for contents/value
+and captured-execution feasibility; R-022 stays Pending. The proprietary helper
+closure and machine settings are unchanged.
+
 R-021's push-constant slice completes at **0.4.6**, retaining the **28-tool**
 surface. `capture_draw_state` tracks per-stage partial writes and push-layout
 compatibility. Its explicit `read_push_constants` option resolves bounded opaque

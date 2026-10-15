@@ -226,6 +226,12 @@ Call call(const Document& d, std::size_t at) {
 // These are the value/cast helpers observed in qualified recording/creation
 // blocks. This is deliberately a generated-source grammar, not a C++ evaluator.
 const std::set<std::string_view> value_types{"uint32_t",
+                                             "uint64_t",
+                                             "VkDescriptorSet",
+                                             "VkDescriptorSetAllocateInfo",
+                                             "VkDescriptorSetLayoutBinding",
+                                             "VkDescriptorSetLayoutCreateInfo",
+                                             "VkDescriptorSetLayoutCreateFlags",
                                              "VkPipelineLayoutCreateInfo",
                                              "VkPipelineLayoutCreateFlags",
                                              "VkPushConstantRange",
@@ -431,6 +437,7 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                                              "NV_MESSAGE_VERBOSE",
                                              "NV_TO_ARRAY",
                                              "NV_TO_OUTPUT_ARRAY",
+                                             "NV_TO_STACK_PTR",
                                              "NV_VK_REPLAY",
                                              "VK_MAKE_API_VERSION",
                                              "WindowSystemInstance",
@@ -611,10 +618,12 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
         creation |= v == "VulkanReplay_CreateGraphicsPipelines" || v == "VulkanReplay_CreateShaderModule";
         if(state)
             creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers" ||
-                        v == "VulkanReplay_CreatePipelineLayout";
+                        v == "VulkanReplay_CreatePipelineLayout" || v == "VulkanReplay_CreateDescriptorSetLayout" ||
+                        v == "VulkanReplay_AllocateDescriptorSets";
         relevant_handle |= v.starts_with("VkPipeline_uid_") || v.starts_with("VkShaderModule_uid_");
         if(state)
-            relevant_handle |= v.starts_with("VkCommandBuffer_uid_") || v.starts_with("VkPipelineLayout_uid_");
+            relevant_handle |= v.starts_with("VkCommandBuffer_uid_") || v.starts_with("VkPipelineLayout_uid_") ||
+                               v.starts_with("VkDescriptorSetLayout_uid_") || v.starts_with("VkDescriptorSet_uid_");
         if(i + 3 < end && t[i + 1].value == "(" && t[i + 2].value == "*" && t[i + 3].value == "reinterpret_cast") {
             const auto expression = d.expression(i + 1, t[i + 1].pair + 1);
             check(expression == "( * reinterpret_cast < xcb_connection_t * * > ( WindowSystemInstance ( ) . "
@@ -635,7 +644,10 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
     }
     if(creation) {
         const auto parsed = body(d, opening, false);
-        check(parsed.calls.size() == 1, "creation sibling must have one direct replay call");
+        check(parsed.calls.size() == 1 || (state && parsed.calls.size() == 2 &&
+                                           parsed.calls.front().name == "VulkanReplay_AllocateDescriptorSets" &&
+                                           parsed.calls.back().name == "VulkanHelper_RegisterObject"),
+              "creation sibling must have one creation and an optional descriptor registration");
         return true;
     }
     return !relevant_handle;
@@ -651,32 +663,56 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
         const auto& t = d.tokens;
         std::map<std::size_t, bool> qualified_parents;
         for(std::size_t i = 0; i + 3 < t.size(); ++i) {
-            if(t[i].value != "NV_VK_REPLAY" || (t[i + 2].value != "VulkanReplay_CreateGraphicsPipelines" &&
-                                                t[i + 2].value != "VulkanReplay_CreateShaderModule" &&
-                                                !(state && (t[i + 2].value == "VulkanReplay_CreateRenderPass" ||
-                                                            t[i + 2].value == "VulkanReplay_AllocateCommandBuffers" ||
-                                                            t[i + 2].value == "VulkanReplay_CreatePipelineLayout"))))
+            if(t[i].value != "NV_VK_REPLAY" ||
+               (t[i + 2].value != "VulkanReplay_CreateGraphicsPipelines" &&
+                t[i + 2].value != "VulkanReplay_CreateShaderModule" &&
+                !(state && (t[i + 2].value == "VulkanReplay_CreateRenderPass" ||
+                            t[i + 2].value == "VulkanReplay_AllocateCommandBuffers" ||
+                            t[i + 2].value == "VulkanReplay_CreatePipelineLayout" ||
+                            t[i + 2].value == "VulkanReplay_CreateDescriptorSetLayout" ||
+                            t[i + 2].value == "VulkanReplay_AllocateDescriptorSets"))))
                 continue;
             std::string symbol;
+            std::vector<std::string> outputs;
             try {
                 auto invocation = call(d, i);
                 const bool pipeline = invocation.name == "VulkanReplay_CreateGraphicsPipelines";
-                const bool allocation = invocation.name == "VulkanReplay_AllocateCommandBuffers";
+                const bool descriptors = invocation.name == "VulkanReplay_AllocateDescriptorSets";
+                const bool allocation = invocation.name == "VulkanReplay_AllocateCommandBuffers" || descriptors;
                 check(invocation.args.size() == (pipeline ? 6 : allocation ? 3 : 4), "unsupported creation call arity");
                 auto output = expr(d, invocation.args.back());
-                if(pipeline || allocation) {
-                    const std::string prefix = "NV_TO_OUTPUT_ARRAY ( & ";
-                    check(output.starts_with(prefix) && output.ends_with(" )"), "unsupported pipeline output");
-                    output = output.substr(prefix.size(), output.size() - prefix.size() - 2);
+                if(descriptors) {
+                    const auto range = invocation.args.back();
+                    check(t[range.first].value == "NV_TO_OUTPUT_ARRAY" && t[range.first + 1].value == "(" &&
+                              t[range.first + 1].pair + 1 == range.second,
+                          "unsupported descriptor allocation output");
+                    for(const auto element : arguments(d, range.first + 1)) {
+                        const auto text = expr(d, element);
+                        check(text.starts_with("& ") && outputs.size() < 8,
+                              "descriptor allocation output exceeds bounds");
+                        outputs.push_back(uid(text.substr(2), "VkDescriptorSet_uid_"));
+                    }
+                    check(!outputs.empty(), "empty descriptor allocation output");
+                    symbol = outputs.front();
                 } else {
-                    check(output.starts_with("& "), "unsupported shader output");
-                    output = output.substr(2);
+                    if(pipeline || allocation) {
+                        const std::string prefix = "NV_TO_OUTPUT_ARRAY ( & ";
+                        check(output.starts_with(prefix) && output.ends_with(" )"), "unsupported pipeline output");
+                        output = output.substr(prefix.size(), output.size() - prefix.size() - 2);
+                    } else {
+                        check(output.starts_with("& "), "unsupported shader output");
+                        output = output.substr(2);
+                    }
+                    symbol =
+                        uid(output, pipeline                                                 ? "VkPipeline_uid_"
+                                    : allocation                                             ? "VkCommandBuffer_uid_"
+                                    : invocation.name == "VulkanReplay_CreateRenderPass"     ? "VkRenderPass_uid_"
+                                    : invocation.name == "VulkanReplay_CreatePipelineLayout" ? "VkPipelineLayout_uid_"
+                                    : invocation.name == "VulkanReplay_CreateDescriptorSetLayout"
+                                        ? "VkDescriptorSetLayout_uid_"
+                                        : "VkShaderModule_uid_");
+                    outputs.push_back(symbol);
                 }
-                symbol = uid(output, pipeline                                                 ? "VkPipeline_uid_"
-                                     : allocation                                             ? "VkCommandBuffer_uid_"
-                                     : invocation.name == "VulkanReplay_CreateRenderPass"     ? "VkRenderPass_uid_"
-                                     : invocation.name == "VulkanReplay_CreatePipelineLayout" ? "VkPipelineLayout_uid_"
-                                                                                              : "VkShaderModule_uid_");
                 const auto block = t[i].brace;
                 check(block != none && t[block].brace != none, "creation lacks object block");
                 const auto parent = t[block].brace;
@@ -711,16 +747,31 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                 }
                 check(qualified_parents.at(parent), "resource setup parent contains unsupported direct statements");
                 auto content = body(d, block, false);
-                check(content.calls.size() == 1, "ambiguous creation block");
+                check(!content.calls.empty() && content.calls.front().at == invocation.at,
+                      "creation must precede optional descriptor registration");
+                check(content.calls.size() == 1 || (descriptors && content.calls.size() == 2 && outputs.size() == 1 &&
+                                                    content.calls.back().name == "VulkanHelper_RegisterObject"),
+                      "ambiguous creation block");
+                if(content.calls.size() == 2) {
+                    const auto& registration = content.calls.back();
+                    check(registration.args.size() == 3 &&
+                              expr(d, registration.args[0]) == "VK_OBJECT_TYPE_DESCRIPTOR_SET" &&
+                              expr(d, registration.args[1]) == "uint64_t ( " + symbol + " )" &&
+                              integer(expr(d, registration.args[2])) == integer(symbol.substr(20)),
+                          "descriptor registration does not match its allocation");
+                }
                 check(!t[i].conditional, "conditional creation unsupported");
-                if(!result.emplace(symbol, Creation{&d, block, std::move(content), std::move(invocation)}).second)
-                    duplicates.insert(symbol);
+                for(const auto& name : outputs)
+                    if(!result.emplace(name, Creation{&d, block, content, invocation}).second)
+                        duplicates.insert(name);
             } catch(const Unsupported& e) {
                 budget.append(unsupported, {{"source", d.span(i, i)}, {"symbol", symbol}, {"reason", e.what()}});
                 if(symbol.empty())
                     unassignable_output = true;
                 if(!symbol.empty())
                     duplicates.insert(symbol);
+                for(const auto& name : outputs)
+                    duplicates.insert(name);
             }
         }
     }

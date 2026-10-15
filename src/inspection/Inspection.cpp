@@ -778,7 +778,7 @@ StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
 }
 Json state_base(const Capture& capture, const Json& parsed, Json identities) {
     auto result = cpp_base_result(capture);
-    result["schema_profile"] = std::string(capture.profile->name) + "-recorded-state-v2";
+    result["schema_profile"] = std::string(capture.profile->name) + "-recorded-state-v3";
     for(const auto* key : {"selection_domain", "evidence_origin", "captured_gpu_execution_correspondence",
                            "full_effective_state_coverage"})
         result[key] = parsed.at(key);
