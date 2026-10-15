@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         require(other.tool("capabilities")["server"]["protocol_version"] == "2025-11-25",
                 "independent protocol version B");
         require(!fs::exists(store), "discovery does not open store");
-        require(c.rpc("tools/list")["result"]["tools"].size() == 29, "same implemented tools");
+        require(c.rpc("tools/list")["result"]["tools"].size() == 30, "same implemented tools");
         bad = c.headers();
         bad.erase("Accept");
         bad.emplace("Accept", "application/json;q=1");
@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
             } catch(const fastmcpp::TransportHttpError& e) {
                 throw std::runtime_error(std::string(e.what()) + ": " + e.body());
             }
-            require(sdk.list_tools().size() == 29, "supported client tool discovery");
+            require(sdk.list_tools().size() == 30, "supported client tool discovery");
             // Preserve JSON Schema union types: the pinned client's optional
             // high-level result coercion assumes string-only schema types.
             const auto result = sdk.call("tools/call", {{"name", "capabilities"}, {"arguments", Json::object()}});
@@ -314,6 +314,20 @@ int main(int argc, char** argv) {
         require(invalid_overlay.at("result").at("isError") == true,
                 "HTTP rejects keys outside the shared launch allowlist");
         gone(scratch.path / "first.pid");
+        const auto replay = other.tool("replay", {{"capture_id", complete.at("artifact_id")},
+                                                  {"pin", true},
+                                                  {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}}});
+        const auto replay_job = await_job(other, replay.at("identity").at("job_id"));
+        require(replay_job.at("state") == "succeeded" && replay_job.at("cleanup_confirmed") == true,
+                "HTTP replay uses the shared supervised workflow");
+        const auto replay_report = Json::parse(
+            other.tool("artifact_read", {{"artifact_id", replay.at("artifact_id")}, {"path", "raw/report.json"}})
+                .at("text")
+                .get<std::string>());
+        require(replay_report.at("evidence_origin") == "nsight_gpu_replay" && replay_report.at("replayed") == true &&
+                    replay_report.at("source").at("capture_id") == complete.at("artifact_id") &&
+                    replay_report.at("environment").at("SDL_VIDEODRIVER") == "x11",
+                "HTTP retains replay source identity and launch overlay");
         auto waiting = capture(c, scratch.path / "wait.pid", true);
         wait_record(scratch.path / "wait.pid");
         c.remove();

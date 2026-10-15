@@ -4,6 +4,11 @@ The R-010/R-002/R-006/R-007/R-015/R-014 visual first-release group completes at
 **0.3.0**. The implementation evidence below is versioned through 0.2.12; 0.3.0
 records acceptance and delivery without changing capture/inspection behavior.
 
+The matrix below retains that visual-release qualification. **0.5.2** later
+qualifies standalone GPU replay on the measured matching **2026.3** path;
+[REPLAY.md](REPLAY.md) records its new jobs, independent output comparisons and
+explicit 2026.2 limitation. It does not retrospectively change the timeout runs.
+
 The first visual release covers source-available Vulkan diagnosis, an actual
 source/shader edit, rebuild, fresh capture and comparison through Codex's normal
 development tools and this server's local stdio MCP interface. It also supports

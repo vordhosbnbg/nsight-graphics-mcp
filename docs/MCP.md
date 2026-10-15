@@ -1,5 +1,11 @@
 # Local MCP server
 
+At **0.5.2**, `replay` brings the shared stdio/HTTP surface to **30 tools**.
+It submits finite GPU replay jobs for retained service Graphics Captures on the
+qualified matching 2026.3 producer, with source leases/snapshots and the existing
+capture/profile GPU queue. [REPLAY.md](REPLAY.md) defines limits, provenance,
+actual GPU checks and the separate rendered-output oracle.
+
 The **0.5.0** R-018–R-022 group completes with **29 tools**, final CPU and
 retained stdio/HTTP qualification. [CAPABILITY_FOLLOWUP_COMPLETION.md](CAPABILITY_FOLLOWUP_COMPLETION.md)
 records implemented capabilities and conditional unavailable outcomes. Recorded

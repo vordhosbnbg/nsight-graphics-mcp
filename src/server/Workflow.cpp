@@ -761,6 +761,7 @@ Json implemented_tool_names() {
     return Json::array({"capabilities",
                         "capture",
                         "capture_cpp",
+                        "replay",
                         "job_status",
                         "job_cancel",
                         "artifact_list",
@@ -1157,6 +1158,32 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .compare({args.at("baseline"), args.at("candidate"), args.at("table"), args.at("label"),
                           args.at("column_index"), args.at("workload_policy"), args.at("warmup_policy")});
         });
+
+    add_tool(tools, "replay",
+             object_schema({{"capture_id", string_schema(39, 39)},
+                            {"loop_count", integer_schema(1, 600)},
+                            {"timeout_ms", integer_schema(1, 600000)},
+                            {"pin", boolean_schema()},
+                            {"launch_environment", launch_environment_schema()}},
+                           {"capture_id"}),
+             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                           {"identity", "artifact_id"}),
+             "Submit a fresh finite GPU replay of a complete retained service Graphics Capture, serialized with "
+             "capture/profile jobs. Requires matching Nsight 2026.3.1.0/build 38722833 tools, a working desktop and "
+             "compatible driver. Defaults: loop_count 1, timeout 120000 ms, pin false. Source inputs are leased "
+             "while queued/running and snapshotted into the result bundle. Imports, C++ captures, profiles and "
+             "unsupported producers refuse. Poll job_status and inspect raw/report.json and logs. Completion "
+             "checks the tool's GPU initialization/execution report; pixel correctness, original frame/event "
+             "correspondence and replay timing accuracy require separate evidence.",
+             false, false, [this](const Json& arguments) {
+                 ReplayRequest request;
+                 request.capture_id = arguments.at("capture_id");
+                 request.loop_count = arguments.value("loop_count", std::uint64_t{1});
+                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+                 request.pin = arguments.value("pin", false);
+                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
+                 return Json(service().replay(std::move(request)));
+             });
 
     add_tool(tools, "capture",
              object_schema({{"executable", string_schema(4096, 1)},

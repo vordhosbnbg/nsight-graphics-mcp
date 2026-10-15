@@ -99,6 +99,16 @@ void snapshots(ngm::ArtifactStore& store, const fs::path& scratch) {
     rejected(
         [&] { store.snapshot_file(id, "raw/large", destination, "raw/input/data", 18U * 1024U * 1024U, deadline); });
     rejected([&] { store.snapshot_file(id, "raw/large", destination, "raw/small", 100, deadline); });
+    std::stop_source cancelled;
+    cancelled.request_stop();
+    rejected([&] {
+        store.snapshot_file(id, "raw/large", destination, "raw/cancelled", 1024U * 1024U * 1024U, deadline,
+                            cancelled.get_token());
+    });
+    require(!fs::exists(destination.raw_directory() / "cancelled"), "cancelled snapshot never opens its destination");
+    rejected([&] {
+        store.snapshot_file(id, "raw/empty", destination, "raw/over-limit", 1024U * 1024U * 1024U + 1U, deadline);
+    });
     rejected(
         [&] { store.snapshot_file(id, "raw/empty", destination, "raw/late", 100, std::chrono::steady_clock::now()); });
     rejected([&] { store.snapshot_file(id, "../raw/large", destination, "raw/escape", 100, deadline); });

@@ -55,6 +55,15 @@ struct CaptureSubmission {
     std::string artifact_id;
 };
 
+struct ReplayRequest {
+    // Complete service Graphics Capture bundle in the same artifact store.
+    std::string capture_id;
+    std::uint64_t loop_count = 1;
+    std::chrono::milliseconds timeout{120000};
+    bool pin = false;
+    LaunchEnvironment launch_environment;
+};
+
 // Composes the independently tested storage, coordinator, and documented CLI
 // adapter. All jobs use one local-GPU reservation. Construction claims the
 // artifact root; callers should construct lazily for discovery-only sessions.
@@ -66,6 +75,7 @@ public:
     CaptureService& operator=(const CaptureService&) = delete;
 
     CaptureSubmission capture(CaptureRequest request);
+    CaptureSubmission replay(ReplayRequest request);
     std::optional<JobSnapshot> status(const std::string& job_id) const;
     std::optional<JobSnapshot> wait(const std::string& job_id, std::chrono::milliseconds timeout) const;
     JobCancelResult cancel(const std::string& job_id);

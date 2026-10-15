@@ -2283,3 +2283,80 @@ One separately pinned private matching-tool replay succeeds as
 and execution-engine completion plus successful process exit. This is preliminary
 R-027 evidence; product replay integration and independent rendered-output/
 repeatability qualification remain In Progress. R-024–R-026 are still Pending.
+
+## 0.5.2 retained-capture GPU replay (R-027), 2026-10-15
+
+R-027 completes at **0.5.2** with **30 shared stdio/HTTP tools**. The typed
+`run_nsight_replay` backend, `CaptureService::replay` and MCP `replay` tool use
+finite matching-tool GPU execution, a source lease across queue/execution,
+cancellable immutable snapshots, fresh header validation and the shared
+capture/profile GPU reservation. A common finalizer retains typed worker outcomes,
+cleanup quarantine, failed evidence and quota/publication recovery. New Graphics
+Captures retain payload SHA-256; legacy inputs explicitly keep an unverified
+original-byte identity scope. [REPLAY.md](REPLAY.md) specifies limits and behavior.
+
+The serial GCC Debug command `cmake --build --preset linux-gcc-debug --target
+ngm_check_all -j 4` passes **37/37 CPU checks**, **381.19 seconds** elapsed in CTest.
+The new replay workflow passes in 9.97 seconds, including native-format/import/
+failed-result refusals, source mutation after queueing, wrong selected release,
+bounds, queued source retention after unpin, queued/active cancellation, deadlines,
+escaped child reaping, shared capture/profile serialization, service shutdown,
+persistent pins and actual stdio calls. Actual HTTP also submits/inspects replay.
+`ngm_resource_read_check` preserves narrower reader limits while checking the
+extended copier's cancellation and 1 GiB upper bound. The aggregate includes
+Nsight, ordinary capture, MCP/HTTP, dependency, linkage and install checks.
+Focused CPU checks previously passed; I-052 retains initial build/test corrections.
+
+Actual **0.5.2** collection uses the matching **2026.3.1.0/build 38722833** tools,
+RTX 3080 Ti / kernel driver **615.71.09**, KDE Wayland and XCB/Xwayland.
+The explicit process-local driver-library/ICD overlay is the previously validated
+matching selection; no machine setting changes. The original application is not
+launched by replay. The separately retained **0.5.1** source captures keep their
+original executable/shader/capture identities.
+
+| Source case | New native replay bundle | Actual result |
+| --- | --- | --- |
+| Reference `bundle-644cc39112ddd32696ce24823764ca97` | `bundle-96495afffde5b48b55f5c68d6500f68e` | Three loops, 3976 ms, success/cleanup |
+| Repeat `bundle-4163726d809bb9b09cc1758f7d0399d2` | `bundle-7d53c8a03e7981510d6720adecd9455d` | Three loops, 3907 ms, success/cleanup |
+| Fault `bundle-7b77529e3352f19296bd669906110bfa` | `bundle-03b3a8c85ca5e3f92654a96d168f8b2a` | Three loops, 3851 ms, success/cleanup |
+
+All input snapshots match observed source hashes; legacy sources have no
+capture-time payload hash and remain labelled accordingly. Two server restarts
+preserve reports/pins. **73** actual successful results validate against advertised
+schemas. An independent lifecycle run observes the execution-engine phase before
+cancellation, deadline and EOF shutdown; all three retain failed/pinned bundles
+with confirmed cleanup and released GPU ownership:
+`bundle-3380de532946d3654741e9d0cf24b99f`,
+`bundle-d3aa9d37d2b8ffe30d8c46e1d034b13d`, and
+`bundle-a94f31f4a748bee9c14f32695bdf0561`. Its **442** successful results validate
+against the same schemas, totaling **515**. These are intentional failure checks.
+
+Earlier **0.5.1** private probes supply the independent image evidence: three
+plain replays and four captures of replay pass; healthy/repeated/faulty output
+matches independent frame-1 application RGB8 pixels exactly. The embedded source
+image is a distinct frame-2 view; a no-blit control changes fresh output. I-050/
+I-051 retain the failed shell-launch verification and initial oracle mismatch.
+The pinned 340-payload probe snapshot remains
+**bundle-9592f2cd01c4623855009d7589ed37af**, with all eight probe attempts separately
+pinned. No generic application-frame mapping, executed event state or replay
+performance measurement is inferred. The older 2026.2 replay path remains
+unqualified and is refused by the new backend.
+
+Final qualification is complete/pinned
+**bundle-1c59130aafc0cb1a946cd9e0c4da869c**. All **741** source/imported payloads
+(**94,894,691 bytes** of payload) match SHA-256 and length, and the portable
+imported verifier passes all 515 schemas, six job bundles and independent image
+checks. It contains the full nine-bundle native store snapshot, original probe
+payloads, frozen tested server/source, request/response transcripts, CPU and ELF
+logs, and diagnostics. All nine native source/normal/cleanup bundles remain
+independently pinned. `artifact_info` confirms complete/pinned/not in use.
+Importer identity remains the installed **0.4.1**, separately recorded from the
+tested **0.5.2** binary.
+
+The final build and both collected server copies are byte-identical SHA-256
+`d1f7c3d7577047c00e5e9d2493d0d41a375b336142813cf20909beef19b9744e`.
+MCP and capture CLI ELF dependencies are limited to the documented system
+C/C++/math runtimes; vendored code remains static. No installed server/worker,
+proprietary helper closure, profiling access, driver, clock or desktop setting
+changes. **R-024–R-026 remain Pending** and require their actual documented
+state/correlation/counter evidence; R-027 completion does not satisfy them.

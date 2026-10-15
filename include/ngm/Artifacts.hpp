@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -175,7 +176,7 @@ public:
     // changes; the copied bytes, not a later reopening of the source, are evidence.
     ArtifactFile snapshot_file(const std::string& id, const std::string& relative_path, ArtifactWriter& destination,
                                const std::string& destination_path, std::size_t maximum_bytes,
-                               std::chrono::steady_clock::time_point deadline);
+                               std::chrono::steady_clock::time_point deadline, std::stop_token stop = {});
     ArtifactUsage usage() const;
     ArtifactPruneResult prune();
     // Copies a source directory below raw/imported without following links.

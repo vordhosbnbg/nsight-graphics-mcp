@@ -90,6 +90,15 @@ struct NsightExportOptions {
     std::size_t maximum_bytes = 64U * 1024U * 1024U;
 };
 
+struct NsightReplayOptions {
+    NsightRunContext context;
+    std::filesystem::path capture_file;
+    std::string capture_tool_version;
+    std::string capture_tool_build;
+    // Project bound for a finite owned invocation, not the CLI's maximum.
+    std::uint64_t loop_count = 1;
+};
+
 enum class NsightOutcome {
     Success,
     InvalidInput,
@@ -172,6 +181,12 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
 // not a claim that Nsight cannot represent other arguments.
 NsightOperationResult run_nsight_capture(const NsightInstallation& installation, const NsightCaptureOptions& options,
                                          std::stop_token stop = {});
+
+// Executes a fresh matching replayer, never a metadata-only export. Success is
+// qualified against retained 2026.3 initialization/completion markers and owned
+// cleanup. It does not assert pixel correctness, event state or timing units.
+NsightOperationResult run_nsight_replay(const NsightInstallation& installation, const NsightReplayOptions& options,
+                                        std::stop_token stop = {});
 
 // Each export uses a separate ngfx-replay process. Success requires exit zero,
 // confirmed cleanup, and a readable regular output within maximum_bytes. Raw

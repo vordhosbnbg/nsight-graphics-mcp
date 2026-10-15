@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**29 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**30 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 The [0.5.0 capability follow-up](docs/CAPABILITY_FOLLOWUP_COMPLETION.md) adds
 controlled launches, retained reader activation, bounded recorded draw state
@@ -19,6 +19,12 @@ The **0.5.1** capture fix prevents the qualified 2026.3 tool's low-space warning
 from blocking unattended jobs. Fresh reference/repeat/fault captures and exact
 readback comparisons pass; [validation details](docs/BUILD_VALIDATION.md#051-fresh-graphics-capture-reliability-r-023-2026-10-15)
 retain the tested environment and evidence.
+
+At **0.5.2**, [retained-capture GPU replay](docs/REPLAY.md) uses matching
+2026.3 tools without relaunching the original application. Source snapshots,
+shared GPU scheduling and cleanup are qualified separately from the fixture's
+independent replay-image comparisons. The older 2026.2 replay path remains
+unqualified.
 
 ## Example workflows
 

@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay is In Progress; R-024–R-026 remain Pending in their accepted priority order and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface remains 29 tools; installed server/worker configuration is unchanged.**
+Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay completes at 0.5.2 on its measured matching 2026.3 path; R-024–R-026 remain Pending in their accepted priority order and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface now has 30 tools; installed server/worker configuration is unchanged.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -183,19 +183,6 @@ Item conventions:
 
 ## In Progress
 
-### R-027
-
-```text
-Status: In Progress
-Area: replay/capture/platform/test
-Title: Qualify standalone GPU replay
-Goal: Render retained captures reproducibly without launching the original application again.
-Scope: Isolate the initialization stalls in I-007/I-009/I-010/I-011 through matching documented replay tools and controlled environments; implement the demonstrated correction in the supervised replay path and retain explicit version support.
-Acceptance: Actual GPU replay completes for retained correct/faulty captures and demonstrates repeatable rendered output at equivalent inputs. Each advertised release has its own matching-tool pass; metadata-export success cannot substitute for GPU replay. Failure, deadline, cancellation and shutdown checks confirm bounded owned-process cleanup. Exact capture/tool/GPU/driver/desktop identities, logs, comparisons and persistent evidence pins are retained; an initialization-timeout report alone does not complete the item.
-Notes: Priority 5, accepted by the owner on 2026-10-15. Both measured Nsight 2026.3 and 2026.2 replay paths stalled; serial initialization and nonblocking incompatibility controls did not resolve them. Recheck each available matching release and report unsupported/unavailable versions explicitly. Existing capture/export qualification stays separate; replay success does not itself establish new state exports or replay-based performance measurement. Use documented interfaces only and preserve the existing machine-setting policy. A private 0.5.1 C++ probe now completes one matching 2026.3 replay with explicit driver selection; native bundle-1ed49923b28aa4c6c8dff50ebf85d95d is complete/pinned in the isolated replay store. This is preliminary process/GPU evidence: product replay integration, repeatability and independent rendered-output qualification remain unfinished. I-047/I-048 preserve probe compilation/link corrections.
-```
-
-
 ## Pending
 
 ### R-024
@@ -238,6 +225,18 @@ Notes: Priority 4, accepted by the owner on 2026-10-15. Follow-up to I-045 and I
 ## Blocked
 
 ## Done
+
+### R-027
+
+```text
+Status: Done
+Area: replay/capture/platform/test
+Title: Qualify standalone GPU replay
+Goal: Render retained captures reproducibly without launching the original application again.
+Scope: Isolate the initialization stalls in I-007/I-009/I-010/I-011 through matching documented replay tools and controlled environments; implement the demonstrated correction in the supervised replay path and retain explicit version support.
+Acceptance: Actual GPU replay completes for retained correct/faulty captures and demonstrates repeatable rendered output at equivalent inputs. Each advertised release has its own matching-tool pass; metadata-export success cannot substitute for GPU replay. Failure, deadline, cancellation and shutdown checks confirm bounded owned-process cleanup. Exact capture/tool/GPU/driver/desktop identities, logs, comparisons and persistent evidence pins are retained; an initialization-timeout report alone does not complete the item.
+Notes: Priority 5, accepted by the owner on 2026-10-15. Completed at 0.5.2 on the measured matching 2026.3.1.0/build 38722833 desktop path with explicit matching-driver library/ICD selection; the historical stall causes are not retroactively established and 2026.2 GPU replay remains unqualified. The new replay tool shares stdio/HTTP, the GPU coordinator, source leases/snapshots, typed completions and failure publication. All 37 serial CPU checks pass (381.19 seconds). Three actual MCP replay jobs pass; execution-phase cancellation, deadline and EOF shutdown each confirm cleanup. All 515 actual results validate against advertised schemas; source hashes and two restarts preserve reports/pins. Earlier 0.5.1 output probes independently establish exact fixture frame-1 healthy/repeated/faulty pixels and a no-blit negative control, distinct from the source's embedded frame-2 screenshot (I-050/I-051); no generic frame/event/timing inference is made. Final complete/pinned bundle-1c59130aafc0cb1a946cd9e0c4da869c retains all 741 verified payloads, nine independently pinned native bundles and the earlier probe evidence. The installed importer remains 0.4.1; the tested binary/source is 0.5.2. See docs/REPLAY.md and docs/BUILD_VALIDATION.md; I-047/I-048/I-052 retain development corrections. R-024–R-026 remain Pending and need actual documented evidence improvements.
+```
 
 ### R-023
 

@@ -1413,12 +1413,15 @@ ArtifactUsage ArtifactStore::usage() const {
 }
 ArtifactFile ArtifactStore::snapshot_file(const std::string& id, const std::string& relative_path,
                                           ArtifactWriter& destination, const std::string& destination_path,
-                                          std::size_t maximum_bytes, std::chrono::steady_clock::time_point deadline) {
+                                          std::size_t maximum_bytes, std::chrono::steady_clock::time_point deadline,
+                                          std::stop_token stop) {
     check_relative(relative_path);
     check_relative(destination_path);
+    if(stop.stop_requested())
+        throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot cancelled");
     if(std::chrono::steady_clock::now() >= deadline)
         throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
-    if(maximum_bytes > 256U * 1024U * 1024U || destination.state_ != state_ || !destination.state_)
+    if(maximum_bytes > 1024U * 1024U * 1024U || destination.state_ != state_ || !destination.state_)
         throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Invalid snapshot writer or byte limit");
     auto protection = lease(id);
     std::uint64_t expected = 0;
@@ -1458,6 +1461,8 @@ ArtifactFile ArtifactStore::snapshot_file(const std::string& id, const std::stri
     std::array<char, 65536> buffer;
     std::uint64_t copied = 0;
     while(copied < expected) {
+        if(stop.stop_requested())
+            throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot cancelled");
         if(std::chrono::steady_clock::now() >= deadline)
             throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
         const auto count = ::read(from.get(), buffer.data(), std::min<std::uint64_t>(buffer.size(), expected - copied));
@@ -1481,6 +1486,8 @@ ArtifactFile ArtifactStore::snapshot_file(const std::string& id, const std::stri
     if(fchmod(to.get(), 0400) != 0 || fsync(to.get()) != 0)
         fail_errno("Finalize snapshot file");
     sync_directory(to_dir.get());
+    if(stop.stop_requested())
+        throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot cancelled");
     if(std::chrono::steady_clock::now() >= deadline)
         throw ArtifactError(ArtifactErrorCode::Busy, "Snapshot deadline exceeded");
     return {destination_path, copied};

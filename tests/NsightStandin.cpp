@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
         } else {
             std::cout << "NVIDIA Nsight Graphics Replayer CLI Tool\n--version --help";
             for(const auto* option : {"--metadata", "--metadata-functions", "--metadata-objects", "--metadata-logs",
-                                      "--metadata-screenshot"}) {
+                                      "--metadata-screenshot", "--loop-count", "--present-app", "--verbose"}) {
                 if(environment("NGM_OMIT_REPLAY_OPTION") != option) {
                     std::cout << ' ' << option;
                 }
@@ -207,6 +207,9 @@ int main(int argc, char** argv) {
        name == "ngfx-replay" && replay_mode != nullptr) {
         mode = replay_mode;
     }
+    if(name == "ngfx-replay" && !value(arguments, "--loop-count").empty() &&
+       !environment("NGM_STANDIN_BATCH_REPLAY_MODE").empty())
+        mode = environment("NGM_STANDIN_BATCH_REPLAY_MODE");
     if(is_cli && !environment("NGM_STANDIN_CPP_MODE").empty()) {
         mode = environment("NGM_STANDIN_CPP_MODE");
     }
@@ -435,6 +438,21 @@ int main(int argc, char** argv) {
                 stream << "CPU stand-in capture, not an Nsight capture\n";
             }
         }
+        return 0;
+    }
+    if(!is_cli && !capture && !value(arguments, "--loop-count").empty()) {
+        if(!has(arguments, "--present-app") || !has(arguments, "--verbose") || arguments.empty() ||
+           !std::filesystem::is_regular_file(arguments.back()))
+            return 81;
+        if(mode == "missing" || mode == "empty")
+            return 0;
+        if(mode == "metadata-only") {
+            std::cout << "{\"metadata_version\":1}\n";
+            return 0;
+        }
+        std::cout << "Initialization Complete:\n"
+                     "> Initializing Execution Engine ................ 100%\n"
+                     "Replay completed successfully\n";
         return 0;
     }
     if(mode == "missing" || mode == "empty") {

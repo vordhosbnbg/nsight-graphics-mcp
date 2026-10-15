@@ -257,8 +257,10 @@ the repository's deliberate faults remain present.
   coverage gaps. A configured worker path does not prove kernel confinement.
   [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) documents qualified byte semantics.
 - General after-event resource state, executed descriptor selection and live
-  shader stepping are unavailable. Standalone GPU replay remains unqualified
-  after recorded timeouts. Metadata export success does not qualify replay.
+  shader stepping are unavailable. At 0.5.2, standalone GPU replay is qualified
+  on the measured matching 2026.3 path through the `replay` tool; 2026.2 remains
+  unqualified. [REPLAY.md](REPLAY.md) records the exact environment and separate
+  output oracle. Metadata export success does not qualify replay.
 - Optional SDK control is separately qualified in [SDK_CONTROL.md](SDK_CONTROL.md).
   Compute correctness, performance profiling and HTTP service are later roadmap
   work. [INVESTIGATIONS.md](INVESTIGATIONS.md) retains failed probes and revisit

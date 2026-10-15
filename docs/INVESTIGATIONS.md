@@ -1723,3 +1723,89 @@ assessment stays open.
   original 0.3.0 identity; this audit does not qualify a new compute GPU run.
 - **Revisit:** Any future producer field/value change must preserve agreement
   between actual results and the shared stdio/HTTP output contract.
+
+### I-050 — Capture of the replayer's shell launcher fails to track its target
+
+- **Context:** R-027 private **0.5.1** C++ probe, matching Nsight
+  **2026.3.1.0/build 38722833**, RTX 3080 Ti / **615.71.09**, existing
+  KDE Wayland/Xwayland-XCB and the matching driver-library/ICD selection.
+- **Reproduction:** Run documented Graphics Capture against the selected
+  `ngfx-replay` shell launcher, passing `--loop-count=20 --present-app --verbose`
+  and an isolated copy of the pinned reference capture. Select capture interval
+  2 with a 60-second outer deadline; all arguments/source hashes are retained.
+- **Expected/observed:** A new capture of the replayed GPU output was expected.
+  The capture launcher instead exits **255**, reporting that launch tracking
+  failed; no new capture is produced. Cleanup is confirmed without an outer
+  timeout. This does not invalidate the separately successful plain replay.
+- **Resolution:** The installed launcher source explicitly invokes its sibling
+  `ngfx-replay.bin`. Targeting that same ELF under the sibling capture launcher
+  succeeds with matching loader setup. The ordinary replay path continues to use
+  the documented launcher; the ELF selection is only the output-verification
+  experiment. No private RPC, generated replay compilation or GUI automation is
+  used. The first failure's internal launcher cause is not established.
+- **Evidence/retention:** Failed native
+  **bundle-0b0eeadf85d8b4e7f70cd37ab6d56447** and successful ELF control
+  **bundle-859ebe7f55f6d5fffbec9f2f34a8d4c6** are independently pinned in
+  `roadmap-resolution-aytro126/replay-store`. Complete/pinned
+  **bundle-9592f2cd01c4623855009d7589ed37af** in the central store retains
+  requests, launcher sources, native reports/logs and independent image controls;
+  all **340** payloads verify.
+- **Revisit:** Retest launcher tracking if the documented wrapper changes;
+  do not generalize this failed target launch to every script or replay release.
+
+### I-051 — Embedded final-present image is not the replay pixel oracle
+
+- **Context:** Same R-027 **0.5.1** probes and matching 2026.3 runtime as I-050;
+  source capture **bundle-644cc39112ddd32696ce24823764ca97**, seed 42,
+  192×128, one captured interval at present ordinal 2.
+- **Reproduction/observation:** Compare the source's embedded screenshot with
+  the screenshot of the fresh capture of its standalone GPU replay. They differ
+  on **7372 pixels**, with maximum RGB8 channel differences **4/4/3**. Assuming
+  equality between these evidence origins was too strong; this is initially a
+  comparison failure, not a demonstrated rendering failure.
+- **Resolution within this fixture:** Explicit independent application baselines
+  at frames **0, 1 and 2** retain identical executable/shader inputs. The new
+  replay image matches frame **1** exactly, while the source embedded image
+  matches frame **2**. A fresh repeated reference replay is identical; a shader
+  fault replay exactly matches its independent faulty frame-1 readback and
+  differs from the reference. The documented no-present-blit control changes
+  the newly captured output, discriminating it from a copied embedded image.
+  RGB8 tolerance stays **zero** throughout.
+- **Boundary:** This measures two distinct image views for the stated workload
+  and producer. It does not establish a generic frame-number formula, original
+  draw/queue/sample correspondence, or the internal reason for the image offset.
+  Unknown applications still need their own equivalent-input pixel oracle.
+- **Evidence/retention:** All eight native replay-probe attempts remain
+  independently pinned in the isolated replay store. Complete/pinned
+  **bundle-9592f2cd01c4623855009d7589ed37af** retains the initial mismatch,
+  all explicit baseline requests/results, original and repeated replay outputs,
+  the no-blit control, exact source/probe identities and a passing independent
+  `verify_pixels.py`. Product integration was unfinished at that 0.5.1 probe
+  milestone; 0.5.2 completes it as documented in REPLAY.md.
+- **Revisit:** Qualify different intervals, workloads or producer versions before
+  reusing this correspondence; never substitute metadata-image equality for
+  actual GPU replay verification.
+
+### I-052 — Replay integration build and retention-test corrections
+
+- **Context:** R-027 product **0.5.2** development, GCC 16/C++20 and the CPU
+  executable Nsight stand-in; no GPU failure is inferred from these checks.
+- **Reproduction/observed:** The first product build compared a `std::string`
+  snapshot digest directly with a JSON value and failed with `no match for
+  operator!=`. After explicit string extraction, the first replay workflow test
+  advanced its fake storage clock by 31 days, unpinned the source, released its
+  last usage lease, then tried to pin it again. Publication correctly pruned it;
+  the check reported `Maximum retention age reached`.
+- **Expected/resolution:** Extract the JSON hash as `std::string` before comparing.
+  Test lease protection while queued/running, then restore the persistent pin
+  before releasing the last lease. The corrected replay, resource-reader, MCP
+  and HTTP focused checks pass. The source-mutation, owned escaped-child cleanup,
+  timeout/cancellation/shutdown and shared-GPU checks retain their assertions.
+- **Evidence/retention:** The observed diagnostics are transcribed in
+  `r027-build-corrections.txt` alongside the final CPU logs in complete/pinned
+  **bundle-1c59130aafc0cb1a946cd9e0c4da869c** (all 741 payloads verified). Earlier rerun logs were overwritten; no complete original build
+  log or surviving CPU scratch bundle is claimed. The final aggregate and native
+  GPU evidence are recorded separately in BUILD_VALIDATION.md.
+- **Revisit:** Preserve typed JSON boundaries and restore protection before
+  deliberately releasing a retention lease; do not weaken production pruning
+  to satisfy a test that asks for an expired bundle.

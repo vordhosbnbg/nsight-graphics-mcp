@@ -75,6 +75,14 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
         {"launch_environment", launch_environment_policy()},
         {"operations",
          {{"capture", capture},
+          {"replay",
+           {{"available", capture_ready},
+            {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
+            {"reason", "Finite asynchronous GPU replay of complete retained service Graphics Captures requires "
+                       "matching Nsight 2026.3.1.0/build 38722833 tools, a desktop and compatible GPU/driver. "
+                       "Each job snapshots and validates the source, shares the capture/profile GPU queue and "
+                       "retains completion logs. Older producers are unqualified. Path observations do not "
+                       "verify compatibility; tool completion does not establish pixel or timing correctness."}}},
           {"jobs", store},
           {"artifacts", store},
           {"inspection",
@@ -246,7 +254,8 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers"}) {
+    for(const auto* operation :
+        {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers", "replay"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }

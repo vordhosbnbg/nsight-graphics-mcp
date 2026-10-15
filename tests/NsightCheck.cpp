@@ -232,6 +232,53 @@ int main(int argc, char** argv) {
         legacy_capture.context.environment["NGM_PROFILE_OLD_RELEASE"] = "1";
         require_success(ngm::run_nsight_capture(legacy, legacy_capture));
 
+        const auto replay_options = [&](const std::string& name) {
+            ngm::NsightReplayOptions replay;
+            replay.context = context(scratch.path / name);
+            replay.capture_file = first.output_file;
+            replay.capture_tool_version = installation.capture.version;
+            replay.capture_tool_build = installation.capture.build;
+            return replay;
+        };
+        require_success(ngm::run_nsight_replay(installation, replay_options("gpu replay")));
+        for(const auto* mode : {"fail", "missing", "metadata-only"}) {
+            auto replay = replay_options(std::string("gpu replay ") + mode);
+            replay.context.environment["NGM_STANDIN_REPLAY_MODE"] = mode;
+            const auto result = ngm::run_nsight_replay(installation, replay);
+            require(result.outcome == (std::string_view(mode) == "fail" ? ngm::NsightOutcome::Failed
+                                                                        : ngm::NsightOutcome::InvalidOutput) &&
+                        result.process.cleanup_confirmed,
+                    "zero-exit metadata or missing completion cannot qualify GPU replay");
+        }
+        for(const auto count : {0U, 601U}) {
+            auto replay = replay_options("gpu replay bad count " + std::to_string(count));
+            replay.loop_count = count;
+            const auto result = ngm::run_nsight_replay(installation, replay);
+            require(result.outcome == ngm::NsightOutcome::InvalidInput && !result.launched,
+                    "finite replay bounds are checked before launch");
+        }
+        auto mismatched_replay = replay_options("gpu replay mismatch");
+        mismatched_replay.capture_tool_build = "42";
+        require(ngm::run_nsight_replay(installation, mismatched_replay).outcome == ngm::NsightOutcome::Unavailable,
+                "GPU replay retains exact producer identity");
+        require(ngm::run_nsight_replay(legacy, replay_options("gpu replay legacy")).outcome ==
+                    ngm::NsightOutcome::Unavailable,
+                "unqualified old replay is distinct from qualified capture and metadata support");
+        const auto partial_replay =
+            inspect(root, scratch.path / "missing gpu replay option", {{"NGM_OMIT_REPLAY_OPTION", "--loop-count"}});
+        require(partial_replay.interface_ready &&
+                    ngm::run_nsight_replay(partial_replay, replay_options("gpu replay unavailable")).outcome ==
+                        ngm::NsightOutcome::Unavailable,
+                "GPU replay gates its own required help without disabling metadata capture");
+        auto hanging_replay = replay_options("gpu replay timeout");
+        hanging_replay.context.environment = {{"NGM_STANDIN_REPLAY_MODE", "hang"},
+                                              {"NGM_STANDIN_PIDS", (scratch.path / "gpu replay pids").string()}};
+        hanging_replay.context.timeout = 150ms;
+        const auto replay_timeout = ngm::run_nsight_replay(installation, hanging_replay);
+        require(replay_timeout.outcome == ngm::NsightOutcome::TimedOut && replay_timeout.process.cleanup_confirmed,
+                "replay timeout preserves bounded owned cleanup");
+        require_owned_pids_gone(scratch.path / "gpu replay pids");
+
         const auto replay_failure_installation =
             inspect(root, scratch.path / "replay runtime failure inspection", {{"NGM_STANDIN_REPLAY_MODE", "fail"}});
         require(replay_failure_installation.interface_ready && replay_failure_installation.cleanup_confirmed,

@@ -484,6 +484,70 @@ NsightOperationResult run_nsight_capture(const NsightInstallation& installation,
     return result;
 }
 
+NsightOperationResult run_nsight_replay(const NsightInstallation& installation, const NsightReplayOptions& options,
+                                        std::stop_token stop) {
+    NsightOperationResult result;
+    result.process.cleanup_confirmed = true;
+    if(!usable_installation(result, installation)) {
+        return result;
+    }
+    if(installation.replay.version != "2026.3.1.0" || installation.replay.build != "38722833") {
+        result.outcome = NsightOutcome::Unavailable;
+        result.message = "GPU replay completion is qualified only for Nsight 2026.3.1.0/build 38722833";
+        return result;
+    }
+    if(options.capture_tool_version != installation.replay.version ||
+       options.capture_tool_build != installation.replay.build) {
+        result.outcome = NsightOutcome::Unavailable;
+        result.message = "Capture provenance and replay version/build must match exactly";
+        return result;
+    }
+    for(const auto* option : {"--loop-count", "--present-app", "--verbose"}) {
+        if(!installation.replay.documented_options.contains(option)) {
+            result.outcome = NsightOutcome::Unavailable;
+            result.message = std::string("Replay help does not advertise required option ") + option;
+            return result;
+        }
+    }
+    try {
+        if(options.loop_count < 1 || options.loop_count > 600) {
+            throw std::invalid_argument("Replay loop count must be in [1, 600]");
+        }
+        const auto capture = absolute_path(options.capture_file, "Capture file");
+        if(capture.extension() != ".ngfx-capture") {
+            throw std::invalid_argument("GPU replay input must use the .ngfx-capture extension");
+        }
+        regular_file_size(capture, false, 1024ULL * 1024ULL * 1024ULL);
+        auto process = process_options(*installation.replay.path, options.context, "replay");
+        process.arguments = {"--loop-count=" + std::to_string(options.loop_count), "--present-app", "--verbose",
+                             capture.string()};
+        result.output_file = process.stdout_path;
+        if(!run_operation(result, process, stop)) {
+            return result;
+        }
+    } catch(const std::exception& error) {
+        result.outcome = NsightOutcome::InvalidInput;
+        result.message = error.what();
+        return result;
+    }
+    try {
+        const auto output = read_regular_file(result.stdout_path, observation_limit);
+        if(output.find("Initialization Complete:") == std::string::npos ||
+           output.find("Initializing Execution Engine") == std::string::npos ||
+           output.find("Replay completed successfully") == std::string::npos) {
+            throw std::runtime_error("Replayer did not report qualified GPU initialization and completion");
+        }
+        result.output_bytes = output.size();
+        result.outcome = NsightOutcome::Success;
+        result.message = "Matching GPU replay reported initialization and finite execution completion; "
+                         "pixel correctness and performance are not inferred";
+    } catch(const std::exception& error) {
+        result.outcome = NsightOutcome::InvalidOutput;
+        result.message = error.what();
+    }
+    return result;
+}
+
 NsightOperationResult export_nsight_capture(const NsightInstallation& installation, const NsightExportOptions& options,
                                             std::stop_token stop) {
     NsightOperationResult result;

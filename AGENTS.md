@@ -75,8 +75,8 @@ The owner accepted **R-023–R-027** on **2026-10-15** in this priority order:
 restore fresh Graphics Capture reliability; expose proven descriptor contents/
 execution-time values; associate timings with draw occurrences; qualify counter
 meaning/application attribution; qualify standalone GPU replay. Implementation
-of all five is authorized. **R-023 completes at 0.5.1**; **R-024–R-026 are Pending**,
-and **R-027 is In Progress**. Follow docs/ROADMAP.md for evidence dependencies
+of all five is authorized. **R-023 completes at 0.5.1** and **R-027 at 0.5.2**;
+**R-024–R-026 remain Pending**. Follow docs/ROADMAP.md for evidence dependencies
 and acceptance. R-024–R-026 require documented evidence before any
 new execution-time or physical attribution capability can be claimed.
 
@@ -87,9 +87,21 @@ The 36-check serial CPU aggregate passes before a final producer-schema repair
 (I-049); focused MCP/HTTP checks and 20 actual schema-valid results then pass.
 All 407 qualification payloads verify in pinned
 `bundle-ab49ccec89e6f4584051359b650e7f41`. See docs/BUILD_VALIDATION.md. Original
-I-038 causes and new 2026.2 GPU support remain unproven. R-027 has one successful
-private replay probe; product integration and rendered-output verification are
-still required. No machine setting or installed server/worker is changed.
+I-038 causes and new 2026.2 GPU support remain unproven. R-027 now has successful
+private plain replays and independent replay-output captures, exact frame-1
+application oracles and a changed-output no-blit control (I-050/I-051). The source
+embedded image remains a distinct frame-2 view for this fixture. Probe evidence
+is pinned as `bundle-9592f2cd01c4623855009d7589ed37af`; all 340 payloads verify.
+The product replay job/MCP integration completes at **0.5.2**, with **30 tools**
+over shared stdio/HTTP, queued/running source protection and snapshots, matching
+metadata/payload checks and the shared capture/profile GPU reservation. All **37
+CPU checks** pass. Three real MCP replays plus execution-phase cancellation,
+deadline and EOF shutdown pass, with **515** schema-valid results and two
+restart checks. Complete/pinned **bundle-1c59130aafc0cb1a946cd9e0c4da869c** retains
+all **741** verified payloads and nine independently pinned native bundles.
+See docs/REPLAY.md and docs/BUILD_VALIDATION.md. New 2026.2 replay support,
+general pixel/frame/event correspondence and timing accuracy are not claimed.
+No machine setting or installed server/worker is changed.
 
 The **R-018–R-022 capability follow-up group completes at 0.5.0** with **29
 tools**. Reader activation, launch controls, empty-table compatibility, bounded
@@ -302,7 +314,8 @@ docs/NSIGHT_VALIDATION.md and docs/INVESTIGATIONS.md. Qualification snapshots an
 referenced evidence are explicitly pinned. General executed event state and
 executed descriptor selection remain unavailable. Fixed-input descriptor hydration
 experiments are not a generic product API. Standalone GPU replay timed out on both
-releases and remains unqualified. Compute correctness is qualified within the
+releases at that visual milestone; the later 0.5.2 matching 2026.3 qualification
+is recorded above and in docs/REPLAY.md. Compute correctness is qualified within the
 R-008 scope above; performance analysis is qualified within the measured R-009
 scope and Streamable HTTP within the local policy above. Update these instructions
 as the project develops.

@@ -1,14 +1,19 @@
 #include "ngm/CaptureService.hpp"
 
+#include "ngm/File.hpp"
 #include "ngm/Hash.hpp"
+#include "ngm/Inspection.hpp"
 #include "ngm/Nsight.hpp"
+#include "ngm/NsightEvidence.hpp"
 #include "ngm/Version.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <tuple>
 #include <unistd.h>
 
 namespace ngm {
@@ -68,12 +73,12 @@ Json operation_json(const NsightOperationResult& result, const fs::path& root) {
 }
 
 std::map<std::string, std::string> isolated_environment(const CaptureServiceOptions& options,
-                                                        const CaptureRequest& request, const fs::path& root) {
+                                                        const LaunchEnvironment& overlay, const fs::path& root) {
     auto environment = options.environment;
     // Preserve the existing default injection policy. Only an explicit validated
     // job overlay can disable the two qualified unwanted layers.
     environment.erase("VK_LOADER_LAYERS_DISABLE");
-    for(const auto& [key, value] : request.launch_environment)
+    for(const auto& [key, value] : overlay)
         environment[key] = value;
     // Nsight adds its layer directory to this search path. Materialize the XDG
     // defaults first so that injection does not hide system Vulkan drivers when
@@ -107,9 +112,10 @@ Json manifest_provenance(const Json& report) {
     // Full argv, caller provenance, and operation observations are retained in
     // raw/report.json. Their growth must not exhaust the compact manifest API.
     Json result{{"report_path", "raw/report.json"}};
-    for(const auto* key : {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings",
-                           "sdk", "readable_capture", "generated_cpp_project", "application_identity_observed",
-                           "cleanup_confirmed", "worker_outcome", "profiled"}) {
+    for(const auto* key :
+        {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings", "sdk",
+         "readable_capture", "generated_cpp_project", "application_identity_observed", "cleanup_confirmed",
+         "worker_outcome", "profiled", "replayed", "replay_settings", "source"}) {
         if(report.contains(key)) {
             result[key] = report.at(key);
         }
@@ -207,6 +213,7 @@ void retain_safe_cpp_failure_output(const fs::path& root, Json& report, const st
 struct Attempt {
     ArtifactStore* artifacts = nullptr;
     ArtifactWriter writer;
+    ArtifactLease source_lease;
     Json provenance;
     bool started = false;
 
@@ -220,13 +227,69 @@ struct Attempt {
                 save(writer.raw_directory() / "report.json", provenance);
                 artifacts->update_provenance(writer, manifest_provenance(provenance));
                 artifacts->publish_failure(
-                    writer, "Capture did not start: cancelled, expired, rejected, or shut down while queued");
+                    writer, "GPU job did not start: cancelled, expired, rejected, or shut down while queued");
             } catch(...) {
                 // Storage failure leaves the writer's conservative recovery path.
             }
         }
     }
 };
+
+JobCompletion finish_attempt(ArtifactStore& artifacts, const std::shared_ptr<Attempt>& attempt,
+                             const JobContext& context, JobCompletion completion) {
+    auto& report = attempt->provenance;
+    const auto root = attempt->writer.directory();
+    if(stopped(context)) {
+        completion.outcome = JobClock::now() >= context.deadline ? JobOutcome::timed_out : JobOutcome::cancelled;
+        if(completion.error.empty()) {
+            completion.error = "GPU job stopped during its deadline/cancellation boundary";
+        }
+    }
+    report["cleanup_confirmed"] = completion.cleanup_confirmed;
+    report["worker_outcome"] = completion.outcome == JobOutcome::succeeded ? "succeeded" : "failed";
+    report["error"] = completion.error;
+    // These are worker observations. The coordinator alone decides the final
+    // job outcome when cancellation/deadline and completion race.
+    try {
+        save(root / "raw/report.json", report);
+        artifacts.update_provenance(attempt->writer, manifest_provenance(report));
+        if(!completion.cleanup_confirmed) {
+            artifacts.quarantine(attempt->writer, failure_reason(completion.error));
+        } else if(completion.outcome == JobOutcome::succeeded) {
+            artifacts.publish_success(attempt->writer);
+        } else {
+            artifacts.publish_failure(attempt->writer, failure_reason(completion.error));
+        }
+    } catch(const std::exception& error) {
+        completion.outcome = JobOutcome::failed;
+        completion.error += std::string("; evidence publication: ") + error.what();
+        // A quota failure before publication owns no live process and must not
+        // become a permanent cleanup quarantine. A post-rename durability error
+        // may already have published the bundle: preserve its immutable files.
+        if(completion.cleanup_confirmed) {
+            try {
+                const auto current = artifacts.inspect(attempt->writer.id()).summary;
+                if(current.status == "staging" || current.quarantined) {
+                    report["worker_outcome"] = "failed";
+                    report["error"] = completion.error;
+                    try {
+                        save(attempt->writer.raw_directory() / "report.json", report);
+                    } catch(const std::exception& saving) {
+                        // A long/failed output path may prevent saving the raw
+                        // report while descriptor-relative store metadata still
+                        // works. Retain any available files as a normal failure.
+                        completion.error += std::string("; saving failure report: ") + saving.what();
+                    }
+                    artifacts.update_provenance(attempt->writer, manifest_provenance(report));
+                    artifacts.publish_failure(attempt->writer, failure_reason(completion.error));
+                }
+            } catch(const std::exception& failure) {
+                completion.error += std::string("; retaining failed evidence: ") + failure.what();
+            }
+        }
+    }
+    return completion;
+}
 
 JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStore& artifacts,
                               const std::shared_ptr<Attempt>& attempt, const CaptureRequest& request,
@@ -247,7 +310,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
         if(validate_launch_environment(request.launch_environment, options.environment, context.deadline,
                                        context.stop) != report.at("launch_environment").at("selection"))
             throw std::runtime_error("Launch environment selection changed after job submission; submit a new job");
-        const auto environment = isolated_environment(options, request, root);
+        const auto environment = isolated_environment(options, request.launch_environment, root);
         report["environment"] = environment;
         report["application"]["sha256_before_launch"] =
             sha256_regular_file(request.executable, context.deadline, context.stop);
@@ -398,6 +461,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
             if(captured.outcome != NsightOutcome::Success) {
                 throw std::runtime_error("Capture failed: " + captured.message);
             }
+            report["capture"]["sha256"] = sha256_regular_file(capture.capture_file, context.deadline, context.stop);
             report["exports"] = Json::array();
             for(const auto kind : {NsightExportKind::Metadata, NsightExportKind::Functions, NsightExportKind::Objects,
                                    NsightExportKind::Logs, NsightExportKind::Screenshot}) {
@@ -445,60 +509,139 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
         completion.error = error.what();
         completion.outcome = JobOutcome::failed;
     }
-    if(stopped(context)) {
-        completion.outcome = JobClock::now() >= context.deadline ? JobOutcome::timed_out : JobOutcome::cancelled;
-        if(completion.error.empty()) {
-            completion.error = "Capture stopped during its deadline/cancellation boundary";
-        }
-    }
     report["readable_capture"] = readable_capture;
     report["generated_cpp_project"] = generated_cpp_project;
     report["profiled"] = profiled;
     report["application_identity_observed"] = inspected_application;
-    report["cleanup_confirmed"] = completion.cleanup_confirmed;
-    report["worker_outcome"] = completion.outcome == JobOutcome::succeeded ? "succeeded" : "failed";
-    report["error"] = completion.error;
-    // These are worker observations. The coordinator alone decides the final
-    // job outcome when cancellation/deadline and completion race.
+    return finish_attempt(artifacts, attempt, context, std::move(completion));
+}
+
+std::string text_hash(const std::string& value) {
+    return sha256(std::as_bytes(std::span(value.data(), value.size())));
+}
+
+Json replay_metadata_identity(const std::string& raw) {
+    const auto metadata = parse_nsight_metadata(raw);
+    if(metadata.nsight_version != "2026.3.1" || metadata.nsight_version_build_id != "38722833" ||
+       metadata.primary_api != "Vulkan" || metadata.has_unsupported_operation == true)
+        throw std::invalid_argument("GPU replay requires qualified Nsight 2026.3.1/build 38722833 Vulkan metadata");
+    Json identity{{"metadata_version", metadata.metadata_version}};
+    const auto retain = [&](const char* name, const std::optional<std::string>& value) {
+        identity[name] = value ? Json(*value) : Json(nullptr);
+    };
+    retain("uuid", metadata.uuid);
+    retain("nsight_version", metadata.nsight_version);
+    retain("nsight_version_build_id", metadata.nsight_version_build_id);
+    retain("primary_api", metadata.primary_api);
+    retain("primary_gpu", metadata.primary_gpu);
+    retain("driver_version", metadata.driver_version);
+    retain("process_name", metadata.process_name);
+    retain("request_time", metadata.request_time);
+    retain("captured_frame", metadata.captured_frame);
+    retain("resolution", metadata.resolution);
+    return identity;
+}
+
+JobCompletion execute_replay(const CaptureServiceOptions& options, ArtifactStore& artifacts,
+                             const std::shared_ptr<Attempt>& attempt, const ReplayRequest& request,
+                             const JobContext& context) {
+    attempt->started = true;
+    JobCompletion completion;
+    completion.identity = context.identity;
+    completion.cleanup_confirmed = true;
+    completion.artifact_ids = {attempt->writer.id()};
+    auto& report = attempt->provenance;
+    report["job"] = context.identity;
+    report["replayed"] = false;
+    const auto root = attempt->writer.directory();
     try {
+        if(stopped(context))
+            throw std::runtime_error("Replay stopped before source snapshot");
+        if(validate_launch_environment(request.launch_environment, options.environment, context.deadline,
+                                       context.stop) != report.at("launch_environment").at("selection"))
+            throw std::runtime_error("Launch environment selection changed after job submission; submit a new job");
+        const auto environment = isolated_environment(options, request.launch_environment, root);
+        report["environment"] = environment;
+        // Snapshot only fixed, inventoried paths; the source stays leased from
+        // submission through retirement of this worker, including queued jobs.
+        for(const auto& [source, destination, limit, hash_field] :
+            std::array<std::tuple<const char*, const char*, std::size_t, const char*>, 3>{
+                {{"raw/report.json", "raw/input/report.json", NsightEvidenceLimits::maximum_bytes, "report_sha256"},
+                 {"raw/exports/metadata.raw", "raw/input/metadata.raw", NsightEvidenceLimits::maximum_bytes,
+                  "metadata_sha256"},
+                 {"raw/capture.ngfx-capture", "raw/input/capture.ngfx-capture", 1024U * 1024U * 1024U,
+                  "original_capture_sha256"}}}) {
+            artifacts.snapshot_file(request.capture_id, source, attempt->writer, destination, limit, context.deadline,
+                                    context.stop);
+            const auto hash = sha256_regular_file(root / destination, context.deadline, context.stop);
+            const auto& expected = report.at("source").at(hash_field);
+            if(!expected.is_null() && expected != hash)
+                throw std::runtime_error(std::string("Replay source changed since its retained identity: ") + source);
+            if(std::string_view(hash_field) == "original_capture_sha256")
+                report["source"]["observed_capture_sha256"] = hash;
+        }
+        const auto input = root / "raw/input/capture.ngfx-capture";
+        const auto expected_metadata = replay_metadata_identity(
+            read_regular_file(root / "raw/input/metadata.raw", NsightEvidenceLimits::maximum_bytes));
+        fs::create_directories(root / "raw/logs/discovery");
         save(root / "raw/report.json", report);
-        artifacts.update_provenance(attempt->writer, manifest_provenance(report));
-        if(!completion.cleanup_confirmed) {
-            artifacts.quarantine(attempt->writer, failure_reason(completion.error));
-        } else if(completion.outcome == JobOutcome::succeeded) {
-            artifacts.publish_success(attempt->writer);
-        } else {
-            artifacts.publish_failure(attempt->writer, failure_reason(completion.error));
-        }
+        NsightInspectionOptions inspection;
+        inspection.installation_root = options.nsight_root;
+        inspection.context = {root / "raw/logs/discovery", environment, remaining(context)};
+        completion.cleanup_confirmed = false;
+        const auto installation = inspect_nsight(inspection, context.stop);
+        completion.cleanup_confirmed = installation.cleanup_confirmed;
+        report["nsight"] = {{"interface_ready", installation.interface_ready},
+                            {"problem", installation.problem},
+                            {"cli", observation_json(installation.cli, root)},
+                            {"capture", observation_json(installation.capture, root)},
+                            {"replay", observation_json(installation.replay, root)}};
+        if(!completion.cleanup_confirmed || !installation.interface_ready)
+            throw std::runtime_error("Replay discovery unavailable or cleanup unconfirmed: " + installation.problem);
+        const auto& producer = report.at("source").at("capture_tool");
+        fs::create_directories(root / "raw/logs/metadata");
+        fs::create_directories(root / "raw/exports");
+        NsightExportOptions export_options;
+        export_options.context = {root / "raw/logs/metadata", environment, remaining(context)};
+        export_options.capture_file = input;
+        export_options.capture_tool_version = producer.at("version");
+        export_options.capture_tool_build = producer.at("build");
+        export_options.kind = NsightExportKind::Metadata;
+        export_options.output_file = root / "raw/exports/metadata.raw";
+        completion.cleanup_confirmed = false;
+        const auto exported = export_nsight_capture(installation, export_options, context.stop);
+        completion.cleanup_confirmed = !exported.launched || exported.process.cleanup_confirmed;
+        report["metadata_validation"] = operation_json(exported, root);
+        if(exported.outcome != NsightOutcome::Success || !completion.cleanup_confirmed)
+            throw std::runtime_error("Replay input metadata validation failed: " + exported.message);
+        if(expected_metadata !=
+           replay_metadata_identity(read_regular_file(export_options.output_file, NsightEvidenceLimits::maximum_bytes)))
+            throw std::runtime_error("Fresh replay input metadata differs from the retained capture identity");
+        if(stopped(context))
+            throw std::runtime_error("Replay stopped before GPU launch");
+        fs::create_directories(root / "raw/logs/replay");
+        NsightReplayOptions replay;
+        replay.context = {root / "raw/logs/replay", environment, remaining(context)};
+        replay.capture_file = input;
+        replay.capture_tool_version = producer.at("version");
+        replay.capture_tool_build = producer.at("build");
+        replay.loop_count = request.loop_count;
+        completion.cleanup_confirmed = false;
+        const auto replayed = run_nsight_replay(installation, replay, context.stop);
+        completion.cleanup_confirmed = !replayed.launched || replayed.process.cleanup_confirmed;
+        report["replay"] = operation_json(replayed, root);
+        if(replayed.outcome != NsightOutcome::Success || !completion.cleanup_confirmed)
+            throw std::runtime_error("GPU replay failed: " + replayed.message);
+        if(sha256_regular_file(input, context.deadline, context.stop) !=
+           report.at("source").at("observed_capture_sha256").get<std::string>())
+            throw std::runtime_error("Replay input snapshot changed during execution");
+        report["replayed"] = true;
+        completion.outcome = JobOutcome::succeeded;
     } catch(const std::exception& error) {
+        completion.error = error.what();
         completion.outcome = JobOutcome::failed;
-        completion.error += std::string("; evidence publication: ") + error.what();
-        // A quota failure before publication owns no live process and must not
-        // become a permanent cleanup quarantine. A post-rename durability error
-        // may already have published the bundle: preserve its immutable files.
-        if(completion.cleanup_confirmed) {
-            try {
-                const auto current = artifacts.inspect(attempt->writer.id()).summary;
-                if(current.status == "staging" || current.quarantined) {
-                    report["worker_outcome"] = "failed";
-                    report["error"] = completion.error;
-                    try {
-                        save(attempt->writer.raw_directory() / "report.json", report);
-                    } catch(const std::exception& saving) {
-                        // A long/failed output path may prevent saving the raw
-                        // report while descriptor-relative store metadata still
-                        // works. Retain any available files as a normal failure.
-                        completion.error += std::string("; saving failure report: ") + saving.what();
-                    }
-                    artifacts.update_provenance(attempt->writer, manifest_provenance(report));
-                    artifacts.publish_failure(attempt->writer, failure_reason(completion.error));
-                }
-            } catch(const std::exception& failure) {
-                completion.error += std::string("; retaining failed evidence: ") + failure.what();
-            }
-        }
     }
-    return completion;
+    return finish_attempt(artifacts, attempt, context, std::move(completion));
 }
 } // namespace
 
@@ -651,6 +794,66 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
     job.deadline = JobClock::now() + request.timeout;
     job.worker = [this, attempt, request = std::move(request)](const JobContext& context) {
         return execute_capture(options_, artifacts_, attempt, request, context);
+    };
+    return {jobs_.submit(std::move(job)), artifact_id};
+}
+
+CaptureSubmission CaptureService::replay(ReplayRequest request) {
+    if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.loop_count < 1 ||
+       request.loop_count > 600)
+        throw std::invalid_argument("Replay requires timeout 1..600000 ms and loop_count 1..600");
+    const auto deadline = JobClock::now() + request.timeout;
+    const auto selection = validate_launch_environment(request.launch_environment, options_.environment, deadline);
+    auto source_lease = artifacts_.lease(request.capture_id);
+    // Reuse retained-capture validation, including complete status, native origin,
+    // manifest/report/job agreement, matching producer and metadata export schema.
+    const auto metadata = InspectionService(artifacts_).metadata(request.capture_id);
+    const auto raw_report = artifacts_.read(request.capture_id, "raw/report.json", NsightEvidenceLimits::maximum_bytes);
+    const auto source_report = Json::parse(raw_report);
+    const auto raw_metadata =
+        artifacts_.read(request.capture_id, "raw/exports/metadata.raw", NsightEvidenceLimits::maximum_bytes);
+    (void)replay_metadata_identity(raw_metadata);
+    const auto original_hash = source_report.at("capture").value("sha256", Json(nullptr));
+    if(!original_hash.is_null() &&
+       (!original_hash.is_string() || original_hash.get_ref<const std::string&>().size() != 64))
+        throw std::invalid_argument("Retained capture SHA-256 is invalid");
+    artifacts_.prune();
+    auto attempt = std::make_shared<Attempt>();
+    attempt->artifacts = &artifacts_;
+    attempt->source_lease = std::move(source_lease);
+    attempt->provenance = {
+        {"schema_version", 1},
+        {"project_version", project_version()},
+        {"evidence_origin", "nsight_gpu_replay"},
+        {"backend", "documented_nsight_cli"},
+        {"replay_settings", {{"loop_count", request.loop_count}, {"timeout_ms", request.timeout.count()}}},
+        {"source",
+         {{"capture_id", request.capture_id},
+          {"job", source_report.at("job")},
+          {"capture_tool", metadata.at("producer").at("capture_tool")},
+          {"report_sha256", text_hash(raw_report)},
+          {"metadata_sha256", text_hash(raw_metadata)},
+          {"original_capture_sha256", original_hash},
+          {"observed_capture_sha256", nullptr},
+          {"identity_scope", original_hash.is_null()
+                                 ? "Legacy source has no capture-time payload hash. Retained header/report and an "
+                                   "observed snapshot hash are checked; original-byte authenticity is unverified."
+                                 : "Snapshot must match the retained capture-time payload hash and fresh metadata. "
+                                   "Recorded provenance is not producer authentication."}}},
+        {"launch_environment", {{"requested", request.launch_environment}, {"selection", selection}}},
+        {"scope", "Fresh matching Nsight GPU replay of a retained input. Original application is not launched. "
+                  "Tool completion does not prove pixels, GPU event state, frame correspondence or timing accuracy."}};
+    attempt->writer =
+        artifacts_.begin(manifest_provenance(attempt->provenance),
+                         {"raw/input/capture.ngfx-capture", "raw/input/metadata.raw", "raw/input/report.json",
+                          "raw/exports/metadata.raw", "raw/logs/replay/replay.stdout.txt", "raw/report.json"},
+                         request.pin);
+    const auto artifact_id = attempt->writer.id();
+    JobRequest job;
+    job.capture_id = artifact_id;
+    job.deadline = deadline;
+    job.worker = [this, attempt, request = std::move(request)](const JobContext& context) {
+        return execute_replay(options_, artifacts_, attempt, request, context);
     };
     return {jobs_.submit(std::move(job)), artifact_id};
 }

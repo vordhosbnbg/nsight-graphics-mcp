@@ -88,6 +88,7 @@ Json query_capabilities(Client& client) {
     require(report["implemented_tools"] == Json::array({"capabilities",
                                                         "capture",
                                                         "capture_cpp",
+                                                        "replay",
                                                         "job_status",
                                                         "job_cancel",
                                                         "artifact_list",
@@ -136,7 +137,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 29, "discover exactly the implemented tools");
+    require(listing.size() == 30, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");

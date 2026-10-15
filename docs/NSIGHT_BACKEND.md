@@ -1,5 +1,12 @@
 # Nsight CLI backend
 
+At **0.5.2**, `run_nsight_replay` adds finite standalone GPU execution for
+matching **2026.3.1.0/build 38722833** captures. It uses help-qualified
+`--loop-count`, `--present-app` and `--verbose`, and requires successful GPU
+initialization/execution messages in addition to exit zero and owned cleanup.
+[REPLAY.md](REPLAY.md) records the product workflow and measured qualification;
+the older replay failures below retain their original versioned scope.
+
 `include/ngm/Nsight.hpp` and `src/nsight/Nsight.cpp` implement synchronous,
 cancellable backend operations. The job coordinator owns scheduling and state;
 the caller owns isolated attempt directories, artifact leases, publication, and
