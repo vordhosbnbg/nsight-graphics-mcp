@@ -1943,3 +1943,81 @@ single-frame marker query with explicit ambiguity/scope refusals. General draw
 IDs, queue/submission correspondence, multi-column frame identity, isolated
 draw counters and physical counter scaling remain unqualified. New support on
 2026.2 remains unqualified; that matching installation is absent locally.
+
+## 0.4.10 retained marker-range queries, 2026-10-15
+
+This R-022 slice adds **profile_marker** to the shared **29-tool** stdio/HTTP
+surface. It returns exported marker-range duration in ms and up to eight exact
+raw regime metrics for a uniquely associated single-frame path. Original
+execution IDs, draw membership, physical counter scaling and shader-stage
+isolation remain unavailable. [PROFILE_MARKERS.md](PROFILE_MARKERS.md) specifies
+the qualified producer, collection shape, bounds and refusal contract.
+No dependency, artifact/index schema or proprietary helper closure changes.
+
+The source build is based on **4fbf834**, with the tested 0.4.10 changes explicitly
+dirty. It uses GCC **16.2.1**, CMake **4.4.4**, Ninja **1.13.2** and Linux
+**7.2.7-zen1-1-zen**. Actual profiles retain the **0.4.9** collection identities,
+matching Nsight **2026.3.1.0/build 38722833**, RTX **3080 Ti** / **615.71.09**
+and desktop/configuration recorded in the preceding section. This validation
+launches no Nsight/GPU process and changes no machine setting or installed server.
+
+The verified commands are:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_profile_marker_check_run
+cmake --build --preset linux-gcc-debug --target ngm_profile_workflow_check_run
+cmake --build --preset linux-gcc-debug --target ngm_profile_marker_integration
+/absolute/build/tests/ngm_profile_marker_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/source-correlation-run \
+  /absolute/validation-parent
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+The focused pure marker check passes and the expanded process-boundary workflow
+check passes in **18.61 s**. All **36/36 serial CPU checks pass, zero skipped, in
+355.68 s** (355.66 s summed CPU-test time). The regression subset preserves exact
+single-frame event rows and two regime columns from the pinned 0.4.9 direct
+profile. Pure coverage includes unique/different-branch/repeated paths, malformed
+hierarchy, absent anchors, header-only regimes and invalid/zero timing values.
+Workflow coverage includes missing/duplicate/undefined metrics, unsupported
+collection/producer cases, strict arguments and actual stdio restarts. C++
+stand-ins establish no additional hardware compatibility.
+
+The opt-in C++ verifier queries every event row of all **fifteen** retained native
+profiles, in two fresh source-built stdio processes. Its **360 marker responses**
+contain **32 available**, **48 ambiguous/unavailable** and **280 unsupported**
+selections. Independent raw TSV parsing and the original API/timestamp audit
+check exact paths, values/text, row/column positions and source hashes. The
+one-draw and two-draw fixture markers both preserve null product draw membership.
+All results are identical after restart; all fifteen native source bundles stay
+complete/pinned with unchanged inventories and released usage leases.
+
+All **391** native tool results pass their actual JSON Schema 2020-12 contracts
+and text/structured parity: capabilities ×1, profile_marker ×360 and artifact_info
+×30. A separate authenticated HTTP process on an ephemeral IPv4 loopback port
+discovers the same 29 tools and exactly matches available, ambiguous and
+unsupported stdio selections. Its **eight** schema-valid tool results comprise
+capabilities ×1, profile_marker ×3 and artifact_info ×4. Source inventories/pins
+remain stable; session deletion returns 204, SIGTERM exits 0 and stdout is empty.
+The temporary 0600 token file is removed; no credential is retained in evidence.
+
+The validation root is
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/profile-marker-93WsgI`.
+The original source store remains the 0.4.9 correlation store above; its fifteen
+native pins are separate from the marker qualification. The consolidated
+qualification is complete/pinned as **bundle-b8d3515b5cd6079e2ba2c8cb5637067e**,
+reported as **10,377,072 bytes / 189 files**, with **34** first-party source files
+and **75** original raw text exports. It retains
+reports, actual schemas/transcripts, independent export/source references, exact
+first-party source/diff, binary hashes, HTTP checker and final CPU receipt.
+Every imported payload hash and the current source/server/verifier identities
+verify; usage is released. This selected evidence is not a complete native
+profile backup or typed import. The generic importer remains installed **0.4.1**;
+payload identities bind the tested **0.4.10** reader and **0.4.9** profile sources.
+Scoped formatting, document links and whitespace checks pass. No first-party
+code changes follow the passing aggregate.
+
+**R-022 remains In Progress** for the remaining scope/overhead assessment.
+Repeated paths, multi-column sample identity, general action/queue/submission
+mapping, isolated draw counters and physical scaling remain explicit limitations
+under I-043. New 2026.2 marker support remains unqualified.

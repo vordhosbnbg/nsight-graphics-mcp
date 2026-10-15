@@ -103,6 +103,96 @@ int main(int argc, char** argv) {
         });
         std::string retained;
         std::string retained_empty;
+        std::string retained_marker;
+        Json retained_marker_result;
+        const std::string marker_metric = "FE_A.TriageSCG.gr__cycles_active.avg.pct_of_peak_sustained_elapsed";
+        {
+            const auto exports = scratch.path / "marker-exports";
+            fs::create_directory(exports);
+            for(const auto* name : {"D3DPERF_EVENTS.xls", "GPUTRACE_REGIMES.xls"})
+                fs::copy_file(fs::path(NGM_PROFILE_MARKER_FIXTURES) / (std::string(name) + ".tsv"),
+                              exports / (std::string(name) + ".tsv"));
+            std::ofstream(exports / "FRAME.xls.tsv") << "GPU frame time\t0.5\n";
+            std::ofstream(exports / "GPUTRACE_FRAME.xls.tsv") << "synthetic.frame.metric\t1\n";
+            auto marker_options = options;
+            marker_options.environment["NGM_STANDIN_PROFILE_EXPORT_ROOT"] = exports.string();
+            auto selected = request;
+            selected.profile.delimiter = "frames";
+            selected.profile.limit = 1;
+            selected.profile.time_every_action = true;
+            ngm::CaptureService service(marker_options);
+            ngm::ProfileInspection inspect(service.artifacts());
+            const auto collect = [&] {
+                const auto job = service.capture(selected);
+                require(completed(service, job).state == ngm::JobState::succeeded,
+                        "native-format CPU marker profile publishes");
+                return job.artifact_id;
+            };
+            retained_marker = collect();
+            retained_marker_result = inspect.marker(retained_marker, 4, {marker_metric, "missing.metric"});
+            require(retained_marker_result.at("coverage").at("status") == "available" &&
+                        retained_marker_result.at("duration").at("unit") == "ms" &&
+                        retained_marker_result.at("duration").at("value").is_number() &&
+                        retained_marker_result.at("metrics")[0].at("status") == "available" &&
+                        retained_marker_result.at("metrics")[0].at("unit").is_null() &&
+                        retained_marker_result.at("metrics")[0].at("aggregation").is_null() &&
+                        retained_marker_result.at("metrics")[1].at("status") == "unavailable" &&
+                        retained_marker_result.at("metrics")[1].at("value").is_null() &&
+                        retained_marker_result.at("identities").at("draw_count").is_null() &&
+                        retained_marker_result.at("metric_semantics").at("isolated_draw") == false,
+                    "available marker range retains units, bounded raw counters and explicit unavailable semantics");
+            const auto repeated = inspect.marker(retained_marker, 5, {marker_metric});
+            require(repeated.at("coverage").at("status") == "unavailable" &&
+                        repeated.at("duration").at("value").is_null() &&
+                        repeated.at("selection").at("event_path_matches") == 2 &&
+                        repeated.at("metrics")[0].at("value").is_null(),
+                    "ambiguous marker paths never become a selected duration or counter");
+            require(inspect.marker(retained_marker, 9).at("identities").at("draw_count").is_null(),
+                    "valid multi-draw marker does not acquire inferred action membership");
+            rejected([&] { inspect.marker(retained_marker, 10); });
+            rejected([&] { inspect.marker(retained_marker, 4, {marker_metric, marker_metric}); });
+            selected.profile.limit = 2;
+            require(inspect.marker(collect(), 4).at("coverage").at("status") == "unsupported",
+                    "multiple frame collection retains raw data without an inferred column identity");
+            selected.profile.limit = 1;
+            selected.profile.time_every_action = false;
+            require(inspect.marker(collect(), 4).at("coverage").at("status") == "unsupported",
+                    "unqualified per-action selection receives an explicit refusal");
+            selected.profile.time_every_action = true;
+            const auto original = ngm::read_regular_file(exports / "GPUTRACE_REGIMES.xls.tsv", 16384);
+            auto modified = original;
+            const auto name_end = modified.find('\t', modified.find('\n') + 1);
+            const auto value_end = modified.find('\t', name_end + 1);
+            modified.replace(name_end + 1, value_end - name_end - 1, "nan");
+            std::ofstream(exports / "GPUTRACE_REGIMES.xls.tsv") << modified;
+            const auto undefined = inspect.marker(collect(), 0, {marker_metric});
+            require(undefined.at("coverage").at("status") == "available" &&
+                        undefined.at("metrics")[0].at("status") == "unavailable" &&
+                        undefined.at("metrics")[0].at("text") == "nan" &&
+                        undefined.at("metrics")[0].at("value").is_null(),
+                    "an undefined associated counter does not erase a valid duration or become zero");
+            modified = original;
+            const auto header_end = modified.find('\n');
+            modified.replace(0, header_end, "flattened_event_name\t" + marker_metric + '\t' + marker_metric);
+            std::ofstream(exports / "GPUTRACE_REGIMES.xls.tsv") << modified;
+            const auto duplicate = inspect.marker(collect(), 4, {marker_metric});
+            require(duplicate.at("coverage").at("status") == "available" &&
+                        duplicate.at("metrics")[0].at("value").is_null() &&
+                        duplicate.at("metrics")[0].at("reason").get<std::string>().find("multiple") !=
+                            std::string::npos,
+                    "duplicated metric columns do not silently choose a sample");
+            auto old_options = marker_options;
+            old_options.artifacts.root = scratch.path / "marker-old-store";
+            old_options.environment["NGM_PROFILE_OLD_RELEASE"] = "1";
+            ngm::CaptureService old_service(old_options);
+            const auto old_job = old_service.capture(selected);
+            require(completed(old_service, old_job).state == ngm::JobState::succeeded &&
+                        ngm::ProfileInspection(old_service.artifacts())
+                                .marker(old_job.artifact_id, 4)
+                                .at("coverage")
+                                .at("status") == "unsupported",
+                    "a compatible older raw profile does not acquire the new producer qualification");
+        }
         {
             auto empty_options = options;
             empty_options.environment["NGM_STANDIN_PROFILE_MODE"] = "header-only";
@@ -249,6 +339,9 @@ int main(int argc, char** argv) {
             ngm::CaptureService service(offline);
             require(ngm::ProfileInspection(service.artifacts()).metadata(retained).at("profile_id") == retained,
                     "retained profile query works after restart without tools");
+            require(ngm::ProfileInspection(service.artifacts())
+                            .marker(retained_marker, 4, {marker_metric, "missing.metric"}) == retained_marker_result,
+                    "exact marker result survives offline restart with immutable source exports");
             const auto source = scratch.path / "caller-import";
             fs::create_directory(source);
             std::ofstream(source / "note") << "not a server profile";
@@ -397,6 +490,29 @@ int main(int argc, char** argv) {
             require(completed(service, job).state == (cancel ? ngm::JobState::cancelled : ngm::JobState::timed_out),
                     "profile cancellation/deadline terminal state");
             require(completed(service, queued).state == ngm::JobState::cancelled, "queued cross-format cancellation");
+        }
+        {
+            using ngm::check::mcp::Client;
+            const std::vector<std::string> args{"--artifact-root", options.artifacts.root.string()};
+            for(unsigned pass = 0; pass < 2; ++pass) {
+                Client reader(fs::absolute(argv[2]), scratch.path, args);
+                initialize(reader);
+                require(call(reader, "profile_marker",
+                             {{"profile_id", retained_marker},
+                              {"event_row_index", 4},
+                              {"metrics", {marker_metric, "missing.metric"}}}) == retained_marker_result,
+                        "actual stdio marker result, source identity and restart stability");
+                for(const auto& bad :
+                    {Json{{"event_row_index", "4"}}, Json{{"metrics", {marker_metric, marker_metric}}}}) {
+                    Json arguments{{"profile_id", retained_marker}, {"event_row_index", 4}};
+                    arguments.update(bad);
+                    const auto response =
+                        reader.request(22, "tools/call", {{"name", "profile_marker"}, {"arguments", arguments}});
+                    require(response.at("result").value("isError", false),
+                            "marker input errors are bounded tool errors");
+                }
+                require(reader.finish() == 0, "read-only marker server exits cleanly");
+            }
         }
         {
             using ngm::check::mcp::Client;

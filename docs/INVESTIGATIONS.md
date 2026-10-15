@@ -1566,3 +1566,13 @@ and isolation record accompany the complete/pinned final qualification
   physical counter claims need documented export identifiers/definitions and
   independent new-input qualification; a new documented NVIDIA interface may
   provide that evidence. No private trace decoding or GUI backend is selected.
+
+The **0.4.10 follow-up** implements that narrow `profile_marker` query and
+qualifies all 180 retained event selections in two fresh stdio processes:
+32 available, 48 ambiguous/unavailable and 280 unsupported responses across
+restart. Available/ambiguous/unsupported HTTP selections exactly match. The
+query preserves original execution IDs, draw membership, physical scaling and
+shader-stage isolation as unavailable; it resolves none of the wider I-043
+identity/counter limitations. See PROFILE_MARKERS.md and the complete/pinned
+`bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. R-022's remaining scope/overhead
+assessment stays open.

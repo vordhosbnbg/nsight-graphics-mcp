@@ -1,0 +1,11 @@
+flattened_event_name	FE_A.TriageSCG.gr__cycles_active.avg.pct_of_peak_sustained_elapsed	FE_A.TriageSCG.fe__draw_count.sum
+frame.5	99.4645	2
+frame.5/scene.raster	99.4645	2
+frame.5/scene.raster/timing.batch	99.9223	0
+frame.5/scene.raster/timing.batch/branch.a	100	0
+frame.5/scene.raster/timing.batch/branch.a/unique.first	100	0
+frame.5/scene.raster/timing.batch/branch.a/repeat	100	0
+frame.5/scene.raster/timing.batch/branch.a/repeat	100	0
+frame.5/scene.raster/timing.batch/branch.b	99.9081	0
+frame.5/scene.raster/timing.batch/branch.b/repeat	100	0
+frame.5/scene.raster/timing.batch/branch.b/unique.pair	99.8851	0

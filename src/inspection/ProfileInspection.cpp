@@ -3,6 +3,7 @@
 #include "ngm/Inspection.hpp"
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/ProfileEvidence.hpp"
+#include "ngm/ProfileMarkers.hpp"
 #include "ngm/ProfileSettings.hpp"
 
 #include <algorithm>
@@ -432,6 +433,138 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             {"scope",
              "Zero-based export positions only; repeated labels/columns are preserved. Null unit means physical "
              "scaling is unresolved, not dimensionless. No frame/sample/statistic mapping is inferred."}};
+    });
+}
+
+Json ProfileInspection::marker(const std::string& id, std::size_t row_index,
+                               const std::vector<std::string>& metrics) const {
+    if(row_index >= ProfileEvidenceLimits::rows || metrics.size() > ProfileMarkerLimits::metrics)
+        throw std::invalid_argument("Marker selection requires event_row_index 0..4095 and at most eight metric names");
+    std::set<std::string> names;
+    for(const auto& name : metrics)
+        if(name.empty() || name.size() > ProfileEvidenceLimits::field_bytes || !names.insert(name).second)
+            throw std::invalid_argument(
+                "Marker metric names must be distinct nonempty exact export names of at most 4096 bytes");
+    return guarded([&] {
+        const auto profile = open(artifacts_, id);
+        const auto& index = profile.index;
+        const auto& refs = index.at("tables");
+        const auto events = parse_profile_table(reference(artifacts_, id, refs.at("event_durations")),
+                                                ProfileTableKind::EventDurations, table_policy(index));
+        if(row_index >= events.rows.size())
+            throw std::invalid_argument("Selected event row is absent; inspect profile_metrics event_durations first");
+        const auto regimes = parse_profile_table(reference(artifacts_, id, refs.at("regime_metrics")),
+                                                 ProfileTableKind::RegimeMetrics, table_policy(index));
+        const auto frame = parse_profile_table(reference(artifacts_, id, refs.at("frame_duration")),
+                                               ProfileTableKind::FrameDuration, table_policy(index));
+        const auto counters = parse_profile_table(reference(artifacts_, id, refs.at("frame_metrics")),
+                                                  ProfileTableKind::FrameMetrics, table_policy(index));
+        const auto& requested = index.at("requested");
+        const auto& settings = index.at("settings");
+        const auto per_action = settings.value("Time Every Action", Json(nullptr));
+        ProfileMarkerAssociation association;
+        if(index.at("producer") != "2026.3.1.0 (build 38722833) (public-release)")
+            association.reason = "Marker association is qualified only for Nsight 2026.3.1.0/build 38722833";
+        else if(requested.at("delimiter") != "frames" || requested.at("limit") != 1 ||
+                frame.rows[0].values.size() != 1 || counters.rows[0].values.size() != 1)
+            association.reason = "Marker association requires one collected frame and one frame-data column; "
+                                 "sample/frame-column identity is otherwise unresolved";
+        else if(per_action != "Yes")
+            association.reason = "Marker association requires the qualified Time Every Action: Yes export; recollect "
+                                 "with time_every_action true";
+        else
+            association = correlate_profile_marker(events, regimes, row_index);
+        const bool available = association.status == ProfileMarkerStatus::Available;
+        const auto status = available                                                ? "available"
+                            : association.status == ProfileMarkerStatus::Unavailable ? "unavailable"
+                                                                                     : "unsupported";
+        const auto& time = events.rows[row_index].values[0];
+        Json values = Json::array();
+        for(const auto& name : metrics) {
+            Json item{{"name", name},         {"status", "unavailable"}, {"reason", association.reason},
+                      {"row_index", nullptr}, {"column_index", nullptr}, {"text", nullptr},
+                      {"value", nullptr},     {"unit", nullptr},         {"aggregation", nullptr}};
+            if(available) {
+                std::optional<std::size_t> selected;
+                std::size_t matches = 0;
+                for(std::size_t column = 0; column < regimes.columns.size(); ++column)
+                    if(regimes.columns[column] == name) {
+                        selected = column;
+                        ++matches;
+                    }
+                if(matches != 1)
+                    item["reason"] = matches == 0
+                                         ? "Requested metric name is absent from this export"
+                                         : "Requested metric name has multiple columns without unique sample keys";
+                else {
+                    const auto& cell = regimes.rows[*association.regime_row].values[*selected];
+                    item["row_index"] = *association.regime_row;
+                    item["column_index"] = *selected;
+                    item["text"] = cell.text;
+                    if(cell.value) {
+                        item["value"] = *cell.value;
+                        item["status"] = "available";
+                        item["reason"] = nullptr;
+                    } else
+                        item["reason"] = "Producer exported nan; no finite measurement is available";
+                }
+            }
+            values.push_back(std::move(item));
+        }
+        return Json{
+            {"profile_id", id},
+            {"producer", index.at("producer")},
+            {"gpu", index.at("gpu")},
+            {"driver", index.at("driver")},
+            {"source_project_version", profile.report.at("project_version")},
+            {"report", profile.report_reference},
+            {"selection",
+             {{"domain", "gpu_trace_exported_marker"},
+              {"event_row_index", row_index},
+              {"raw_label", events.rows[row_index].label},
+              {"export_path", association.path.empty() ? Json(nullptr) : Json(association.path)},
+              {"flat_path", association.path.empty() ? Json(nullptr) : Json(association.flat_path)},
+              {"event_path_matches", association.event_matches},
+              {"regime_path_matches", association.regime_matches},
+              {"regime_row_index", association.regime_row ? Json(*association.regime_row) : Json(nullptr)}}},
+            {"coverage", {{"status", status}, {"reason", association.reason}}},
+            {"duration",
+             {{"status", available ? "available" : "unavailable"},
+              {"reason", available ? Json(nullptr) : Json(association.reason)},
+              {"text", available ? Json(time.text) : Json(nullptr)},
+              {"value", available ? Json(*time.value) : Json(nullptr)},
+              {"unit", "ms"},
+              {"unit_source", "D3DPERF_EVENTS.xls time_ms header"},
+              {"column_index", available ? Json(0) : Json(nullptr)},
+              {"scope", "exported_marker_range"}}},
+            {"metrics", values},
+            {"metric_semantics",
+             {{"scope", "exported_marker_regime"},
+              {"unit_source", nullptr},
+              {"normalization", nullptr},
+              {"shader_stage", nullptr},
+              {"isolated_draw", false},
+              {"reason", "Raw producer-exported regime cells associated by exact unique path; physical scaling, "
+                         "aggregation, shader-stage isolation and exact draw attribution remain unresolved"}}},
+            {"identities",
+             {{"frame_id", nullptr},
+              {"queue_id", nullptr},
+              {"submission_id", nullptr},
+              {"action_id", nullptr},
+              {"draw_count", nullptr},
+              {"reason", "Original execution IDs and draw membership are not supplied by the qualified export; names "
+                         "and source capture event numbers do not establish them"}}},
+            {"collection",
+             {{"delimiter", requested.at("delimiter")},
+              {"limit", requested.at("limit")},
+              {"time_every_action_exported", per_action},
+              {"gpu_clocks", "unaltered"},
+              {"overhead", "Instrumentation overhead is present and not subtracted; no per-marker causal overhead "
+                           "estimate or correction is inferred"}}},
+            {"evidence",
+             {{"event_durations", refs.at("event_durations")},
+              {"regime_metrics", refs.at("regime_metrics")},
+              {"reproduction", index.at("reproduction")}}}};
     });
 }
 

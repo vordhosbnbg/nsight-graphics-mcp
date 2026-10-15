@@ -1,5 +1,13 @@
 # Local MCP server
 
+At **0.4.10**, `profile_marker` brings the shared surface to **29 tools**. It
+returns a qualified single-frame exported marker-range duration and up to eight
+requested raw regime metrics, with exact path/position/hash provenance and
+explicit ambiguity/refusal coverage. Original execution IDs, physical counter
+scaling and isolated draw scope remain unavailable.
+[PROFILE_MARKERS.md](PROFILE_MARKERS.md) defines the bounded contract and actual
+retained-profile qualification. The versioned notes below retain earlier surfaces.
+
 At **0.4.5**, two recorded-state tools bring the shared surface to **28 tools**:
 `capture_draw_executions` lists capture-local recorded submission occurrences;
 `capture_draw_state` interprets the qualified pipeline/shader, depth/culling and
@@ -101,6 +109,7 @@ The surface remains 28 tools; see [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md).
 | `profile` | Required absolute `executable`, `working_directory`, and `settings.architecture`. Optional arguments, pin, application output option and deadline follow capture. Settings select frames/submits, start/limit/duration and metric set. Launches one fresh target through GPU Trace with clocks unaltered; never changes permissions. Returns identity/artifact ID. See PERFORMANCE.md for defaults and prerequisites. |
 | `profile_metadata` | Required `profile_id`; validates retained service-produced evidence and returns producer, GPU/driver, requested/exported settings and hashed file references. Works offline after restart. |
 | `profile_metrics` | Required `profile_id` and `table` (frame_duration, frame_metrics, event_durations or regime_metrics). Optional row offset/limit (0/50, max 100), numeric column offset/limit (0/32, max 64). Returns positional values with original text, explicit ms for event durations and null for unresolved units. No inferred frame/statistic mapping. |
+| `profile_marker` | Required `profile_id` and `event_row_index` (0–4095); optional up to eight distinct exact `metrics` names. Select the row using `profile_metrics`. Requires the qualified 2026.3 producer, one frame, Time Every Action Yes, supported hierarchy and a unique exact event/regime path. Returns marker duration in ms, requested raw regime cells and explicit unavailable identities/scaling. Repeated paths and unsupported collection shapes receive null values with reasons. Works offline; see PROFILE_MARKERS.md. |
 | `profile_compare` | Required baseline/candidate arrays of 2–8 distinct profile IDs each, table, exact label, numeric column_index, workload_policy and warmup_policy. Checks matching producer, exported GPU name, driver and collection settings; returns per-trace summaries and equally weighted run-median statistics, with hashed report references. Declarations are unverified; no inferred correctness, significance or clock stability. See PERFORMANCE.md. |
 | `capture` | Required absolute `executable` and `working_directory`; optional `arguments` (up to 256 strings, each at most 4096 bytes), `capture_frame` (default 2, minimum 2), `delimiter` (`present`, the default, `graphics_capture_api`, or `vk_frame_boundary`), `timeout_ms` (default 120000, range 1–600000), `pin` (default false), and `application_output_option` (one option of at most 64 bytes). Captures one selected delimiter interval in a fresh target. The SDK delimiter requires application-side initialization/boundaries; its exact two-release basic-workload qualification is in SDK_CONTROL.md. The extension delimiter requires application-enabled VK_EXT_frame_boundary and frame-end submissions; see COMPUTE.md for its measured 2026.3-only compute profile. Returns `identity` and `artifact_id`. |
 | `capture_cpp` | Required absolute `executable` and `working_directory`; optional `arguments`, `wait_frames` (default 2, range 2–1000000), `timeout_ms`, `pin`, and `application_output_option` with the same bounds as `capture`. Generates a C++ project in a fresh target. Read `derived/cpp-project.json` and its source paths through artifact tools. Does not accept `capture_frame` or `delimiter`; see CPP_CAPTURE.md. |

@@ -121,6 +121,13 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
              "unaltered. Retained metric queries require only --artifact-root, independently of this collection "
              "availability. Numeric positions and unresolved physical units are preserved; workload "
              "correctness, repeated comparisons and performance improvement are not inferred."}}},
+          {"profile_markers",
+           {{"available", storage},
+            {"status", storage ? "qualified_export_subset" : "missing_prerequisites"},
+            {"reason", "profile_marker joins a unique exact event/regime path in a qualified 2026.3.1.0 single-frame "
+                       "Time Every Action Yes export. Marker ranges may contain several draws; original execution "
+                       "IDs, physical counter scaling and isolated draw scope remain unavailable. Every call checks "
+                       "producer, collection shape, grammar, ambiguity, hashes and retained evidence."}}},
           {"fixture_via_mcp",
            unavailable("No fixture-specific tool; the generic capture tool accepts its absolute executable path.")}}},
         {"prerequisites",
@@ -239,7 +246,7 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state"}) {
+    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }

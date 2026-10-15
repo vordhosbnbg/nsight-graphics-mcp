@@ -4,6 +4,7 @@
 #include "ngm/Inspection.hpp"
 #include "ngm/NsightEvidence.hpp"
 #include "ngm/ProfileInspection.hpp"
+#include "ngm/ProfileMarkers.hpp"
 #include "ngm/Version.hpp"
 
 #include <fastmcpp/util/pagination.hpp>
@@ -778,6 +779,7 @@ Json implemented_tool_names() {
                         "profile",
                         "profile_metadata",
                         "profile_metrics",
+                        "profile_marker",
                         "profile_compare"});
 }
 
@@ -980,6 +982,101 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .metrics(artifact_id(args, "profile_id"), args.at("table"), args.value("offset", std::size_t{0}),
                          args.value("limit", std::size_t{50}), args.value("column_offset", std::size_t{0}),
                          args.value("column_limit", std::size_t{32}));
+        });
+
+    const auto marker_status = Schema{{"type", "string"}, {"enum", {"available", "unavailable", "unsupported"}}};
+    const auto field_status = Schema{{"type", "string"}, {"enum", {"available", "unavailable"}}};
+    const auto null_value = Schema{{"type", "null"}};
+    auto metric_names = array_schema(string_schema(4096, 1), ProfileMarkerLimits::metrics);
+    metric_names["uniqueItems"] = true;
+    const auto marker_metric = object_schema(
+        {{"name", string_schema(4096, 1)},
+         {"status", field_status},
+         {"reason", nullable(string_schema(512, 1))},
+         {"row_index", nullable(integer_schema(0, 4095))},
+         {"column_index", nullable(integer_schema(0, 4095))},
+         {"text", nullable(string_schema(4096, 1))},
+         {"value", nullable({{"type", "number"}})},
+         {"unit", null_value},
+         {"aggregation", null_value}},
+        {"name", "status", "reason", "row_index", "column_index", "text", "value", "unit", "aggregation"});
+    add_tool(
+        tools, "profile_marker",
+        object_schema({{"profile_id", string_schema(39, 39)},
+                       {"event_row_index", integer_schema(0, 4095)},
+                       {"metrics", metric_names}},
+                      {"profile_id", "event_row_index"}),
+        object_schema(
+            {{"profile_id", string_schema(39, 39)},
+             {"producer", string_schema(128, 1)},
+             {"gpu", string_schema(4096, 1)},
+             {"driver", string_schema(4096, 1)},
+             {"source_project_version", string_schema(64, 1)},
+             {"report", profile_ref},
+             {"selection", object_schema({{"domain", {{"type", "string"}, {"enum", {"gpu_trace_exported_marker"}}}},
+                                          {"event_row_index", integer_schema(0, 4095)},
+                                          {"raw_label", string_schema(4096, 1)},
+                                          {"export_path",
+                                           nullable(array_schema(string_schema(ProfileMarkerLimits::component_bytes, 1),
+                                                                 ProfileMarkerLimits::depth))},
+                                          {"flat_path", nullable(string_schema(ProfileMarkerLimits::path_bytes, 1))},
+                                          {"event_path_matches", integer_schema(0, 4096)},
+                                          {"regime_path_matches", integer_schema(0, 4096)},
+                                          {"regime_row_index", nullable(integer_schema(0, 4095))}},
+                                         {"domain", "event_row_index", "raw_label", "export_path", "flat_path",
+                                          "event_path_matches", "regime_path_matches", "regime_row_index"})},
+             {"coverage",
+              object_schema({{"status", marker_status}, {"reason", string_schema(512, 1)}}, {"status", "reason"})},
+             {"duration",
+              object_schema({{"status", field_status},
+                             {"reason", nullable(string_schema(512, 1))},
+                             {"text", nullable(string_schema(4096, 1))},
+                             {"value", nullable({{"type", "number"}})},
+                             {"unit", {{"type", "string"}, {"enum", {"ms"}}}},
+                             {"unit_source", string_schema(128, 1)},
+                             {"column_index", nullable(integer_schema(0, 0))},
+                             {"scope", {{"type", "string"}, {"enum", {"exported_marker_range"}}}}},
+                            {"status", "reason", "text", "value", "unit", "unit_source", "column_index", "scope"})},
+             {"metrics", array_schema(marker_metric, ProfileMarkerLimits::metrics)},
+             {"metric_semantics",
+              object_schema({{"scope", {{"type", "string"}, {"enum", {"exported_marker_regime"}}}},
+                             {"unit_source", null_value},
+                             {"normalization", null_value},
+                             {"shader_stage", null_value},
+                             {"isolated_draw", {{"type", "boolean"}, {"const", false}}},
+                             {"reason", string_schema(512, 1)}},
+                            {"scope", "unit_source", "normalization", "shader_stage", "isolated_draw", "reason"})},
+             {"identities",
+              object_schema({{"frame_id", null_value},
+                             {"queue_id", null_value},
+                             {"submission_id", null_value},
+                             {"action_id", null_value},
+                             {"draw_count", null_value},
+                             {"reason", string_schema(512, 1)}},
+                            {"frame_id", "queue_id", "submission_id", "action_id", "draw_count", "reason"})},
+             {"collection",
+              object_schema({{"delimiter", {{"type", "string"}, {"enum", {"frames", "submits"}}}},
+                             {"limit", integer_schema(1, 1000)},
+                             {"time_every_action_exported", nullable(string_schema(4096))},
+                             {"gpu_clocks", {{"type", "string"}, {"enum", {"unaltered"}}}},
+                             {"overhead", string_schema(512, 1)}},
+                            {"delimiter", "limit", "time_every_action_exported", "gpu_clocks", "overhead"})},
+             {"evidence",
+              object_schema(
+                  {{"event_durations", profile_ref}, {"regime_metrics", profile_ref}, {"reproduction", profile_ref}},
+                  {"event_durations", "regime_metrics", "reproduction"})}},
+            {"profile_id", "producer", "gpu", "driver", "source_project_version", "report", "selection", "coverage",
+             "duration", "metrics", "metric_semantics", "identities", "collection", "evidence"}),
+        "Inspect one retained exported marker range and up to eight exact named regime metrics. Select event_row_index "
+        "using profile_metrics event_durations. Requires qualified Nsight 2026.3.1.0/build 38722833, one frame, "
+        "Time Every Action Yes, supported marker spelling/indentation and a unique exact same-profile regime path. "
+        "Returns explicit coverage/refusals. Durations are exported marker ranges in ms; markers may contain several "
+        "draws. Counter units/normalization, original execution IDs and isolated draw scope remain unavailable. "
+        "Uses retained hashes and leases; no live tool/GPU, new capture or instrumentation correction is required.",
+        true, false, [this](const Json& args) {
+            return ProfileInspection(service().artifacts())
+                .marker(artifact_id(args, "profile_id"), args.at("event_row_index").get<std::size_t>(),
+                        args.value("metrics", std::vector<std::string>{}));
         });
 
     const auto statistic = object_schema({{"count", integer_schema(1, 4096)},

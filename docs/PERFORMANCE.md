@@ -10,6 +10,14 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+At **0.4.10**, [profile_marker](PROFILE_MARKERS.md) exposes the qualified
+single-frame unique-path subset through the shared 29-tool surface. It returns
+exported marker duration in ms and up to eight requested raw regime metrics,
+with explicit ambiguity, unknown physical scaling and unavailable original
+execution IDs. A marker can contain several draws. Retained source data remains
+0.4.9; the reader qualification uses the actual source-built 0.4.10 MCP process.
+R-022's remaining scope/overhead assessment stays In Progress.
+
 The **0.4.9** graphics timing matrix adds private fixture/API/timestamp validation
 for direct/indexed draws, nested/repeated labels and reused recordings. Fifteen
 fresh profiles pass, with single-frame scene units/timing sanity verified.

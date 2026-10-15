@@ -63,6 +63,17 @@ and BUILD_VALIDATION.md for exact identities and retained evidence.
 The complete qualification is pinned as
 `bundle-40d1c8f983a49246a26d5294f20636bb`, with native sources independently pinned.
 
+At **0.4.10**, step E adds `profile_marker` for qualified single-frame unique
+exported marker paths, with duration in ms, up to eight exact raw regime metrics
+and explicit identity/scaling/ambiguity limits. All **36** serial CPU checks,
+**391** retained-profile stdio results and **eight** HTTP results pass, including
+restart parity and source pin/inventory stability. The source profiles retain
+their 0.4.9 collection identities; no new GPU collection is implied.
+Qualification is pinned as `bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. See
+[PROFILE_MARKERS.md](PROFILE_MARKERS.md) and BUILD_VALIDATION.md. R-022 remains
+In Progress for the remaining scope/overhead assessment. The installed/live
+server remains 0.4.1; the source-built surface now has **29 tools**.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

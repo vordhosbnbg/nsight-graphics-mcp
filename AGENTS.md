@@ -71,6 +71,18 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+The bounded R-022 marker-query slice completes at **0.4.10**, bringing the
+shared stdio/HTTP surface to **29 tools**. `profile_marker` returns duration in
+ms and up to eight raw regime metrics for a uniquely associated qualified
+2026.3 single-frame exported path. Original execution IDs, draw membership and
+physical counter scaling stay unavailable. All **36 CPU checks**, **391**
+retained-profile stdio results and **eight** HTTP results pass actual schemas;
+360 marker selections preserve values/refusals after restart. No new GPU run is
+performed; the fifteen source profiles retain their 0.4.9 identities and pins.
+See docs/PROFILE_MARKERS.md and docs/BUILD_VALIDATION.md. Qualification is pinned
+as `bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. **R-022 stays In Progress** for the remaining
+scope/overhead assessment. The installed/live server remains 0.4.1.
+
 The R-022 graphics timing fixture/assessment slice completes at **0.4.9** with
 the existing **28-tool** surface. Three new direct/indexed/reuse scenarios have
 an explicit private API-marker/timestamp witness; no new product query is added.
@@ -219,7 +231,7 @@ The repository now implements the **0.3.0 visual first-release group**
 0.1.0 and capture/evidence group at 0.2.0. It supplies C++20/CMake/Ninja source
 builds, a deterministic windowed Vulkan fixture, a C++ experiment runner,
 fastmcpp stdio integration, asynchronous capture jobs and managed artifact storage.
-The server exposes **28 tools**, including bounded metadata/event/object queries,
+The server exposes **29 tools**, including bounded metadata/event/object queries,
 image previews/comparisons, generated-source relationships and qualified optional
 serialized-resource reads. `ngm-capture` shares the capture service.
 

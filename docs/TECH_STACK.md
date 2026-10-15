@@ -9,6 +9,17 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.10 marker query separates a pure bounded event/regime path interpreter
+from the existing retained-profile inspection adapter. The adapter holds one
+artifact lease across provenance/hash validation, table parsing and result
+construction; stdio and HTTP share the same typed handler. Same-profile literal
+anchors and unique full paths qualify exported ranges; unknown execution IDs,
+draw membership, counter units/aggregation and shader-stage isolation stay null.
+The opt-in C++ verifier reuses retained 0.4.9 data with independently read raw
+cells and fresh server processes, without a GPU launch or private witness in
+product responses. No new dependency or proprietary helper is selected. See
+PROFILE_MARKERS.md; R-022's remaining scope/overhead assessment stays active.
+
 The 0.4.9 graphics timing slice uses the existing Vulkan/volk fixture and process/
 MCP harness. An explicit private witness adds a two-query timestamp pool and
 records actual API marker occurrences and calls; default launches create no pool.

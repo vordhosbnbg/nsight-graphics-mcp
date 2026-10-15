@@ -6,6 +6,13 @@ private validation witness. It adds no MCP query or new draw/counter claim.
 units/coverage contract. R-022 remains In Progress for bounded product queries
 and the remaining scope/overhead qualification.
 
+At **0.4.10**, [profile_marker](PROFILE_MARKERS.md) implements the qualified
+single-frame unique-path query using this retained matrix. It preserves explicit
+marker/regime scope and unavailable original execution identities and scaling.
+Repeated paths and wider collection shapes receive reasons. R-022 remains In
+Progress for its remaining scope/overhead assessment; the versioned matrix
+results below retain their original 0.4.9 collection/build identities.
+
 ## Workloads and independent witness
 
 | Scenario | Calls per submission | Submissions per present |

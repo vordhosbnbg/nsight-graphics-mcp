@@ -19,6 +19,8 @@ public:
     nlohmann::json metrics(const std::string& id, const std::string& table, std::size_t offset = 0,
                            std::size_t limit = 50, std::size_t column_offset = 0, std::size_t column_limit = 32) const;
     nlohmann::json compare(const ProfileComparison& request) const;
+    nlohmann::json marker(const std::string& id, std::size_t event_row_index,
+                          const std::vector<std::string>& metrics = {}) const;
 
 private:
     ArtifactStore& artifacts_;

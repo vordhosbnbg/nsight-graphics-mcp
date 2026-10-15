@@ -1,0 +1,11 @@
+event_text	time_ms
+frame.5	0.3312
+        scene.raster	0.3312
+                timing.batch	0.328608
+                        branch.a	0.05104
+                                unique.first	0.009248
+                                repeat	0.013952
+                                repeat	0.02784
+                        branch.b	0.277568
+                                repeat	0.055552
+                                unique.pair	0.222016

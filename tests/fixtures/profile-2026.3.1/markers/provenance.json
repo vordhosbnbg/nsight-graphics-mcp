@@ -1,0 +1,15 @@
+{
+  "producer": "2026.3.1.0/build 38722833",
+  "source_profile": "bundle-044dab66242bb5eeac71fd3f1c8c7be5",
+  "qualification_pin": "bundle-40d1c8f983a49246a26d5294f20636bb",
+  "source_project": "0.4.9",
+  "source_event_sha256": "02c997daff06aeb410eb0d0ebdabe90bf1c203ec3921a67eca414fac54ab34bd",
+  "source_regime_sha256": "0c6fd631dc74347d84e52f60f458c7f559398818225aef28150745b5f3ae9acb",
+  "event_fixture_sha256": "02c997daff06aeb410eb0d0ebdabe90bf1c203ec3921a67eca414fac54ab34bd",
+  "regime_fixture_sha256": "99035b9c0e8d1fec954ca66b34dc5d7045e93644ac8be7f2ab71966331148502",
+  "regime_numeric_columns_0_based": [
+    0,
+    13
+  ],
+  "transformation": "Complete exact single-frame event table; select two exact regime metric columns across every row, preserving duplicate paths and raw numeric text. Public repository fixture labels only; no host identity or private application data."
+}

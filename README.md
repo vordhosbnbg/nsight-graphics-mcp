@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**28 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**29 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 ## Example workflows
 
@@ -58,8 +58,9 @@ tested RTX 3080 Ti.
 [Measurement details](docs/PERFORMANCE.md#actual-selected-scenario-source-repair-036-validation)
 
 Profiles can select [per-action timing and HES collection controls](docs/PROFILE_CONTROLS.md).
-Unavailable exported counter cells remain explicit; draw correlation is still
-under qualification.
+For qualified single-frame traces, `profile_marker` reads
+[unique exported marker ranges](docs/PROFILE_MARKERS.md) and associated raw
+regime metrics. Unavailable cells and wider draw/counter scope remain explicit.
 
 ## MCP tools
 
@@ -72,6 +73,7 @@ under qualification.
 | Inspect resource data | `capture_cpp_resources` lists serialized resource references; `capture_cpp_resource` reads byte ranges through an optional resource worker. |
 | Preview and compare images | `artifact_preview_image` returns an image or crop; `artifact_compare_images` measures pixel differences with a specified tolerance. |
 | Profile GPU workloads | `profile` records a GPU Trace; `profile_metadata` describes its configuration; `profile_metrics` reads exported timings and counters. |
+| Inspect marker ranges | `profile_marker` associates unique single-frame exported paths, with marker duration and requested raw regime metrics. |
 | Compare performance | `profile_compare` compares repeated baseline and candidate traces, reporting medians and variation. |
 | Manage jobs | `job_status` reports progress; `job_cancel` requests cancellation. |
 | Browse artifacts | `artifact_list` lists bundles; `artifact_info` describes a bundle; `artifact_files` lists its files; `artifact_read` retrieves text. |
