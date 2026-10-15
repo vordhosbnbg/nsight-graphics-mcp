@@ -1394,3 +1394,36 @@ and no layer-disable filter. Its source pin, literal source queries and exact
 shader-byte oracle are recorded in BUILD_VALIDATION.md. This narrows the failed
 observation to the measured graphics-capture activity; it does not resolve that
 failure or prove an underlying cause.
+
+### I-039 — Remaining selected-state values lack a qualified documented path
+
+- **Context:** Feasibility review at product **0.4.7 / abb6387**, installed Nsight
+  **2026.3.1.0/build 38722833**, plus the four exact retained hydration inputs from
+  matching 2026.3 and **2026.2.0.0/build 37991608**. No new GPU attempt or generic
+  hydration experiment is performed.
+- **Reproduction:** Run the existing C++ `--verify-descriptors SERVER RUN` harness
+  against `draw-state-pC6JVF`, or query `capture_draw_state` for source
+  `bundle-160c221f248ae3873459eb60055300b0` and listed execution reference
+  `c6bcbda467b377e755d23ef692658fb4ee5f82736e7b5bc5af9215a4fc9124f7`.
+  Review its retained source callsites, installed replay help and the documented
+  CLI/C++ export paths. Exact query transcript and source pins are retained with
+  the 0.4.7 qualification.
+- **Expected/observed:** The requested general descriptor contents,
+  execution-time uniform/material values and observed GPU event correspondence
+  cannot be established by these inputs. The successful query correctly reports
+  unavailable value fields and false GPU correspondence. Fresh setup exports use
+  serialized hydration calls (four writes/352 output bytes each); that size does
+  not establish input blob length. Mapped uploads and private fixture witnesses
+  do not establish arbitrary after-event resource lifetime or types. The reviewed
+  documented interfaces establish no additional selected-event backend.
+- **Evidence/retention:** Complete/pinned audit
+  **bundle-7269c28d30326b8f1fa3ef64ebd4ed36** verifies 56 historical file identities,
+  both fresh source pins/callsites and all 15 unavailable value/correspondence
+  outcomes. Existing fixed hydration qualification
+  **bundle-93e2c3dd09c57553642b1afa873e8566** remains pinned separately. See
+  [DRAW_STATE_FEASIBILITY.md](DRAW_STATE_FEASIBILITY.md) for exact scope and sources.
+- **Revisit:** A new documented machine-readable selected-event interface, or an
+  explicitly accepted bounded hydration experiment with independent new-input
+  and resource-lifetime/type evidence. The existing five-file production worker
+  exception does not authorize adding VulkanStructHydrator. This scoped outcome
+  is not a claim that Nsight can never expose these values.

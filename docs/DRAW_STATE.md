@@ -274,5 +274,7 @@ build/linux-gcc-debug/tests/ngm_draw_state_integration --verify-descriptors \
 
 The runner retains the private witness and an independent literal export audit;
 the product never consumes those expected values. See BUILD_VALIDATION.md for
-source identities and pinned qualification. R-021 remains In Progress for the
-contents/value and captured-execution feasibility outcome; R-022 stays Pending.
+source identities and pinned qualification. The subsequent
+[feasibility outcome](DRAW_STATE_FEASIBILITY.md) completes R-021's conditional
+assessment with contents, values and general GPU correspondence unavailable.
+R-022's timing/counter work remains separate.

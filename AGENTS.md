@@ -81,9 +81,11 @@ repeated submissions; the private C++ oracle checks 15 recorded occurrences and
 MCP restart stability. All **46** state responses pass advertised schemas.
 Qualification is pinned as `bundle-b59b7343be911eec0e49b85ffe5767ef`.
 See DRAW_STATE.md and BUILD_VALIDATION.md for the precise
-qualification and pinned evidence. R-021 remains In Progress for contents/value
-and captured-execution feasibility; R-022 stays Pending. The proprietary helper
-closure and machine settings are unchanged.
+qualification and pinned evidence. R-021's conditional feasibility assessment
+is now complete: descriptor contents, execution-time values and general GPU
+correspondence remain unavailable. See docs/DRAW_STATE_FEASIBILITY.md and pinned
+audit `bundle-7269c28d30326b8f1fa3ef64ebd4ed36`. R-022 timing/counters is next and
+In Progress. The proprietary helper closure and machine settings are unchanged.
 
 R-021's push-constant slice completes at **0.4.6**, retaining the **28-tool**
 surface. `capture_draw_state` tracks per-stage partial writes and push-layout

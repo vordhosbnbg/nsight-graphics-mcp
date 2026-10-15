@@ -29,6 +29,15 @@ MCP restart checks. Descriptor contents, uniform/material values and general
 captured-execution correspondence still need their feasibility outcome. This
 does not extend the proprietary helper closure or complete R-021/R-022.
 
+The subsequent [state feasibility outcome](DRAW_STATE_FEASIBILITY.md) completes
+step D/R-021's conditional assessment at **0.4.7**: implemented recorded-state
+slices remain qualified, while descriptor contents, execution-time values and
+general GPU correspondence remain explicitly unavailable. The two-producer/
+fresh-input audit is pinned as `bundle-7269c28d30326b8f1fa3ef64ebd4ed36`.
+This documentation-only closure does not add a full-state capability or extend
+the helper policy. Step E/R-022 is now In Progress. Earlier versioned implementation
+notes above retain their status at those increments.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.
