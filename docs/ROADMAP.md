@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019 completes launch-environment implementation at 0.4.3 with current capture timeouts explicitly unqualified; R-020–R-022 track profile-table compatibility, selected-draw state and correlated timing/counters. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 26 tools; new capabilities require their own evidence.**
+Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019 completes launch-environment implementation at 0.4.3 with current capture timeouts explicitly unqualified; R-020 completes profile-table compatibility at 0.4.4; R-021–R-022 track selected-draw state and correlated timing/counters. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 26 tools; new capabilities require their own evidence.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -176,31 +176,19 @@ Item conventions:
 
 ## In Progress
 
-### R-020
-
-```text
-Status: In Progress
-Area: profile/inspection/mcp/test
-Title: Preserve valid header-only event and regime exports
-Goal: Keep frame metrics usable when a qualified GPU Trace export has no action/regime rows.
-Scope: Accept producer-qualified header-only event/regime tables; make metadata, queries and comparisons safe with explicit missing coverage; retain malformed-export rejection.
-Acceptance: Retained header shapes and frame rows parse; stand-in jobs, restart, queries and comparisons preserve provenance and never fabricate zero counters or durations.
-Notes: Authorized by the owner on 2026-10-15. Step C; complete before new live profiling. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
-```
-
-## Pending
-
 ### R-021
 
 ```text
-Status: Pending
+Status: In Progress
 Area: inspection/capture/mcp/test
 Title: Qualify selected-draw state in bounded evidence slices
 Goal: Expose evidence-supported pipeline/shader, depth/culling and viewport/scissor state for identified draw execution occurrences, then assess descriptors/constants/values.
 Scope: Qualify documented interfaces and retained source grammar, add a separate state interpreter/adapter with capture-local execution selection, per-field provenance and deterministic refusals; qualify later state/value slices only where evidence establishes them.
 Acceptance: Independent fixture API/execution records, static/dynamic disagreement and lifecycle/refusal matrices pass; retained and fresh matching-tool evidence supports every advertised field; unresolved executed-state/value correspondence remains explicitly unavailable.
-Notes: Authorized by the owner on 2026-10-15. Step D; documented interfaces only. Wider proprietary hydration helper closure requires a separate owner scope decision; the current authorization does not silently extend it. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+Notes: Authorized by the owner on 2026-10-15. Step D; documented interfaces only. A current 0.4.4 Generate C++ Capture succeeds on matching 2026.3 tools; its pinned source and exact shader-byte read establish the next evidence path, separately from I-038 graphics timeouts. No new state query is implemented yet; see BUILD_VALIDATION.md. Wider proprietary hydration helper closure requires a separate owner scope decision; the current authorization does not silently extend it. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
 ```
+
+## Pending
 
 ### R-022
 
@@ -217,6 +205,18 @@ Notes: Authorized by the owner on 2026-10-15. Step E; no private trace decoder, 
 ## Blocked
 
 ## Done
+
+### R-020
+
+```text
+Status: Done
+Area: profile/inspection/mcp/test
+Title: Preserve valid header-only event and regime exports
+Goal: Keep frame metrics usable when a qualified GPU Trace export has no action/regime rows.
+Scope: Accept producer-qualified header-only event/regime tables; make metadata, queries and comparisons safe with explicit missing coverage; retain malformed-export rejection.
+Acceptance: Retained header shapes and frame rows parse; stand-in jobs, restart, queries and comparisons preserve provenance and never fabricate zero counters or durations.
+Notes: Authorized by the owner on 2026-10-15. Step C completes at 0.4.4: 32/32 serial CPU checks pass. Actual retained header shapes and all 146 frame rows pass managed stand-in/typed queries; actual MCP empty/escaped-header paging and restart checks pass. Empty comparisons refuse explicitly. Qualification is pinned as bundle-2051be7525227bb35f9e959f9d96c9ca; no new GPU profiling, raw import or draw correlation is claimed. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
 
 ### R-019
 

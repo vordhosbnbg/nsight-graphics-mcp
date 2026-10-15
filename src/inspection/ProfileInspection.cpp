@@ -278,6 +278,17 @@ Json ProfileInspection::metadata(const std::string& id) const {
     return guarded([&] {
         const auto profile = open(artifacts_, id);
         const auto& index = profile.index;
+        Json coverage = Json::object();
+        for(const auto& [name, ref] : index.at("tables").items()) {
+            const auto table = parse_profile_table(reference(artifacts_, id, ref), table_kind(name));
+            coverage[name] = {
+                {"status", table.rows.empty() ? "unavailable" : "available"},
+                {"rows", table.rows.size()},
+                {"numeric_columns", table.columns.empty() ? table.rows.at(0).values.size() : table.columns.size()},
+                {"reason", table.rows.empty()
+                               ? "Valid exported header contains no rows; action/regime evidence is unavailable"
+                               : "Exported rows are available within their recorded scope"}};
+        }
         return Json{{"profile_id", id},
                     {"producer", index.at("producer")},
                     {"gpu", index.at("gpu")},
@@ -287,6 +298,7 @@ Json ProfileInspection::metadata(const std::string& id) const {
                     {"trace", index.at("trace")},
                     {"reproduction", index.at("reproduction")},
                     {"tables", index.at("tables")},
+                    {"table_coverage", coverage},
                     {"scope", "Retained live-target exports; application correctness, repeated-run equivalence and "
                               "physical metric scaling are not inferred."}};
     });
@@ -303,10 +315,24 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
         const auto profile = open(artifacts_, id);
         const auto& ref = profile.index.at("tables").at(name);
         const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
-        const auto width = table.rows.front().values.size();
-        const auto end_column = std::min(width, column_offset + column_limit);
+        const auto width = table.columns.empty() ? table.rows.at(0).values.size() : table.columns.size();
+        auto end_column = std::min(width, column_offset + column_limit);
+        Json columns = Json::array();
+        std::size_t bytes = 0;
+        for(auto column = column_offset; column < end_column; ++column) {
+            Json item{{"column_index", column},
+                      {"column_name", table.columns.empty() ? Json(nullptr) : Json(table.columns[column])},
+                      {"unit", kind == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)}};
+            const auto size = item.dump().size();
+            if(bytes + size > 240 * 1024) {
+                end_column = column;
+                break;
+            }
+            bytes += size;
+            columns.push_back(std::move(item));
+        }
         Json rows = Json::array();
-        std::size_t bytes = 0, next = std::min(offset, table.rows.size());
+        std::size_t next = std::min(offset, table.rows.size());
         for(; next < table.rows.size() && rows.size() < limit; ++next) {
             const auto& row = table.rows[next];
             Json values = Json::array();
@@ -334,6 +360,14 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             {"source", ref},
             {"total_rows", table.rows.size()},
             {"total_columns", width},
+            {"label_column", table.label_column.empty() ? Json(nullptr) : Json(table.label_column)},
+            {"columns", columns},
+            {"coverage",
+             {{"status", table.rows.empty() ? "unavailable" : "available"},
+              {"reason",
+               table.rows.empty()
+                   ? "The producer exported a valid header with no rows; no action/regime values are available"
+                   : "Exported rows are available within their recorded scope"}}},
             {"offset", offset},
             {"column_offset", column_offset},
             {"rows", std::move(rows)},
@@ -388,6 +422,9 @@ Json ProfileInspection::compare(const ProfileComparison& request) const {
                 const auto& profile = profiles.at(id);
                 const auto& ref = profile.index.at("tables").at(request.table);
                 const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
+                if(table.rows.empty())
+                    throw std::invalid_argument("Selected table has no exported rows in profile " + id +
+                                                "; action/regime comparison is unavailable");
                 if(request.column_index >= table.rows.front().values.size())
                     throw std::invalid_argument("Selected column is absent in a comparison profile");
                 const Json name = table.columns.empty() ? Json(nullptr) : Json(table.columns[request.column_index]);

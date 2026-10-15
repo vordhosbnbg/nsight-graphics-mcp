@@ -4,6 +4,7 @@
 #include "ngm/ProfileEvidence.hpp"
 
 #include <filesystem>
+#include <sstream>
 
 namespace {
 using ngm::check::require;
@@ -71,6 +72,37 @@ int main(int argc, char** argv) {
         const auto graphics =
             ngm::parse_profile_table(read(argv[1], "graphics-GPUTRACE_FRAME.xls.tsv"), Kind::FrameMetrics);
         require(graphics.rows.size() == 2 && graphics.rows[0].values.size() == 3, "three raw frame positions");
+        const auto empty_events =
+            ngm::parse_profile_table(read(argv[1], "header-only/D3DPERF_EVENTS.xls.tsv"), Kind::EventDurations);
+        const auto empty_regimes =
+            ngm::parse_profile_table(read(argv[1], "header-only/GPUTRACE_REGIMES.xls.tsv"), Kind::RegimeMetrics);
+        require(empty_events.rows.empty() && empty_events.label_column == "event_text" &&
+                    empty_events.columns == std::vector<std::string>{"time_ms"},
+                "actual retained event header remains available with zero rows");
+        require(empty_regimes.rows.empty() && empty_regimes.label_column == "flattened_event_name" &&
+                    empty_regimes.columns.size() == 146 && !empty_regimes.columns.front().empty() &&
+                    !empty_regimes.columns.back().empty(),
+                "all 147 retained regime header fields survive without invented values");
+        std::istringstream header_fields(read(argv[1], "header-only/GPUTRACE_REGIMES.xls.tsv"));
+        std::string field;
+        std::getline(header_fields, field, '\t');
+        require(field == empty_regimes.label_column, "retained label header matches exactly");
+        std::vector<std::string> expected_columns;
+        while(std::getline(header_fields, field, '\t')) {
+            while(!field.empty() && (field.back() == '\r' || field.back() == '\n'))
+                field.pop_back();
+            expected_columns.push_back(field);
+        }
+        require(empty_regimes.columns == expected_columns, "every retained metric header name is preserved in order");
+        const auto retained_frame =
+            ngm::parse_profile_table(read(argv[1], "header-only/GPUTRACE_FRAME.xls.tsv"), Kind::FrameMetrics);
+        const auto retained_duration =
+            ngm::parse_profile_table(read(argv[1], "header-only/FRAME.xls.tsv"), Kind::FrameDuration);
+        require(retained_frame.rows.size() == 146 && retained_duration.rows.size() == 1 &&
+                    retained_duration.rows[0].values[0].value == 2.33344,
+                "the retained 146 frame metrics and actual duration remain usable");
+        require(ngm::parse_profile_table("event_text\ttime_ms\r\n", Kind::EventDurations).rows.empty(),
+                "CRLF header-only export is valid");
         const auto exact = ngm::parse_profile_table("metric\t1.2500e-03\r\n", Kind::FrameMetrics);
         require(exact.rows[0].values[0].text == "1.2500e-03" && exact.rows[0].values[0].value == .00125,
                 "text precision and CRLF preserved/accepted");
@@ -90,8 +122,12 @@ int main(int argc, char** argv) {
         rejected(Code::InvalidField,
                  [&] { ngm::parse_profile_table("event_text\tmilliseconds\nx\t1", Kind::EventDurations); });
         rejected(Code::InvalidSchema, [&] { ngm::parse_profile_table("unknown\t1", Kind::FrameDuration); });
+        rejected(Code::InvalidField, [&] { ngm::parse_profile_table("flattened_event_name\t", Kind::RegimeMetrics); });
+        rejected(Code::InvalidSchema, [&] { ngm::parse_profile_table("wrong\ttime_ms", Kind::EventDurations); });
+        rejected(Code::InvalidField,
+                 [&] { ngm::parse_profile_table("event_text\tmilliseconds", Kind::EventDurations); });
         rejected(Code::InvalidSchema,
-                 [&] { ngm::parse_profile_table("flattened_event_name\tm", Kind::RegimeMetrics); });
+                 [&] { ngm::parse_profile_table("event_text\ttime_ms\n\n", Kind::EventDurations); });
         rejected(Code::LimitExceeded,
                  [&] { ngm::parse_profile_table(std::string(Limits::bytes + 1, 'x'), Kind::FrameMetrics); });
         rejected(Code::LimitExceeded, [&] {

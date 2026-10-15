@@ -158,6 +158,22 @@ int main(int argc, char** argv) {
                         std::abs(durations["baseline"]["run_medians"]["median"].get<double>() - 0.15) < 1e-15,
                     "explicit duration units, duplicate labels reduced within trace");
             auto headerless = spec;
+            auto partial = spec;
+            partial.candidate[0] = produce(service, "", {"--profile-header-only"});
+            for(const auto* table : {"regime_metrics", "event_durations"}) {
+                partial.table = table;
+                bool unavailable = false;
+                try {
+                    inspect.compare(partial);
+                } catch(const std::exception& error) {
+                    unavailable = std::string_view(error.what()).find("no exported rows") != std::string_view::npos;
+                }
+                require(unavailable, "header-only table comparison reports missing selection, never numeric zero");
+            }
+            partial.table = "frame_metrics";
+            partial.label = "synthetic.metric";
+            require(inspect.compare(partial).at("candidate").at("run_medians").at("median") == 1,
+                    "missing action rows leave valid frame comparisons usable");
             headerless.table = "frame_metrics";
             headerless.label = "synthetic.metric";
             const auto frame_metric = inspect.compare(headerless);

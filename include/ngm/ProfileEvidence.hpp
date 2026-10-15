@@ -37,7 +37,8 @@ enum class ProfileTableKind { FrameDuration, FrameMetrics, EventDurations, Regim
 
 // Pure, bounded parsers. Throw NsightEvidenceError. No file access, provenance
 // authentication, unit scaling, event joins, or workload equivalence is inferred.
-// Empty exports are rejected; callers must report missing evidence separately.
+// Empty files are rejected. Valid event/regime headers may have zero rows;
+// retain their columns and report missing data explicitly in consumers.
 ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind);
 
 struct ProfileReproduction {

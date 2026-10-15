@@ -60,6 +60,11 @@ Both transports use the shared validator and service. `capabilities` exposes its
 allowlist and limits; [LAUNCH_ENVIRONMENT.md](LAUNCH_ENVIRONMENT.md) documents
 values, provenance, isolation and the corresponding capture CLI options.
 
+At **0.4.4**, profile metadata includes per-table coverage, and metric pages include
+the label header, paginated column identities and explicit availability even for
+valid zero-row event/regime exports. Frame data stays available; comparisons
+refuse absent rows. See [PERFORMANCE.md](PERFORMANCE.md).
+
 | Tool | Inputs and behavior |
 | --- | --- |
 | `profile` | Required absolute `executable`, `working_directory`, and `settings.architecture`. Optional arguments, pin, application output option and deadline follow capture. Settings select frames/submits, start/limit/duration and metric set. Launches one fresh target through GPU Trace with clocks unaltered; never changes permissions. Returns identity/artifact ID. See PERFORMANCE.md for defaults and prerequisites. |

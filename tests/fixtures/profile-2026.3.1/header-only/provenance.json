@@ -1,0 +1,35 @@
+{
+  "producer": "2026.3.1.0 (build 38722833) (public-release)",
+  "origin": "Externally retained game GPU Trace auto-export, 2026-10-14",
+  "scope": "Parser fixtures; not service-produced captures or per-draw evidence",
+  "files": [
+    {
+      "source": "/home/vordhosbn/.local/share/eternity-forge/profiles/r119-4k-2026-10-14/graphics-training-box-3/BASE_UNLOCKED/D3DPERF_EVENTS.xls",
+      "raw_sha256": "71afdc2ab248f5733858a7eb0fea7e02a060d377fdd7bf876585993a0f50c959",
+      "fixture": "D3DPERF_EVENTS.xls.tsv",
+      "fixture_sha256": "71afdc2ab248f5733858a7eb0fea7e02a060d377fdd7bf876585993a0f50c959",
+      "sanitization": "None; header-only tables or frame metric names/numeric values, no host/application paths."
+    },
+    {
+      "source": "/home/vordhosbn/.local/share/eternity-forge/profiles/r119-4k-2026-10-14/graphics-training-box-3/BASE_UNLOCKED/GPUTRACE_REGIMES.xls",
+      "raw_sha256": "554eae894874cbc549f225ce7a0535aa048555dc46eaa657e5939496247ef746",
+      "fixture": "GPUTRACE_REGIMES.xls.tsv",
+      "fixture_sha256": "554eae894874cbc549f225ce7a0535aa048555dc46eaa657e5939496247ef746",
+      "sanitization": "None; header-only tables or frame metric names/numeric values, no host/application paths."
+    },
+    {
+      "source": "/home/vordhosbn/.local/share/eternity-forge/profiles/r119-4k-2026-10-14/graphics-training-box-3/BASE_UNLOCKED/GPUTRACE_FRAME.xls",
+      "raw_sha256": "f5e3c5042b1d2fb9370fd9b4c88ca79f8105eae59224d39997d6c5c2707110b0",
+      "fixture": "GPUTRACE_FRAME.xls.tsv",
+      "fixture_sha256": "f5e3c5042b1d2fb9370fd9b4c88ca79f8105eae59224d39997d6c5c2707110b0",
+      "sanitization": "None; header-only tables or frame metric names/numeric values, no host/application paths."
+    },
+    {
+      "source": "/home/vordhosbn/.local/share/eternity-forge/profiles/r119-4k-2026-10-14/graphics-training-box-3/BASE_UNLOCKED/FRAME.xls",
+      "raw_sha256": "16460b1d3cd0d14bb068cfa85c5ede05819365763b0edd03f63a31e492e4cf80",
+      "fixture": "FRAME.xls.tsv",
+      "fixture_sha256": "16460b1d3cd0d14bb068cfa85c5ede05819365763b0edd03f63a31e492e4cf80",
+      "sanitization": "None; header-only tables or frame metric names/numeric values, no host/application paths."
+    }
+  ]
+}

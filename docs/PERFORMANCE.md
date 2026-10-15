@@ -10,6 +10,17 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+At **0.4.4**, valid header-only event/regime exports preserve their headers and
+can accompany a successful profile with partial coverage. `profile_metadata`
+returns `table_coverage` (status, reason, row count and numeric column count).
+`profile_metrics` returns `label_column`, separately paginated `columns` and
+explicit `coverage`, including when `rows` is empty. A missing action/regime row
+never becomes a zero timing/counter. `profile_compare` refuses a selection from
+an empty table with an actionable unavailable-selection error. Frame metrics and
+frame comparisons remain usable. Empty files, malformed headers, ragged rows and
+invalid numbers still fail. These additive query fields require no artifact
+schema change; existing profile references and provenance checks remain in force.
+
 `profile` launches a fresh target through the documented GPU Trace CLI. It shares
 the capture job coordinator, GPU reservation, owned-process cleanup and managed
 artifact store. Poll `job_status` and cancel with `job_cancel`; client lifetime
@@ -39,10 +50,18 @@ accepts `profile_id` and one of `frame_duration`, `frame_metrics`,
 `event_durations`, or `regime_metrics`. Row pagination uses `offset`/`limit`
 (default 0/50, maximum 100); independent numeric-column pagination uses
 `column_offset`/`column_limit` (default 0/32, maximum 64). Both offsets are bounded
-at 4096, and pages have a 240 KiB row budget. Values retain original text,
+at 4096, and pages share a 240 KiB column/row budget. Values retain original text,
 finite numeric value and export position. `unit` is `ms` only for explicit
 `time_ms` event-duration columns; otherwise it is null. Repeated labels/headers
 remain distinct positions, with no inferred event IDs or statistical meaning.
+
+The retained 2026.3 game regression inputs have a two-field empty event header,
+a 147-field empty regime header and 146 usable frame metrics. Parser and managed
+stand-in checks preserve all headers/rows, query them after restart, and retain
+explicit missing coverage. Actual MCP checks also page maximum-length escaped
+header names within the response/protocol budgets. The stand-in's producer/GPU
+metadata stays explicitly synthetic. No absent draw rows are reconstructed, and
+no raw-profile import or new hardware/correlation support is introduced.
 
 Queries lease the bundle, check index/report/manifest and producer consistency,
 validate inventoried references, and verify hashes of text exports they read.

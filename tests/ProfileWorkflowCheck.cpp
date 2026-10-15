@@ -89,10 +89,61 @@ int main(int argc, char** argv) {
         request.format = ngm::CaptureFormat::Profile;
         request.executable = target;
         request.working_directory = scratch.path;
-        request.timeout = 5s;
+        // Happy-path submissions include queueing plus publication of the
+        // 520-file application output below. Deadline behavior has separate
+        // deliberately short cases; do not make this outcome depend on disk load.
+        request.timeout = 15s;
         request.profile.architecture = "Ampere GA10x";
         request.pin = true;
         std::string retained;
+        std::string retained_empty;
+        {
+            auto empty_options = options;
+            empty_options.environment["NGM_STANDIN_PROFILE_MODE"] = "header-only";
+            empty_options.environment["NGM_STANDIN_PROFILE_EXPORT_ROOT"] = NGM_PROFILE_TABLE_FIXTURES;
+            ngm::CaptureService service(empty_options);
+            const auto submitted = service.capture(request);
+            require(completed(service, submitted).state == ngm::JobState::succeeded,
+                    "valid header-only event/regime tables publish a successful partial-coverage profile");
+            retained_empty = submitted.artifact_id;
+            ngm::ProfileInspection inspection(service.artifacts());
+            const auto metadata = inspection.metadata(retained_empty);
+            for(const auto* name : {"event_durations", "regime_metrics"}) {
+                require(metadata.at("table_coverage").at(name).at("status") == "unavailable" &&
+                            metadata.at("table_coverage").at(name).at("rows") == 0,
+                        "metadata reports missing action/regime evidence");
+                const auto page = inspection.metrics(retained_empty, name, 0, 50, 0, 1);
+                require(page.at("rows").empty() && page.at("total_rows") == 0 && page.at("next_offset").is_null() &&
+                            page.at("coverage").at("status") == "unavailable" && page.at("columns").size() == 1,
+                        "empty tables retain bounded headers without invented values");
+            }
+            const auto regimes = inspection.metrics(retained_empty, "regime_metrics", 0, 50, 0, 1);
+            const auto tail = inspection.metrics(retained_empty, "regime_metrics", 0, 50, 145, 1);
+            require(regimes.at("total_columns") == 146 && regimes.at("next_column_offset") == 1 &&
+                        tail.at("columns")[0].at("column_index") == 145 && tail.at("next_column_offset").is_null(),
+                    "all retained header columns remain independently pageable");
+            require(
+                inspection.metrics(retained_empty, "frame_metrics").at("total_rows") == 146 &&
+                    inspection.metrics(retained_empty, "frame_duration").at("rows")[0].at("values")[0].at("value") ==
+                        2.33344,
+                "partial action coverage preserves frame metrics and duration");
+            std::size_t offset = 0, count = 0;
+            for(;;) {
+                const auto page = inspection.metrics(retained_empty, "frame_metrics", offset, 50);
+                count += page.at("rows").size();
+                if(page.at("next_offset").is_null())
+                    break;
+                offset = page.at("next_offset").get<std::size_t>();
+            }
+            require(count == 146, "all retained frame-metric rows are retrievable through typed pagination");
+        }
+        {
+            ngm::CaptureService service(options);
+            const auto page = ngm::ProfileInspection(service.artifacts()).metrics(retained_empty, "event_durations");
+            require(page.at("coverage").at("status") == "unavailable" && page.at("columns")[0].at("unit") == "ms" &&
+                        service.artifacts().inspect(retained_empty).summary.pinned,
+                    "missing coverage, exact header units and source pin survive restart");
+        }
         {
             ngm::CaptureService service(options);
             const auto first = service.capture(request);
@@ -103,7 +154,7 @@ int main(int argc, char** argv) {
             const auto second = service.capture(frames);
             for(const auto& job : {first, second}) {
                 const auto status = completed(service, job);
-                require(status.state == ngm::JobState::succeeded, "successful profiling job: " + status.error);
+                require(status.state == ngm::JobState::succeeded, "successful profiling job: " + Json(status).dump());
                 const auto info = service.artifacts().inspect(job.artifact_id);
                 require(info.summary.status == "complete" && info.summary.pinned, "profile complete and pinned");
                 const auto report = Json::parse(service.artifacts().read(job.artifact_id, "raw/report.json"));
@@ -255,6 +306,7 @@ int main(int argc, char** argv) {
             const auto submitted = call(client, "profile",
                                         {{"executable", target.string()},
                                          {"working_directory", scratch.path.string()},
+                                         {"arguments", {"--profile-header-only", "--profile-wide-empty-header"}},
                                          {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
                                          {"settings", {{"architecture", "Ampere GA10x"}}},
                                          {"pin", true}});
@@ -278,6 +330,30 @@ int main(int argc, char** argv) {
                     "actual stdio profile propagates its job overlay");
             require(call(client, "profile_metadata", {{"profile_id", id}}).at("producer").is_string(),
                     "typed profile metadata");
+            const auto empty = call(client, "profile_metrics", {{"profile_id", id}, {"table", "event_durations"}});
+            require(empty.at("rows").empty() && empty.at("total_rows") == 0 &&
+                        empty.at("coverage").at("status") == "unavailable" &&
+                        empty.at("columns")[0].at("column_name") == "time_ms" &&
+                        empty.at("columns")[0].at("unit") == "ms",
+                    "actual MCP output schema carries header-only coverage and units");
+            std::size_t columns = 0, column_offset = 0;
+            for(;;) {
+                const auto page = call(client, "profile_metrics",
+                                       {{"profile_id", id},
+                                        {"table", "regime_metrics"},
+                                        {"column_offset", column_offset},
+                                        {"column_limit", 64}});
+                require(page.dump().size() < 256U * 1024U && page.at("rows").empty() &&
+                            page.at("columns").size() < 64 && !page.at("columns").empty(),
+                        "escaped maximum-size empty headers obey the MCP page and protocol budgets");
+                for(const auto& header : page.at("columns"))
+                    require(header.at("column_index") == columns++,
+                            "byte-limited header pagination never skips a column");
+                if(page.at("next_column_offset").is_null())
+                    break;
+                column_offset = page.at("next_column_offset").get<std::size_t>();
+            }
+            require(columns == 64, "all oversized escaped header names remain retrievable");
             require(
                 call(client, "profile_metrics", {{"profile_id", id}, {"table", "frame_metrics"}}).at("rows").size() ==
                     2,
@@ -287,6 +363,8 @@ int main(int argc, char** argv) {
             initialize(restart);
             require(call(restart, "profile_metadata", {{"profile_id", id}}).at("profile_id") == id,
                     "retained MCP query after restart");
+            require(call(restart, "profile_metrics", {{"profile_id", id}, {"table", "event_durations"}}) == empty,
+                    "header-only MCP pagination, coverage and provenance are stable after restart");
             require(restart.finish() == 0, "restart clean exit");
         }
     });

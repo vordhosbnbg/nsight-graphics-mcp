@@ -1387,3 +1387,10 @@ records the commands, observations, preliminary workload and retention reference
   capture invocation and the same selected environment. Any driver/session or
   permission changes require a separate explicit owner decision. Continue
   retained-source and CPU capability work without advertising a fresh capture.
+
+I-038 follow-up, 2026-10-15: the separate documented Generate C++ Capture activity
+passes at 0.4.4 on matching 2026.3 tools with the same matching-driver selection
+and no layer-disable filter. Its source pin, literal source queries and exact
+shader-byte oracle are recorded in BUILD_VALIDATION.md. This narrows the failed
+observation to the measured graphics-capture activity; it does not resolve that
+failure or prove an underlying cause.

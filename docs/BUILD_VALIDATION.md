@@ -1382,3 +1382,55 @@ artifact root. The three failed source captures remain independently pinned in
 The snapshot records its staged source patch against 7123808; subsequent profile
 compatibility work is excluded. Its importer is the existing installed 0.4.1
 connection, while all nested implementation/runtime reports identify 0.4.3.
+
+## 0.4.4 header-only profile compatibility, 2026-10-15
+
+`cmake --build --preset linux-gcc-debug --target ngm_check_all` passes **32/32
+CPU checks**, no skips, in **320.57 seconds** on the same GCC 16.2.1 / CMake 4.4.4 /
+Linux 7.2.7-zen1-1-zen host. The parser preserves the exact retained two-field
+empty event header, all 147 regime header fields, 146 frame metrics and the
+unaltered frame value 2.33344. The fixture provenance records raw/fixture hashes.
+A real process-boundary stand-in publishes those shapes with explicitly synthetic
+producer/GPU metadata; typed queries retrieve every frame row and page the empty
+headers after restart. No raw game file is promoted into a hardware profile.
+
+Actual stdio checks exercise empty event coverage and maximum-length escaped
+empty regime headers, preserving all 64 positions through byte-limited pages
+within the MCP response budget. Comparisons refuse empty action/regime selections
+with a specific missing-row error while frame comparisons still work. Existing
+malformed/empty-file/ragged/numeric/producer/provenance failures remain rejected.
+Metadata exposes table coverage; metric pages expose label/column headers and
+explicit availability. The artifact schema and 26-tool count are unchanged.
+The expanded happy-path workflow uses a 15-second job deadline for queued work
+and 520-file publication after an earlier five-second happy-path check failed;
+its deliberately short 500 ms deadline and cancellation checks are unchanged.
+
+Implementation, parser fixtures, process/MCP checks and final CPU logs are pinned
+as `bundle-2051be7525227bb35f9e959f9d96c9ca` in the configured external artifact
+root. The snapshot records its source patch against e6d4b9e; the importing
+connection remains 0.4.1, and nested source/runtime reports identify 0.4.4.
+No new GPU profiling collection or per-draw timing/counter support is qualified.
+
+### Separate current Generate C++ Capture feasibility probe
+
+While CPU checks ran, the existing C++ `ngm-capture --format cpp` path launched a
+fresh source-built **0.4.4** reference fixture with seed 42, 192×128, wait-frames 2,
+application final frame 20 and the explicit matching-driver overlay without the
+layer-disable filter. Matching Nsight **2026.3.1.0/build 38722833** completes in
+**9,864 ms** with cleanup confirmed. The complete source capture
+`bundle-ab86c4e307dc933f44923389135174de` is pinned in
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/cpp-feasibility-cb52_ry9/store`.
+A new server session verifies its persistent pin, one literal draw/pipeline/shader
+source relationship, no unsupported recording, and eleven resource references.
+
+The current source server and existing qualified 0.4.2 worker then read fragment
+shader handle 14 through its listed resource reference. All **1,300 bytes** match
+independently retained application `scene.frag.spv`; SHA-256 is
+`425fc681c678f5965bad5dc1cbd42a48958895f5eb5d3c65e0d5c151be881d36`.
+The read bundle `bundle-237ed55fe5983258749219d8e4fc6598` is explicitly pinned
+in that store. Exact inputs, original output, offline MCP queries and byte oracle
+are retained alongside the source store and in the pinned compatibility snapshot.
+This establishes a current generated-source/serialized-input path for R-021;
+it does not establish executed draw state or resolve I-038's separate graphics
+capture timeout. No application source, machine control or profiling permission
+is changed by this probe.

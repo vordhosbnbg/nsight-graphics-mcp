@@ -247,6 +247,22 @@ int main(int argc, char** argv) {
             for(std::string item; std::getline(items, item, ',');)
                 stream << label << '\t' << item << '\n';
         }
+        if(mode == "header-only" || has(target_options, "--profile-header-only")) {
+            std::ofstream(tables / "D3DPERF_EVENTS.xls") << "event_text\ttime_ms\n";
+            std::ofstream(tables / "GPUTRACE_REGIMES.xls")
+                << "flattened_event_name\tsynthetic.metric\tsynthetic.metric\n";
+        }
+        if(const auto fixtures = environment("NGM_STANDIN_PROFILE_EXPORT_ROOT"); !fixtures.empty())
+            for(const auto* table : {"FRAME.xls", "GPUTRACE_FRAME.xls", "D3DPERF_EVENTS.xls", "GPUTRACE_REGIMES.xls"})
+                fs::copy_file(fs::path(fixtures) / (std::string(table) + ".tsv"), tables / table,
+                              fs::copy_options::overwrite_existing);
+        if(has(target_options, "--profile-wide-empty-header")) {
+            std::ofstream wide(tables / "GPUTRACE_REGIMES.xls");
+            wide << "flattened_event_name";
+            for(unsigned column = 0; column < 64; ++column)
+                wide << '\t' << std::string(4096, '"');
+            wide << '\n';
+        }
         if(mode == "malformed")
             std::ofstream(tables / "GPUTRACE_FRAME.xls") << "bad\tnan\n";
         if(mode == "oversize")

@@ -71,6 +71,15 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-020 completes header-only profile compatibility at **0.4.4**. All **32 CPU
+checks** pass in the serial preset. Valid empty event/regime tables preserve
+headers and explicit unavailable coverage; frame metrics remain queryable and
+empty comparisons refuse. See docs/PERFORMANCE.md and docs/BUILD_VALIDATION.md.
+A separate fresh Generate C++ Capture on matching 2026.3 tools succeeds at 0.4.4,
+with source pin/restart queries and an exact 1,300-byte shader read. This is the
+evidence path for active R-021; no new draw-state query is implemented yet.
+R-022 remains pending. I-038's graphics-capture timeouts remain unresolved.
+
 R-019 implements bounded per-job launch environments at **0.4.3**, shared by
 capture, C++ capture, profile and the capture CLI. All **32 CPU checks** pass in
 the serial preset. Standalone matching-driver XCB/Xwayland fixture baselines

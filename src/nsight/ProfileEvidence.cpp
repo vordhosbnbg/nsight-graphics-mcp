@@ -74,7 +74,7 @@ ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind) {
     ProfileTable table;
     const bool header = kind == ProfileTableKind::EventDurations || kind == ProfileTableKind::RegimeMetrics;
     const auto width = lines.front().size();
-    if(width < 2 || (header && lines.size() < 2))
+    if(width < 2)
         fail(Error::InvalidSchema, "GPU Trace table has no values");
     if(header) {
         const auto expected = kind == ProfileTableKind::EventDurations ? "event_text" : "flattened_event_name";

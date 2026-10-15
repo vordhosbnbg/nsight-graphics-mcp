@@ -9,6 +9,12 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+R-020 completes header-only table compatibility at 0.4.4 with preserved headers,
+explicit query coverage and safe comparison refusal, using the existing parser
+and shared inspection layer. All 32 serial CPU checks pass. A separate fresh
+2026.3 Generate C++ Capture and exact shader read establish the next R-021 evidence
+path; general draw state remains unimplemented. See BUILD_VALIDATION.md.
+
 R-019 completes the shared bounded launch overlay at 0.4.3 using the existing
 process supervisor and no new dependency. All 32 serial CPU checks pass; selected
 driver/windowed fixture baselines pass, while current capture timeouts remain

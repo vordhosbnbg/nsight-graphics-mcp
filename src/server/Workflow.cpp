@@ -627,6 +627,19 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                                {"event_durations", profile_ref},
                                                {"regime_metrics", profile_ref}},
                                               {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"});
+    const auto coverage_status = object_schema(
+        {{"status", {{"type", "string"}, {"enum", {"available", "unavailable"}}}}, {"reason", string_schema(512)}},
+        {"status", "reason"});
+    auto coverage_item = coverage_status;
+    coverage_item["properties"]["rows"] = integer_schema(0, 4096);
+    coverage_item["properties"]["numeric_columns"] = integer_schema(0, 4096);
+    coverage_item["required"].push_back("rows");
+    coverage_item["required"].push_back("numeric_columns");
+    const auto table_coverage = object_schema({{"frame_duration", coverage_item},
+                                               {"frame_metrics", coverage_item},
+                                               {"event_durations", coverage_item},
+                                               {"regime_metrics", coverage_item}},
+                                              {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"});
     add_tool(tools, "profile_metadata", object_schema({{"profile_id", string_schema(39, 39)}}, {"profile_id"}),
              object_schema({{"profile_id", string_schema(39, 39)},
                             {"producer", string_schema(128, 1)},
@@ -637,12 +650,14 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                             {"trace", profile_ref},
                             {"reproduction", profile_ref},
                             {"tables", profile_tables},
+                            {"table_coverage", table_coverage},
                             {"scope", string_schema(512)}},
                            {"profile_id", "producer", "gpu", "driver", "settings", "requested", "trace", "reproduction",
-                            "tables", "scope"}),
+                            "tables", "table_coverage", "scope"}),
              "Inspect a complete service-produced GPU Trace using retained producer/settings evidence. No live tool or "
              "GPU is required. "
-             "Imports and failed attempts are not qualified profiles; inspect them through artifact tools.",
+             "Imports and failed attempts are not qualified profiles; inspect them through artifact tools. "
+             "Valid action/regime headers without rows report unavailable coverage.",
              true, false, [this](const Json& args) {
                  return ProfileInspection(service().artifacts()).metadata(artifact_id(args, "profile_id"));
              });
@@ -656,42 +671,50 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                             {"label", string_schema(4096, 1)},
                                             {"values", array_schema(number, 64)}},
                                            {"row_index", "label", "values"});
-    add_tool(tools, "profile_metrics",
-             object_schema({{"profile_id", string_schema(39, 39)},
-                            {"table",
-                             {{"type", "string"},
-                              {"maxLength", 16},
-                              {"enum", {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"}}}},
-                            {"offset", integer_schema(0, 4096)},
-                            {"limit", integer_schema(1, 100)},
-                            {"column_offset", integer_schema(0, 4096)},
-                            {"column_limit", integer_schema(1, 64)}},
-                           {"profile_id", "table"}),
-             object_schema({{"profile_id", string_schema(39, 39)},
-                            {"table", string_schema(16)},
-                            {"source", profile_ref},
-                            {"total_rows", integer_schema(0, 4096)},
-                            {"total_columns", integer_schema(0, 4096)},
-                            {"offset", integer_schema(0, 4096)},
-                            {"column_offset", integer_schema(0, 4096)},
-                            {"rows", array_schema(profile_row, 100)},
-                            {"next_offset", nullable(integer_schema(0, 4096))},
-                            {"next_column_offset", nullable(integer_schema(0, 4096))},
-                            {"scope", string_schema(512)}},
-                           {"profile_id", "table", "source", "total_rows", "total_columns", "offset", "column_offset",
-                            "rows", "next_offset", "next_column_offset", "scope"}),
-             "Page retained GPU Trace TSV rows and numeric columns after provenance/hash checks. Positions and "
-             "duplicate labels are "
-             "preserved, not joined to capture events or interpreted as min/mean/max. Only event_durations has "
-             "explicit ms units; "
-             "other units are null because physical scaling is unresolved. Defaults: 50 rows and 32 columns; pages may "
-             "be byte-limited.",
-             true, false, [this](const Json& args) {
-                 return ProfileInspection(service().artifacts())
-                     .metrics(artifact_id(args, "profile_id"), args.at("table"), args.value("offset", std::size_t{0}),
-                              args.value("limit", std::size_t{50}), args.value("column_offset", std::size_t{0}),
-                              args.value("column_limit", std::size_t{32}));
-             });
+    add_tool(
+        tools, "profile_metrics",
+        object_schema({{"profile_id", string_schema(39, 39)},
+                       {"table",
+                        {{"type", "string"},
+                         {"maxLength", 16},
+                         {"enum", {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"}}}},
+                       {"offset", integer_schema(0, 4096)},
+                       {"limit", integer_schema(1, 100)},
+                       {"column_offset", integer_schema(0, 4096)},
+                       {"column_limit", integer_schema(1, 64)}},
+                      {"profile_id", "table"}),
+        object_schema({{"profile_id", string_schema(39, 39)},
+                       {"table", string_schema(16)},
+                       {"source", profile_ref},
+                       {"total_rows", integer_schema(0, 4096)},
+                       {"total_columns", integer_schema(0, 4096)},
+                       {"label_column", nullable(string_schema(4096))},
+                       {"columns", array_schema(object_schema({{"column_index", integer_schema(0, 4096)},
+                                                               {"column_name", nullable(string_schema(4096))},
+                                                               {"unit", nullable(string_schema(16))}},
+                                                              {"column_index", "column_name", "unit"}),
+                                                64)},
+                       {"coverage", coverage_status},
+                       {"offset", integer_schema(0, 4096)},
+                       {"column_offset", integer_schema(0, 4096)},
+                       {"rows", array_schema(profile_row, 100)},
+                       {"next_offset", nullable(integer_schema(0, 4096))},
+                       {"next_column_offset", nullable(integer_schema(0, 4096))},
+                       {"scope", string_schema(512)}},
+                      {"profile_id", "table", "source", "total_rows", "total_columns", "offset", "column_offset",
+                       "rows", "label_column", "columns", "coverage", "next_offset", "next_column_offset", "scope"}),
+        "Page retained GPU Trace TSV rows and numeric columns after provenance/hash checks. Positions and "
+        "duplicate labels are "
+        "preserved, not joined to capture events or interpreted as min/mean/max. Only event_durations has "
+        "explicit ms units; "
+        "other units are null because physical scaling is unresolved. Defaults: 50 rows and 32 columns; pages may "
+        "be byte-limited. Valid headers with zero rows preserve paginated columns and explicit unavailable coverage.",
+        true, false, [this](const Json& args) {
+            return ProfileInspection(service().artifacts())
+                .metrics(artifact_id(args, "profile_id"), args.at("table"), args.value("offset", std::size_t{0}),
+                         args.value("limit", std::size_t{50}), args.value("column_offset", std::size_t{0}),
+                         args.value("column_limit", std::size_t{32}));
+        });
 
     const auto statistic = object_schema({{"count", integer_schema(1, 4096)},
                                           {"minimum", {{"type", "number"}}},
