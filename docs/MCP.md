@@ -1,5 +1,20 @@
 # Local MCP server
 
+At **0.5.8**, `capture_cpp_descriptor_writes` brings the shared surface to
+**33 tools**. It lists bounded literal source-update references, optionally
+decodes a listed call through the approved confined worker and returns typed
+source identities with retained success/failure evidence. Fresh uniform,
+storage/image and dynamic-array inputs pass source/oracle and restart checks.
+[DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md) defines configuration and bounds.
+Selected-draw lifetimes and typed shader values remain unfinished R-024 work.
+
+The preceding **0.5.6 R-025 completion** retains the 32-tool surface with
+`capture_draw_timings`: exact literal occurrence/source-call association,
+independent per-draw timestamp checks and an actual source repair are qualified
+on the measured matching 2026.3 path. Original live cost and physical counter
+meaning remain unavailable. [DRAW_TIMING_VALIDATION.md](DRAW_TIMING_VALIDATION.md)
+records acceptance; the notes below preserve earlier milestone scope.
+
 At **0.5.4**, `capture_analyze_timing` brings the shared surface to **31 tools**.
 It collects generated C++ and GPU Trace evidence for one selected interval of a
 retained matching 2026.3 capture, with source protection and one GPU job.
@@ -158,6 +173,7 @@ The surface remains 28 tools; see [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md).
 | `capture_objects` | Same inputs/pagination as `capture_events`; returns `objects` with capture-scoped `uid`, `api`, `object_name`, `type_name`, and opaque `access_flags`. No event associations, object definitions, or resource contents are inferred. |
 | `capture_cpp_resources` | Required `capture_id`; optional `section` (`resources` or `unsupported`), `offset`, `limit` (default 50, maximum 100). Lists literal source references and qualified byte declarations with hashes/spans; no worker required. |
 | `capture_cpp_resource` | Required `capture_id` and listed `resource_ref`; optional `offset`, `length` (1–65536, default 65536), `pin` (default false). Uses the configured qualified worker and returns hex bytes/hashes plus a retained attempt artifact. Each call retains database snapshots up to 272 MiB. No GPU event-state reconstruction. |
+| `capture_cpp_descriptor_writes` | Required native `capture_id`; optional listing `section` (`updates`, default, or `unsupported`), `offset` (0–100000), `limit` (default 50, maximum 100). Supply a listed `update_ref` to decode paginated source writes using `--descriptor-worker-2026-3`; optional `pin` requires that read and protects its separate attempt. Exact capture/source/input/helper/reader identities are checked. No selected-draw visibility, effective dynamic address or typed shader value is inferred. See [DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md). |
 
 Strings reject NUL bytes; input byte limits are enforced in addition to the
 advertised schemas. Absolute application/import paths are limited to 4096 bytes;

@@ -6,6 +6,7 @@ function(ngm_add_inspection)
         "${PROJECT_SOURCE_DIR}/src/inspection/PushState.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/DescriptorState.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ResourceRead.cpp"
+        "${PROJECT_SOURCE_DIR}/src/inspection/DescriptorRead.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ProfileInspection.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ProfileMarkers.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ReplayTiming.cpp"
@@ -15,6 +16,14 @@ function(ngm_add_inspection)
 endfunction()
 
 function(ngm_add_inspection_checks)
+    ngm_add_check(ngm_descriptor_source_check SOURCES "${PROJECT_SOURCE_DIR}/tests/DescriptorSourceCheck.cpp"
+        LIBRARIES ngm_inspection)
+    add_executable(ngm_descriptor_read_standin "${PROJECT_SOURCE_DIR}/tests/DescriptorReadStandin.cpp")
+    target_include_directories(ngm_descriptor_read_standin PRIVATE "${PROJECT_SOURCE_DIR}/tests")
+    target_link_libraries(ngm_descriptor_read_standin PRIVATE ngm_core nlohmann_json::nlohmann_json)
+    ngm_first_party(ngm_descriptor_read_standin)
+    ngm_add_check(ngm_descriptor_read_check SOURCES "${PROJECT_SOURCE_DIR}/tests/DescriptorReadCheck.cpp"
+        LIBRARIES ngm_inspection ARGS "$<TARGET_FILE:ngm_descriptor_read_standin>" DEPENDS ngm_descriptor_read_standin)
     ngm_add_check(ngm_replay_timing_inspection_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayTimingInspectionCheck.cpp"
         LIBRARIES ngm_inspection ngm_capture ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
     ngm_add_check(ngm_replay_timing_correlation_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayTimingCorrelationCheck.cpp"

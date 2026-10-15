@@ -60,6 +60,11 @@ public:
                                  std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json cpp_resource(const std::string& capture_id, const std::string& resource_ref, std::size_t offset = 0,
                                 std::size_t length = 65536, bool pin = false) const;
+    // Without update_ref, list updates or unsupported source forms. A listed
+    // capture-bound update_ref decodes source writes with the configured worker.
+    nlohmann::json cpp_descriptor_writes(const std::string& capture_id, const std::string& update_ref = {},
+                                         const std::string& section = "updates", std::size_t offset = 0,
+                                         std::size_t limit = 50, bool pin = false) const;
 
 private:
     ArtifactStore& artifacts_;

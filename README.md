@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**32 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**33 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 The [0.5.0 capability follow-up](docs/CAPABILITY_FOLLOWUP_COMPLETION.md) adds
 controlled launches, retained reader activation, bounded recorded draw state
@@ -41,6 +41,12 @@ At **0.5.6**, independent per-draw timestamps, new direct/indexed/reused inputs
 and a shader edit/rebuild/recapture repair complete **R-025** on the measured
 2026.3 path. See [draw timing validation](docs/DRAW_TIMING_VALIDATION.md).
 Original live performance and physical counter meanings remain unavailable.
+
+At **0.5.8**, `capture_cpp_descriptor_writes` lists and optionally decodes
+qualified source-local buffer/image writes through the confined optional worker.
+Fresh uniform, storage/image and dynamic-array captures pass independent source
+checks and restart/pin checks. Selected-draw descriptor visibility and typed
+values remain unfinished R-024 work. See [descriptor writes](docs/DESCRIPTOR_WRITES.md).
 
 ## Example workflows
 

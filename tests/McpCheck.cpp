@@ -111,6 +111,7 @@ Json query_capabilities(Client& client) {
                                                         "capture_draw_executions",
                                                         "capture_draw_state",
                                                         "capture_cpp_resources",
+                                                        "capture_cpp_descriptor_writes",
                                                         "capture_cpp_resource",
                                                         "profile",
                                                         "profile_metadata",
@@ -139,7 +140,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 32, "discover exactly the implemented tools");
+    require(listing.size() == 33, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -774,6 +775,17 @@ void workflow_check(const std::string& server, const std::string& standin, const
     require(cpp_coverage["total"] == 0 && cpp_coverage["draws"].empty(), "separate coverage section");
     expect_tool_error(call(client, "capture_cpp_draws", {{"capture_id", cpp_id}, {"section", "invalid"}}));
     const auto resource_refs = successful_call(client, "capture_cpp_resources", {{"capture_id", cpp_id}, {"limit", 1}});
+    const auto descriptor_writes =
+        successful_call(client, "capture_cpp_descriptor_writes", {{"capture_id", cpp_id}, {"limit", 1}});
+    require(descriptor_writes.at("section") == "updates" && descriptor_writes.at("read").is_null() &&
+                descriptor_writes.at("inputs_sha256").get<std::string>().size() == 64 &&
+                !descriptor_writes.at("input_files").empty(),
+            "descriptor source listing retains capture-time input identities");
+    successful_call(client, "capture_cpp_descriptor_writes", {{"capture_id", cpp_id}, {"section", "unsupported"}});
+    expect_tool_error(call(client, "capture_cpp_descriptor_writes", {{"capture_id", cpp_id}, {"section", "invalid"}}));
+    expect_tool_error(call(client, "capture_cpp_descriptor_writes", {{"capture_id", cpp_id}, {"pin", true}}));
+    expect_tool_error(
+        call(client, "capture_cpp_descriptor_writes", {{"capture_id", cpp_id}, {"update_ref", std::string(64, 'f')}}));
     require(resource_refs["resources"].size() == 1 && resource_refs["resources"][0]["handle"] == 14,
             "resource references exposed through MCP");
     require(successful_call(client, "capture_cpp_resources",

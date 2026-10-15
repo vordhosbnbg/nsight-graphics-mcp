@@ -1457,6 +1457,157 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseSco
 }
 } // namespace detail
 
+nlohmann::json inspect_cpp_descriptor_updates(const std::vector<CppSource>& sources) {
+    Json result{{"updates", Json::array()},
+                {"registrations", Json::array()},
+                {"unsupported", Json::array()},
+                {"registration_coverage_complete", true},
+                {"association_scope", "Literal generated descriptor-update calls and descriptor-set/buffer/image-view/"
+                                      "sampler registrations only; no execution order, selected-draw visibility, "
+                                      "resource contents or shader selection is inferred."}};
+    ResultBudget budget;
+    const std::map<std::string, std::pair<unsigned, std::string>> types{
+        {"VK_OBJECT_TYPE_BUFFER", {9, "VkBuffer_uid_"}},
+        {"VK_OBJECT_TYPE_IMAGE_VIEW", {14, "VkImageView_uid_"}},
+        {"VK_OBJECT_TYPE_SAMPLER", {21, "VkSampler_uid_"}},
+        {"VK_OBJECT_TYPE_DESCRIPTOR_SET", {23, "VkDescriptorSet_uid_"}}};
+    std::map<std::pair<unsigned, std::uint64_t>, Json> registry;
+    std::set<std::string> paths;
+    std::size_t total = 0;
+    try {
+        check(sources.size() <= 64, "too many descriptor source files");
+        for(const auto& source : sources) {
+            check(paths.insert(source.path).second, "duplicate descriptor source path");
+            total += source.text.size();
+            check(total <= 16U * 1024U * 1024U, "aggregate descriptor source exceeds 16 MiB");
+            const Document d(source);
+            const auto& tokens = d.tokens;
+            const auto hash = sha256(std::as_bytes(std::span(source.text.data(), source.text.size())));
+            for(std::size_t at = 0; at < tokens.size(); ++at) {
+                const auto name = tokens[at].value;
+                const bool registration = name == "VulkanHelper_RegisterObject";
+                if(!registration && name != "VulkanHelper_UpdateDescriptorSetsFromDatabase")
+                    continue;
+                auto end = at;
+                if(at + 1 < tokens.size() && tokens[at + 1].value == "(")
+                    end = tokens[at + 1].pair;
+                auto span = d.span(at, end);
+                span["sha256"] = hash;
+                span["byte_offset"] = tokens[at].begin;
+                span["byte_count"] = tokens[end].end - tokens[at].begin;
+                try {
+                    check(at >= 2 && tokens[at - 2].value == "NV_VK_REPLAY" && tokens[at - 1].value == "(",
+                          "descriptor helper must be one wrapped literal replay statement");
+                    const auto invocation = call(d, at - 2);
+                    check(tokens[tokens[at + 1].pair - 1].value != ",",
+                          "descriptor helper has an empty trailing argument");
+                    span = d.span(invocation.at, invocation.end);
+                    span["sha256"] = hash;
+                    span["byte_offset"] = tokens[invocation.at].begin;
+                    span["byte_count"] = tokens[invocation.end].end - tokens[invocation.at].begin;
+                    bool conditional = false;
+                    for(auto i = invocation.at; i <= invocation.end; ++i)
+                        conditional |= tokens[i].conditional;
+                    const auto& a = invocation.args;
+                    if(registration) {
+                        check(a.size() == 3, "descriptor object registration arity");
+                        const auto kind = expr(d, a[0]);
+                        if(!types.contains(kind)) {
+                            check(kind.starts_with("VK_OBJECT_TYPE_") && kind.find(' ') == std::string::npos,
+                                  "object registration type is not a literal enum");
+                            continue;
+                        }
+                        check(!conditional, "conditional descriptor object registration is unqualified");
+                        const auto [first, last] = a[1];
+                        check(last == first + 4 && tokens[first].value == "uint64_t" &&
+                                  tokens[first + 1].value == "(" && tokens[first + 1].pair == first + 3,
+                              "object registration requires one literal source symbol cast");
+                        const auto& type = types.at(kind);
+                        const auto symbol = uid(std::string(tokens[first + 2].value), type.second);
+                        const auto id = integer(expr(d, a[2]));
+                        check(id != 0, "null object registration is unqualified");
+                        const auto key = std::make_pair(type.first, id);
+                        const auto found = registry.find(key);
+                        if(found != registry.end()) {
+                            check(found->second.at("symbol") == symbol,
+                                  "conflicting source symbols for one typed serialized object ID");
+                            budget.reserve(span);
+                            found->second["sources"].push_back(span);
+                        } else {
+                            Json row{{"object_type", type.first},
+                                     {"type_name", kind},
+                                     {"serialized_id", id},
+                                     {"symbol", symbol},
+                                     {"sources", Json::array({span})}};
+                            budget.reserve(row);
+                            registry.emplace(key, std::move(row));
+                        }
+                    } else {
+                        check(a.size() == 6, "descriptor update helper arity");
+                        const auto device = uid(expr(d, a[0]), "VkDevice_uid_");
+                        const auto count = integer(expr(d, a[1]));
+                        const auto [first, last] = a[2];
+                        check(last == first + 7 && tokens[first].value == "Serialization" &&
+                                  tokens[first + 1].value == ":" && tokens[first + 2].value == ":" &&
+                                  tokens[first + 3].value == "DATABASE_HANDLE" && tokens[first + 4].value == "(" &&
+                                  tokens[first + 4].pair == first + 6,
+                              "descriptor update requires a literal database handle constructor");
+                        const auto handle = integer(tokens[first + 5].value);
+                        const auto capacity = integer(expr(d, a[3]));
+                        check(handle <= 2147483647 && count > 0 && count <= 64 && capacity >= count * 64 &&
+                                  capacity <= 65536,
+                              "descriptor update count/handle/output allocation exceeds worker bounds");
+                        check(integer(expr(d, a[4])) == 0 && expr(d, a[5]) == "nullptr",
+                              "descriptor copies need separate lifetime qualification");
+                        const auto identity = "descriptor-update:" + source.path + '\0' + hash + ':' +
+                                              std::to_string(tokens[invocation.at].begin) + ':' +
+                                              std::to_string(tokens[invocation.end].end);
+                        budget.append(
+                            result["updates"],
+                            {{"source_ref", sha256(std::as_bytes(std::span(identity.data(), identity.size())))},
+                             {"device", device},
+                             {"handle", handle},
+                             {"write_count", count},
+                             {"output_bytes", capacity},
+                             {"copy_count", 0},
+                             {"conditional", conditional},
+                             {"readable", !conditional},
+                             {"reason", conditional
+                                            ? Json("Conditional update cannot supply an unconditional source write")
+                                            : Json(nullptr)},
+                             {"source", span}});
+                    }
+                } catch(const Unsupported& error) {
+                    if(registration)
+                        result["registration_coverage_complete"] = false;
+                    budget.append(result["unsupported"], {{"kind", registration ? "registration" : "descriptor_update"},
+                                                          {"source", span},
+                                                          {"reason", error.what()}});
+                }
+            }
+        }
+        for(auto& [key, row] : registry) {
+            (void)key;
+            result["registrations"].push_back(std::move(row));
+        }
+        std::sort(result["updates"].begin(), result["updates"].end(), [](const Json& a, const Json& b) {
+            const auto& x = a.at("source");
+            const auto& y = b.at("source");
+            return std::make_pair(x.at("path").template get<std::string>(),
+                                  x.at("byte_offset").template get<std::size_t>()) <
+                   std::make_pair(y.at("path").template get<std::string>(),
+                                  y.at("byte_offset").template get<std::size_t>());
+        });
+    } catch(const Unsupported& error) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, error.what());
+    } catch(const std::out_of_range&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Truncated descriptor source expression");
+    } catch(const Json::exception&) {
+        throw InspectionError(InspectionErrorCode::InvalidExport, "Descriptor source contains invalid UTF-8");
+    }
+    return result;
+}
+
 nlohmann::json inspect_cpp_resources(const std::vector<CppSource>& sources) {
     Json result{{"resources", Json::array()},
                 {"unsupported", Json::array()},

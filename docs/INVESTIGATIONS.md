@@ -2334,3 +2334,129 @@ payloads and the complete initial/corrected worker attempts. Its imported
 portable verifier passes the ten source/opaque-byte comparisons and seven
 alignment corrections, plus all source/input hashes against the pinned 0.5.6
 ancestor. The 41-check CPU suite passes; R-024 remains In Progress.
+
+### I-077 — Initial descriptor parent build compares strings to JSON values
+
+- **Context/reproduce:** The uncommitted 0.5.8 source parser passes its focused
+  CPU check. Building the new `ngm_descriptor_read_check_run` with GCC 16.2.1,
+  C++20 and pinned nlohmann/json 3.11.3 fails before the parent process tests run.
+- **Observed/correction:** Four fingerprint comparisons place `std::string` on
+  the left and a JSON value on the right, for which this configuration has no
+  matching equality operator. Extract the already validated string explicitly,
+  as the existing byte-reader parent does. Keep the pinned JSON configuration
+  and dependency unchanged. No worker, Nsight or GPU compatibility inference
+  follows from this compile failure.
+- **Evidence:** External working files `r024-parent-first-cpu.log` and
+  `r024-parent-initial.DescriptorRead.cpp` retain the original errors/source.
+  `r024-parent-typed-cpu.log` records the corrected build/check attempt. These
+  belong to the unfinished 0.5.8 source-query slice and await publication.
+- **Revisit:** Preserve explicit typed fingerprint comparisons and test the
+  parent boundary with stand-ins before actual MCP extraction qualification.
+
+### I-078 — Descriptor MCP selector omits the validator's string bound
+
+- **Context/reproduce:** The uncommitted 0.5.8 parent/source checks pass, including
+  quota-failure evidence retention. The new MCP check lists descriptor sources,
+  then requests the explicit `unsupported` section.
+- **Observed/correction:** The input enum schema omits `maxLength`, which the
+  project's bounded argument validator requires for every string. The call
+  returns a structured `operation_failed` JSON exception instead of accepting
+  the supported selector. Add the same 32-byte bound used by the other source
+  query section enums. No parser, helper, GPU or producer limitation is inferred.
+- **Evidence:** `r024-service-first-cpu.log` and
+  `r024-service-initial.Workflow.cpp` preserve the original check/source. The
+  source and parent checks pass in 0.01/30.07 seconds before this MCP failure;
+  later transport checks and qualification publication remain pending.
+- **Revisit:** Exercise explicit selectors as well as defaults through the
+  actual protocol validator before new retained-data MCP qualification.
+
+### I-079 — Descriptor MCP harness restores snapshots before initializing its store
+
+- **Context/reproduce:** After the 0.5.8 stdio/HTTP checks pass, the first
+  retained-data MCP harness copies two complete/pinned 0.5.6 native C++ bundles
+  into a fresh directory before any product artifact operation opens that root.
+- **Observed:** The first source-listing call refuses to adopt a nonempty
+  unmarked artifact root. No descriptor helper is invoked, no source changes
+  occur and the server closes normally. This is the intended store ownership
+  protection, not a capture/parser/reader failure.
+- **Correction/evidence:** Preserve `r024-descriptor-mcp`, its frozen binaries,
+  harness and transcript. Use a new run directory, initialize its empty store
+  through `artifact_usage`, close the server, then restore the trusted snapshots
+  and reopen it. Do not forge a marker or weaken the product guard. The new
+  `R024DescriptorMcpInitialized.py` records that initialization as an actual call.
+- **Revisit:** Keep private snapshot restoration subordinate to the same
+  managed-root ownership rules as product use. Qualification remains pending.
+
+### I-080 — Fresh descriptor harness uses the Graphics Capture frame argument
+
+- **Context/reproduce:** The first fresh 0.5.8 C++ capture harness supplies
+  `capture_frame: 7`, copied from the Graphics Capture request shape.
+- **Observed:** The actual advertised `capture_cpp` schema uses `wait_frames`.
+  The independent client validator rejects the extra property before sending a
+  tool call; no job or GPU process starts. This is a private harness error.
+- **Correction/evidence:** Preserve `r024-fresh-cpp` with the original plan,
+  harness, advertised schemas and failed audit. A new `r024-fresh-cpp-wait` run
+  uses the demonstrated `wait_frames: 7` control. That control is not promoted
+  to an original captured-frame identifier; source labels remain separate.
+- **Revisit:** Select request fields from each actual advertised tool schema,
+  keeping C++ capture triggers distinct from Graphics Capture frame selection.
+
+### I-081 — Fresh descriptor harness selects an unknown combined scenario
+
+- **Context/reproduce:** The 0.5.8 fresh C++ descriptor qualification uses
+  matching Nsight 2026.3.1.0/build 38722833, the separately recorded process-local
+  615.71.09 runtime and `wait_frames: 7`. The basic reference capture and its
+  uniform write decode succeed. The next request uses `--scenario combined`.
+- **Observed:** Nsight exits 1 after the target exits before connection; owned
+  process cleanup is confirmed. No C++ project is produced. Running the frozen
+  fixture with the exact scenario arguments separately exits 2 with
+  `unknown scenario combined`. Its actual help lists `combined-reference`.
+  This establishes an invalid private harness input, not a combined Vulkan
+  feature or Nsight compatibility failure.
+- **Correction/evidence:** Preserve `r024-fresh-cpp-wait`, its failed pinned
+  native bundle `bundle-8af345d9df358bd9131a62929335e0f7`, complete CLI logs,
+  help and direct argument-refusal receipt. The corrected new
+  `r024-fresh-cpp-names` run uses `combined-reference` with the same dimensions,
+  seed and capture settings. Do not overwrite the original attempt or replace
+  its advanced workload with a simpler one. Qualification publication is pending.
+- **Revisit:** Validate scenario spelling against the frozen fixture's actual
+  help before launching a new hardware matrix. No machine setting changes.
+
+### I-082 — Source-identity harness supplies an absent toolchain directory
+
+- **Context/reproduce:** After the corrected three-case 0.5.8 descriptor matrix
+  passes, a separate private source/fixture oracle harness selects an empty
+  toolchain to verify retained queries need no running Nsight process.
+- **Observed:** It passes a nonexistent directory. CLI validation refuses the
+  path before MCP initialization, with no tool call or worker execution. This
+  is a harness setup error, not evidence that source queries require Nsight.
+- **Correction/evidence:** Preserve `r024-source-identity` with its stderr,
+  transcript and audit. The new `r024-source-identity-directory` run creates an
+  actual empty directory before launch; the source bundles and fixture API
+  oracle stay unchanged. Qualification publication remains pending.
+- **Revisit:** Keep explicit path validation and create selected empty roots
+  before server startup; do not relax the CLI's directory guard.
+
+### I-083 — Descriptor evidence collector names a nonexistent prerequisite receipt
+
+- **Context/reproduce:** The final 0.5.8 43-check CPU aggregate and real source
+  query matrices pass. The first private lossless evidence collector selects
+  the existing process-local runtime/access qualification records.
+- **Observed/correction:** Its prerequisite list spells the before/after access
+  receipt `capability-access-unchanged.json`; the retained file is
+  `capability-unchanged.json`. Collection stops before an archive or product
+  import. Preserve the first script, empty output directory and complete error
+  log, then select the exact existing filename in a new output directory.
+- **Evidence/revisit:** `r024-query-evidence-initial` and
+  `r024-query-collection.log` retain the failed collector. This is a private
+  evidence-path error; it changes no test, source payload, access permission or
+  runtime identity. Verify every selected prerequisite exists before publication.
+
+**Final I-077–I-083 retention:** Complete/pinned
+**bundle-52a3d6a428d29f5fad1e043e61fb9983** retains all 343 verified payloads,
+including every original failed source/schema/harness/collector attempt and
+all 41 native bundle instances. Its imported portable verifier reconstructs all
+1,764 file paths and passes 313 total successful schema results, including 231
+from final qualified runs. All 43 CPU checks pass in 433.91 seconds. The
+0.5.8 query qualifies source descriptor writes; R-024 remains In Progress for
+its selected-draw lifetime/type/value and repair acceptance.

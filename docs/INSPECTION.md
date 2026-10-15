@@ -1,5 +1,15 @@
 # Capture inspection evidence
 
+At **0.5.8**, [source descriptor writes](DESCRIPTOR_WRITES.md) have a bounded
+public query with the approved confined worker. It validates exact source/input
+identities and maps typed serialized objects to source symbols; fresh uniform,
+storage/image and dynamic-array captures pass. Selected-draw visibility,
+update/resource lifetimes and typed shader values remain unfinished R-024 work.
+
+At **0.5.6**, [draw timing acceptance](DRAW_TIMING_VALIDATION.md) completes
+R-025 for unique literal occurrence paths with independent per-draw timestamps
+and an actual source repair. Earlier notes below retain their historical scope.
+
 At **0.5.4**, combined replay timing evidence has a distinct
 `nsight_replay_timing` origin. Inspect its master/child indexes and raw sources
 with the artifact tools; ordinary capture/C++/profile inspection does not

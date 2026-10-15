@@ -145,6 +145,14 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
              "unaltered. Retained metric queries require only --artifact-root, independently of this collection "
              "availability. Numeric positions and unresolved physical units are preserved; workload "
              "correctness, repeated comparisons and performance improvement are not inferred."}}},
+          {"descriptor_writes",
+           {{"available", storage},
+            {"status", storage ? "source_listing_available" : "missing_prerequisites"},
+            {"reason", "List capture-bound literal descriptor update references from fingerprinted matching 2026.3 "
+                       "C++ inputs. Decoding requires --descriptor-worker-2026-3 and verifies seven helper files, "
+                       "bounds instrumentation, confined execution and typed source registrations. Configuration "
+                       "alone does not verify a reader or kernel. These are source writes; selected-draw visibility, "
+                       "effective addresses and shader values remain unavailable."}}},
           {"profile_markers",
            {{"available", storage},
             {"status", storage ? "qualified_export_subset" : "missing_prerequisites"},
@@ -175,7 +183,10 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                                   : Json(options.resource_workers.nsight_2026_3.string())},
             {"nsight_2026_2", options.resource_workers.nsight_2026_2.empty()
                                   ? Json(nullptr)
-                                  : Json(options.resource_workers.nsight_2026_2.string())}}},
+                                  : Json(options.resource_workers.nsight_2026_2.string())},
+            {"descriptor_nsight_2026_3", options.resource_workers.descriptor_nsight_2026_3.empty()
+                                             ? Json(nullptr)
+                                             : Json(options.resource_workers.descriptor_nsight_2026_3.string())}}},
           {"desktop",
            {{"display_environment_present", observations.display_present},
             {"wayland_display_environment_present", observations.wayland_display_present},
@@ -271,7 +282,7 @@ Json output_schema() {
         }}
     })json");
     for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers",
-                                 "replay", "timing_collection", "draw_timings"}) {
+                                 "replay", "timing_collection", "draw_timings", "descriptor_writes"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }
@@ -289,9 +300,11 @@ Json output_schema() {
     schema["properties"]["prerequisites"]["properties"]["resource_readers"] = {
         {"type", "object"},
         {"additionalProperties", false},
-        {"required", {"nsight_2026_3", "nsight_2026_2"}},
+        {"required", {"nsight_2026_3", "nsight_2026_2", "descriptor_nsight_2026_3"}},
         {"properties",
-         {{"nsight_2026_3", {{"type", {"string", "null"}}}}, {"nsight_2026_2", {{"type", {"string", "null"}}}}}}};
+         {{"nsight_2026_3", {{"type", {"string", "null"}}}},
+          {"nsight_2026_2", {{"type", {"string", "null"}}}},
+          {"descriptor_nsight_2026_3", {{"type", {"string", "null"}}}}}}};
     const auto policy = launch_environment_policy();
     Json properties{
         {"supported_keys",

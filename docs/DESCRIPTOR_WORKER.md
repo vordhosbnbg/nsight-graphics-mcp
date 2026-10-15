@@ -6,9 +6,11 @@ The owner explicitly approved its two-file extension and bounds instrumentation
 on **2026-10-15**; [DESCRIPTOR_WORKER_PLAN.md](DESCRIPTOR_WORKER_PLAN.md) records
 the exact scope. The existing five-file byte worker stays independent.
 
-This is an internal worker interface. There is no new MCP tool or execution-time
-value claim. R-024 still needs a validated parent/query path, update/copy/resource
-lifetimes, actual shader type/layout evidence and its fresh repair acceptance.
+This page records the **0.5.7 worker foundation**. The subsequent **0.5.8**
+[parent/query path](DESCRIPTOR_WRITES.md) exposes source-scoped writes through
+MCP with exact profile checks and retained failures. R-024 still needs
+update/copy/resource lifetimes, actual shader type/layout evidence and its fresh
+repair acceptance before execution-time values can be claimed.
 
 ## Source build
 
@@ -85,7 +87,8 @@ source alignment remainder, source handle/count/output capacity, used output
 bytes and descriptor fields. It exposes no live addresses. No output is emitted
 until hydration and full response-size/type checks finish. Nonzero exit, signal,
 timeout, unexpected diagnostics, partial response or failed cleanup must refuse.
-The parent response validator and public query path remain unfinished.
+The 0.5.8 parent validates this response before its bounded source query returns
+fields; [DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md) defines that later contract.
 
 ## Qualification
 

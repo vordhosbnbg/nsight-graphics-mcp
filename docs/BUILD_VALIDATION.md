@@ -2707,3 +2707,71 @@ The source snapshot precedes final documentation/pin bookkeeping only. No new
 GPU operation, installed server/worker activation or machine setting change
 occurs. Installed importer **0.4.1** and byte worker **0.4.2** remain separate
 from the tested **0.5.7** source/optional worker. R-026 remains Pending.
+
+## 0.5.8 source descriptor-write query, R-024 slice (2026-10-15)
+
+`capture_cpp_descriptor_writes` adds the **33rd shared stdio/HTTP tool**.
+[DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md) defines its bounded source parser,
+optional seven-file reader configuration, strict supervised parent, source-local
+object identities and explicit execution-time limits. **R-024 stays In Progress**;
+this slice does not qualify selected-draw visibility or typed shader values.
+
+The GCC Debug aggregate passes **43/43 CPU checks in 433.91 seconds** using
+`CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all`.
+New `ngm_descriptor_source_check` tests literal/conditional/unsupported calls,
+source spans and registration identity conflicts independently of GPU tools.
+New `ngm_descriptor_read_check` exercises five positive typed shapes, 28 malformed/
+process cases, profile/source/helper/registration refusals, owned-child deadline
+cleanup, quota failure after successful extraction and restart pins. Shared
+stdio/HTTP checks pass with the new closed schemas and 33-tool surface. The
+optional `ngm_descriptor_hydrator_integration_run` passes against the actual
+approved helper. An isolated configure with the helper option empty generates
+the same parent profile without adding a proprietary worker target. No source
+or test changes follow this CPU aggregate.
+
+The actual independently validating stdio client passes **35** successful
+schema results on two restored 0.5.6 inputs, six expected worker/configuration
+refusals and four read repeats over two restarts. All **306** original source
+payload identities remain unchanged. Three fresh original-application C++
+captures pass with new seeds: basic uniform (**one** write), combined storage/
+image (**three**) and dynamic arrays (**sixteen**). These produce **190**
+schema-valid results, exact input/field equality across two server restarts and
+persistent pins. Six more bounded source pages establish private resource-name
+associations, and the dynamic partial replacement agrees with the separate
+fixture API witness. Seven confined reads through the existing 0.4.2 byte worker
+independently reproduce each complete opaque input's SHA-256 and length.
+
+The measured stack is matching **2026.3.1.0/build 38722833**, RTX 3080 Ti,
+**615.71.09** kernel plus the already-qualified process-local matching runtime,
+256×160 pixels, seeds 931/137/73 and C++ `wait_frames: 7`. Application labels and
+private API inputs stay distinct from observed GPU execution. The combined
+input is `combined-reference`; the original misspelled `combined` failure is
+preserved. I-077–I-083 retain the initial compile/schema, store/path/scenario and
+collector failures. No installed server/worker, machine access, display, driver
+or clocks are changed.
+
+The frozen **0.5.8 server** SHA-256 is
+`64f72257304bf4a6dc6a925169680e53e8dd904b4b9b0eb1e815ad50bfc2c654`,
+**descriptor worker** `4c31cce685f4bf6d76e61cde1b909ad0ed5647587f25efb456e17266f3ae017a`,
+and **fixture** `0bab42cf70e3dcb322740fd7fddeb5ab6abffcca1b3ba7d96261c46a26b645f7`.
+The existing byte reader remains
+`355360840cb4a8b313e9148e688996064a8dcdd337b198f1e0225786b7518963`.
+The installed importer reports **0.4.1** separately from these test identities.
+
+Complete/pinned **bundle-52a3d6a428d29f5fad1e043e61fb9983** retains **343
+payloads / 29,922,704 bytes** (managed size 29,958,353). Its lossless XZ archive
+stores **468 unique content blobs** with a per-path inventory reconstructing
+all **1,764 files**, including complete manifests, pins and every payload of
+**41 native bundle instances**. This deduplicates identical content without
+omitting native files. Source snapshots, frozen binaries, exact original/derived
+helper sources/patch, requests, transcripts, oracles, successes and failures are
+retained outside version control. No installer/runtime-library bulk is copied;
+the exact prior prerequisite identities/official checksum are retained.
+
+The **imported portable verifier passes** file reconstruction, all payload/code
+hashes, **313** successful schema-valid results across final and failed runs,
+**231** final-qualified results, source/reader/input/oracle matches, **28**
+successful and **four** failed descriptor-read bundles and the original controls.
+The seven retained tool errors comprise six intended worker/configuration
+refusals plus the initial unmarked-store harness error. Final documentation/pin
+bookkeeping follows the frozen source snapshot; product code is identical.

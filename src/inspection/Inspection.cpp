@@ -1,8 +1,10 @@
 #include "ngm/Inspection.hpp"
 
+#include "DescriptorProfiles.hpp"
 #include "PushState.hpp"
 #include "ResourceProfiles.hpp"
 #include "ngm/CppEvidence.hpp"
+#include "ngm/DescriptorRead.hpp"
 #include "ngm/DrawState.hpp"
 #include "ngm/Hash.hpp"
 #include "ngm/NsightEvidence.hpp"
@@ -656,7 +658,13 @@ namespace {
 struct StateInputs {
     Json parsed, identities, resources;
 };
-StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
+struct FingerprintedCppSources {
+    std::vector<CppSource> sources;
+    Json anchors;
+};
+FingerprintedCppSources
+validated_cpp_sources(ArtifactStore& store, const Capture& capture,
+                      std::optional<std::chrono::steady_clock::time_point> parent_deadline = std::nullopt) {
     if(capture.cpp_metadata.has_unsupported_operation)
         fail(Error::ExportUnavailable, "Capture reports unsupported operations; inspect raw generated source");
     if(std::string_view(capture.profile->cli_version) != "2026.3.1.0")
@@ -677,7 +685,7 @@ StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
         expected.insert(project + '/' + name);
     std::map<std::string, Json> identities;
     std::size_t total = 0;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    const auto deadline = parent_deadline.value_or(std::chrono::steady_clock::now() + std::chrono::seconds(10));
     for(const auto& file : files) {
         const auto path = text(file, "path", 512), digest = text(file, "sha256", 64);
         require(expected.erase(path) == 1 && digest.size() == 64 &&
@@ -713,6 +721,10 @@ StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
         (void)path;
         anchors.push_back(identity);
     }
+    return {std::move(sources), std::move(anchors)};
+}
+StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
+    auto [sources, anchors] = validated_cpp_sources(store, capture);
     auto parsed = inspect_draw_executions(sources);
     // Resource references remain opaque and can be read through the existing
     // confined reader; never turn initial bytes into post-event values here.
@@ -925,5 +937,97 @@ Json InspectionService::cpp_resource(const std::string& capture_id, const std::s
     if(!fits_response(result))
         fail(Error::LimitExceeded, "Resource response exceeds MCP budget");
     return result;
+}
+
+Json InspectionService::cpp_descriptor_writes(const std::string& capture_id, const std::string& update_ref,
+                                              const std::string& section, std::size_t offset, std::size_t limit,
+                                              bool pin) const {
+    page_arguments(offset, limit);
+    if((section != "updates" && section != "unsupported") ||
+       (!update_ref.empty() && (section != "updates" || update_ref.size() != 64 ||
+                                update_ref.find_first_not_of("0123456789abcdef") != std::string::npos)) ||
+       (pin && update_ref.empty()))
+        throw std::invalid_argument("List updates/unsupported, or supply a listed update_ref; pin requires a read");
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    auto capture = load_capture(artifacts_, capture_id, true);
+    auto [sources, anchors] = validated_cpp_sources(artifacts_, capture, deadline);
+    auto parsed = inspect_cpp_descriptor_updates(sources);
+    const auto input_text = anchors.dump();
+    const auto input_hash = sha256(std::as_bytes(std::span(input_text.data(), input_text.size())));
+    for(auto& row : parsed["updates"]) {
+        const auto identity =
+            Json{{"capture_id", capture_id}, {"inputs_sha256", input_hash}, {"source_ref", row.at("source_ref")}}
+                .dump();
+        row["update_ref"] = sha256(std::as_bytes(std::span(identity.data(), identity.size())));
+    }
+    auto result = cpp_base_result(capture);
+    result["schema_profile"] = std::string(capture.profile->name) + "-descriptor-writes-v1";
+    result["input_files"] = anchors;
+    result["inputs_sha256"] = input_hash;
+    result["association_scope"] = parsed.at("association_scope");
+    result["registration_coverage_complete"] = parsed.at("registration_coverage_complete");
+    result["section"] = section;
+    result["read"] = nullptr;
+    result["writes"] = Json::array();
+    result["writes_total"] = 0;
+    for(const auto* name : {"updates", "unsupported"}) {
+        result[name] = Json::array();
+        result[std::string(name) + "_total"] = parsed.at(name).size();
+    }
+    if(update_ref.empty())
+        return page_result(std::move(result), section.c_str(), parsed.at(section).get<std::vector<Json>>(), offset,
+                           limit, [](const Json& row) { return row; });
+    const auto& updates = parsed.at("updates");
+    const auto found = std::find_if(updates.begin(), updates.end(),
+                                    [&](const Json& row) { return row.at("update_ref") == update_ref; });
+    if(found == updates.end())
+        fail(Error::ExportUnavailable,
+             "Descriptor update reference is absent, foreign or stale; list this capture again");
+    if(found->at("readable") != true || parsed.at("registration_coverage_complete") != true)
+        fail(Error::ExportUnavailable,
+             "Descriptor update or typed source registrations are unqualified; inspect unsupported forms");
+    if(workers_.descriptor_nsight_2026_3.empty())
+        fail(Error::ExportUnavailable, "Configure --descriptor-worker-2026-3 before decoding source descriptor writes");
+    const auto expected = Json::parse(descriptor_profile_json);
+    const auto project = capture.cpp_index.at("project_directory").get<std::string>();
+    Json helper_paths = Json::object(), inputs = Json::object();
+    for(const auto& [name, digest] : expected.at("original_files").items()) {
+        (void)digest;
+        const auto root = project + '/' + name, alternate = project + "/include/" + name;
+        const bool at_root = capture.files.contains(root);
+        const bool nested = name == "VulkanStructHydrator.h" && capture.files.contains(alternate);
+        if(at_root == nested)
+            fail(Error::ExportUnavailable, "Descriptor helper source is absent or ambiguous: " + name);
+        helper_paths[name] = at_root ? root : alternate;
+    }
+    for(const auto* name : {"data.bin", "data.bin.rec"}) {
+        const auto file = std::find_if(anchors.begin(), anchors.end(),
+                                       [&](const Json& ref) { return ref.at("path") == project + '/' + name; });
+        require(file != anchors.end(), "Descriptor input fingerprint is missing");
+        inputs[name] = {{"bytes", file->at("bytes")}, {"sha256", file->at("sha256")}};
+    }
+    DescriptorReadRequest request;
+    request.capture_id = capture_id;
+    request.project_directory = project;
+    request.reference = *found;
+    request.registrations = parsed.at("registrations");
+    request.helper_profile = expected;
+    request.helper_paths = helper_paths;
+    request.expected_inputs = inputs;
+    request.worker = workers_.descriptor_nsight_2026_3;
+    request.pin = pin;
+    request.deadline = deadline;
+    auto read = read_cpp_descriptor_writes(artifacts_, request);
+    const auto writes = read.at("writes").get<std::vector<Json>>();
+    read.erase("writes");
+    result["read"] = std::move(read);
+    result["section"] = "writes";
+    result["writes_total"] = writes.size();
+    try {
+        return page_result(result, "writes", writes, offset, limit, [](const Json& row) { return row; });
+    } catch(const InspectionError& error) {
+        throw InspectionError(error.code(), std::string(error.what()) + "; descriptor read artifact " +
+                                                result.at("read").at("artifact_id").get<std::string>());
+    }
 }
 } // namespace ngm

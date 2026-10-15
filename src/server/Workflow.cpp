@@ -686,6 +686,103 @@ Schema cpp_resource_schema() {
     return result;
 }
 
+Schema cpp_descriptor_writes_schema() {
+    const auto closed = [](Json properties) {
+        Json required = Json::array();
+        for(const auto& [name, value] : properties.items()) {
+            (void)value;
+            required.push_back(name);
+        }
+        return object_schema(std::move(properties), std::move(required));
+    };
+    const auto hash = string_schema(64, 64);
+    auto span = resource_span_schema();
+    for(const auto* name : {"sha256", "byte_offset", "byte_count"})
+        span["required"].push_back(name);
+    const auto update = closed({{"source_ref", hash},
+                                {"update_ref", hash},
+                                {"device", string_schema(128, 1)},
+                                {"handle", integer_schema(0, INT32_MAX)},
+                                {"write_count", integer_schema(1, 64)},
+                                {"output_bytes", integer_schema(64, 65536)},
+                                {"copy_count", integer_schema(0, 0)},
+                                {"conditional", boolean_schema()},
+                                {"readable", boolean_schema()},
+                                {"reason", nullable(string_schema(256, 1))},
+                                {"source", span}});
+    const auto object = closed({{"object_type", integer_schema(0, UINT32_MAX)},
+                                {"type_name", string_schema(128, 1)},
+                                {"serialized_id", integer_schema(1, UINT64_MAX)},
+                                {"symbol", string_schema(128, 1)},
+                                {"sources", array_schema(span, 1024)}});
+    const auto buffer = closed({{"buffer", nullable(object)},
+                                {"offset", integer_schema(0, UINT64_MAX)},
+                                {"range", integer_schema(1, UINT64_MAX)}});
+    const auto image =
+        closed({{"image_view", nullable(object)},
+                {"sampler", nullable(object)},
+                {"image_layout", {{"type", "integer"}, {"minimum", INT32_MIN}, {"maximum", INT32_MAX}}}});
+    const auto row = closed({{"dst_set", object},
+                             {"binding", integer_schema(0, UINT32_MAX)},
+                             {"array_element", integer_schema(0, UINT32_MAX)},
+                             {"descriptor_type", integer_schema(0, UINT32_MAX)},
+                             {"descriptor_type_name", string_schema(128, 1)},
+                             {"descriptor_count", integer_schema(1, 128)},
+                             {"buffers", array_schema(buffer, 128)},
+                             {"images", array_schema(image, 128)}});
+    Json helpers = Json::object();
+    for(const auto* name : {"ReadOnlyDatabase.cpp", "ReadOnlyDatabase.h", "DataScope.cpp", "DataScope.h", "DllCommon.h",
+                            "VulkanStructHydrator.cpp", "VulkanStructHydrator.h"})
+        helpers[name] = hash;
+    const auto profile =
+        closed({{"schema_version", integer_schema(1, 1)},
+                {"profile", string_schema(128, 1)},
+                {"project_version", string_schema(64, 1)},
+                {"original_files", closed(helpers)},
+                {"instrumented_files", closed({{"VulkanStructHydrator.cpp", hash}, {"VulkanStructHydrator.h", hash}})},
+                {"bounds_sha256", hash},
+                {"recipe_sha256", hash},
+                {"patch_sha256", hash}});
+    auto file = cpp_file_schema();
+    file["properties"]["bytes"] = integer_schema(0, 268435456);
+    const auto input = closed({{"bytes", integer_schema(0, 268435456)}, {"sha256", hash}});
+    const auto read = closed({{"capture_id", string_schema(39, 39)},
+                              {"update_ref", hash},
+                              {"reference", update},
+                              {"helper_profile", string_schema(128, 1)},
+                              {"worker_sha256", hash},
+                              {"worker_profile", profile},
+                              {"inputs", closed({{"data.bin", input}, {"data.bin.rec", input}})},
+                              {"input_bytes", integer_schema(64, 16777216)},
+                              {"input_sha256", hash},
+                              {"output_used_bytes", integer_schema(64, 65536)},
+                              {"artifact_id", string_schema(39, 39)},
+                              {"report_path", string_schema(512, 1)},
+                              {"evidence_origin", {{"type", "string"}, {"const", "nsight_generated_descriptor_read"}}},
+                              {"scope", string_schema(512, 1)}});
+    auto result = cpp_inspection_schema();
+    auto& p = result["properties"];
+    p["association_scope"] = string_schema(512, 1);
+    p["registration_coverage_complete"] = boolean_schema();
+    p["inputs_sha256"] = hash;
+    p["input_files"] = array_schema(file, 260);
+    p["updates"] = array_schema(update, 100);
+    p["unsupported"] = array_schema(
+        closed({{"kind", string_schema(32, 1)}, {"source", span}, {"reason", string_schema(256, 1)}}), 100);
+    p["writes"] = array_schema(row, 64);
+    p["read"] = nullable(read);
+    p["section"] = {{"type", "string"}, {"enum", {"updates", "unsupported", "writes"}}};
+    for(const auto* key : {"updates_total", "unsupported_total", "writes_total", "offset", "total"})
+        p[key] = integer_schema(0, 100000);
+    p["next_offset"] = nullable(integer_schema(0, 100000));
+    for(const auto& [name, value] : p.items()) {
+        (void)value;
+        if(std::find(result["required"].begin(), result["required"].end(), name) == result["required"].end())
+            result["required"].push_back(name);
+    }
+    return result;
+}
+
 // fastmcpp's optional validator maps failures to protocol errors and does not
 // enforce closed objects. This small validator applies the declared input
 // subset before any operation; malformed tool arguments become tool errors.
@@ -880,6 +977,7 @@ Json implemented_tool_names() {
                         "capture_draw_executions",
                         "capture_draw_state",
                         "capture_cpp_resources",
+                        "capture_cpp_descriptor_writes",
                         "capture_cpp_resource",
                         "profile",
                         "profile_metadata",
@@ -1885,6 +1983,31 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .cpp_resource(artifact_id(arguments, "capture_id"), arguments.at("resource_ref").get<std::string>(),
                               arguments.value("offset", std::size_t{0}), arguments.value("length", std::size_t{65536}),
                               arguments.value("pin", false));
+        });
+    add_tool(
+        tools, "capture_cpp_descriptor_writes",
+        object_schema({{"capture_id", string_schema(39, 39)},
+                       {"update_ref", string_schema(64, 64)},
+                       {"section", {{"type", "string"}, {"maxLength", 32}, {"enum", {"updates", "unsupported"}}}},
+                       {"offset", integer_schema(0, 100000)},
+                       {"limit", integer_schema(1, 100)},
+                       {"pin", boolean_schema()}},
+                      {"capture_id"}),
+        cpp_descriptor_writes_schema(),
+        "List literal descriptor update references from capture-time fingerprinted 2026.3 C++ inputs. "
+        "Without update_ref, section is updates (default) or unsupported. With a listed update_ref, decode source "
+        "writes using --descriptor-worker-2026-3; section must stay updates. Returns typed source symbols, "
+        "buffer offset/range and image layout fields with source/reader/input provenance. Default offset0/limit50, "
+        "max100 and 256KiB/page. Reads retain database snapshots/logs under quota with a shared twenty-second "
+        "deadline; "
+        "pin requires a read and does not pin the source. Unknown source/helper/worker/typed IDs refuse. "
+        "These are source writes; selected-draw visibility, resource values and shader access remain unavailable.",
+        false, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts(), options_.resource_workers)
+                .cpp_descriptor_writes(
+                    artifact_id(arguments, "capture_id"), arguments.value("update_ref", std::string{}),
+                    arguments.value("section", std::string("updates")), arguments.value("offset", std::size_t{0}),
+                    arguments.value("limit", std::size_t{50}), arguments.value("pin", false));
         });
 }
 } // namespace ngm

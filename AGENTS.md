@@ -121,6 +121,25 @@ deleted overlay without changing the installed driver, permissions or clocks.
 The installed 0.4.1 server and exact five-file 0.4.2 worker stay unchanged.
 The following slice records retain their historical scope and build identities.
 
+The **0.5.8 R-024 source-query slice** adds `capture_cpp_descriptor_writes`,
+bringing the shared surface to **33 tools**. Its bounded parser and supervised
+parent validate capture/source/database/helper/worker identities, map typed
+serialized IDs to source symbols and retain successful/failed attempts. Fresh
+uniform, combined storage/image and dynamic-array cases decode **20 writes**;
+the partial replacement agrees with the private API oracle, seven complete
+opaque inputs match the existing byte reader, and two restarts preserve fields
+and pins. All **43 CPU checks** pass in **433.91 seconds**. Complete/pinned
+**bundle-52a3d6a428d29f5fad1e043e61fb9983** retains **343** verified payloads,
+including all **1,764 snapshot paths / 468 content blobs** and **41 native
+bundle instances**. Its imported portable verifier passes **313** schema-valid
+results, including **231** from final qualified runs. I-077–I-083 preserve the
+failed build/schema/harness/collector attempts. See docs/DESCRIPTOR_WRITES.md.
+**R-024 stays In Progress** for selected-draw visibility, update/copy/resource
+lifetimes, actual SPIR-V type/layout/value evidence and repair acceptance;
+**R-026 stays Pending**. Source writes alone establish none of those execution
+claims. Installed server/worker and machine policies remain unchanged. The
+following 0.5.7 record describes the earlier worker-only foundation.
+
 The **0.5.7 R-024 foundation** adds the owner-approved optional seven-file
 descriptor worker with recorded pointer/copy bounds instrumentation, aligned
 opaque-input relocation and existing fail-closed confinement. All **41 CPU

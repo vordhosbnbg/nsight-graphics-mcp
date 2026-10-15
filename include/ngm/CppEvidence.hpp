@@ -17,4 +17,8 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources);
 // full content identity and byte span. No execution order or target state is
 // inferred; unsupported occurrences and conflicting sizes remain explicit.
 nlohmann::json inspect_cpp_resources(const std::vector<CppSource>& sources);
+// Literal descriptor-update callsites and typed source object registrations.
+// The reference binds the complete source bytes/span. No execution order,
+// descriptor visibility, database bytes or selected shader access is inferred.
+nlohmann::json inspect_cpp_descriptor_updates(const std::vector<CppSource>& sources);
 } // namespace ngm

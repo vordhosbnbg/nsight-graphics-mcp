@@ -7,6 +7,7 @@ namespace ngm {
 struct ResourceWorkers {
     std::filesystem::path nsight_2026_3;
     std::filesystem::path nsight_2026_2;
+    std::filesystem::path descriptor_nsight_2026_3 = {};
 };
 // Internal composition boundary. The inspection service supplies a qualified
 // capture/reference and a compiled-in helper profile, never MCP caller claims.
