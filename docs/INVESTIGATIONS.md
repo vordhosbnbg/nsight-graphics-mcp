@@ -1330,3 +1330,23 @@ records the commands, observations, preliminary workload and retention reference
   are recorded separately in PERFORMANCE.md and its acceptance snapshot.
 - **Revisit:** If snapshot/copy ownership changes, assert executable permissions
   before launch. This failure does not indicate a Nsight compatibility problem.
+
+### I-037 — Retained reader validation copied evidence before store initialization
+
+- **Context:** R-018 offline MCP resource qualification, source server/worker
+  0.4.2, retained Nsight 2026.3.1.0/build 38722833 capture, 2026-10-15.
+- **Reproduction:** Copy the intact source bundle into a new `store/bundles/`
+  directory before opening that store through the server; run
+  `ngm_retained_resource_integration` against it.
+- **Expected/observed:** The probe expected source inspection. The server
+  correctly refuses `Refusing to adopt nonempty unmarked artifact root` before
+  resource extraction. No Nsight tool or GPU execution occurs.
+- **Correction/evidence:** Initialize a separate empty `verified-store` through
+  an actual MCP `artifact_list` call, close that process, then copy the intact
+  producer-bound source bundle and its existing pin without editing manifests.
+  Whole/split byte-oracle reads and restart checks then pass. Both transcripts
+  and the failed/passing reports are pinned in
+  `bundle-133f94fc5a57cc411bc5eb00a8f1a5b6` at the configured external artifact
+  root; see RESOURCE_QUERIES.md for the independent source/read pins.
+- **Revisit:** If the retained-validation setup changes, initialize the store
+  before copying bundles. This is a probe setup error, not a reader limitation.

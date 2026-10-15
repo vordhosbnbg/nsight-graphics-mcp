@@ -1321,3 +1321,21 @@ confirmed after server restart. Publication receipts are in
 `build/performance-repair-publication`; snapshot documents predate their own
 publication reference and the final roadmap move. R-009 is Done, completing the
 performance group at 0.4.0. No accepted roadmap work remains pending or active.
+
+## 0.4.2 reader activation, 2026-10-15
+
+`cmake --build --preset linux-gcc-debug --target ngm_check_all` passes **31/31
+CPU checks**, no skips, in **325.33 seconds**, with GCC 16.2.1 and CMake 4.4.4 on
+Linux 7.2.7-zen1-1-zen x86-64. This includes actual worker confinement and
+wrong-profile/process-failure coverage. The optional 2026.3 worker uses the
+unchanged exact five-file retained helper closure. No dependency is downloaded.
+
+The current-version retained MCP runner accepts one optional worker, checks its
+required tool names, and rejects an unknown resource reference. Actual whole and
+split shader reads match the independent 2,700-byte SHA-256 oracle; exact input/
+producer/helper/worker hashes and source/read pins survive restart. This retained
+input qualification needs no desktop, Nsight execution or GPU access. Configuration
+for new Codex server processes includes the separately installed verified worker;
+existing connections keep their startup arguments. Detailed evidence, pins, exact
+operator paths and the initial safe store-initialization refusal are recorded in
+[RESOURCE_QUERIES.md](RESOURCE_QUERIES.md) and I-037.

@@ -100,12 +100,25 @@ ngm_add_hardware_check(ngm_retained_image_integration SOURCES RetainedImageInteg
 add_dependencies(ngm_retained_image_integration nsight-graphics-mcp)
 
 set(NGM_RESOURCE_CASES "" CACHE FILEPATH "Explicit retained-resource oracle cases for opt-in validation")
+set(resource_workers "-" "-")
+set(resource_worker_dependencies)
+foreach(profile IN ITEMS 2026_3 2026_2)
+    if(TARGET ngm-resource-worker-${profile})
+        if(profile STREQUAL "2026_3")
+            list(REMOVE_AT resource_workers 0)
+            list(INSERT resource_workers 0 "$<TARGET_FILE:ngm-resource-worker-${profile}>")
+        else()
+            list(REMOVE_AT resource_workers 1)
+            list(INSERT resource_workers 1 "$<TARGET_FILE:ngm-resource-worker-${profile}>")
+        endif()
+        list(APPEND resource_worker_dependencies ngm-resource-worker-${profile})
+    endif()
+endforeach()
 ngm_add_hardware_check(ngm_retained_resource_integration SOURCES RetainedResourceIntegration.cpp
     LIBRARIES ngm_core nlohmann_json::nlohmann_json
     ARGS "$<TARGET_FILE:nsight-graphics-mcp>" "${NGM_CAPTURE_ARTIFACT_ROOT}" "${NGM_RESOURCE_CASES}"
-        "${NGM_CAPTURE_VALIDATION_ROOT}" "${CMAKE_BINARY_DIR}/ngm-resource-worker-2026_3"
-        "${CMAKE_BINARY_DIR}/ngm-resource-worker-2026_2")
-add_dependencies(ngm_retained_resource_integration nsight-graphics-mcp)
+        "${NGM_CAPTURE_VALIDATION_ROOT}" ${resource_workers})
+add_dependencies(ngm_retained_resource_integration nsight-graphics-mcp ${resource_worker_dependencies})
 
 set(NGM_CPP_CASES "" CACHE FILEPATH "Explicit retained C++ inputs for opt-in validation")
 ngm_add_hardware_check(ngm_retained_cpp_integration SOURCES RetainedCppIntegration.cpp

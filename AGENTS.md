@@ -71,6 +71,14 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-018 completes retained resource-reader activation at **0.4.2**. All 31 CPU
+checks pass, including actual Linux confinement. Two offline current-server MCP
+runs verify the independent 2,700-byte shader oracle, split ranges, provenance,
+refusals and restart pins. The optional 2026.3 worker is configured for new Codex
+server processes; existing connections retain their startup configuration.
+See docs/RESOURCE_QUERIES.md and the pinned external qualification snapshot.
+R-019–R-022 remain capability follow-up work; no new GPU support is implied.
+
 R-016 adds native x86-64 Arch Linux packaging at **0.4.1**. The `package` preset
 provides `ngm_arch_sources` and `ngm_arch_package`: a source archive containing
 the exact dependency sources, generated checksummed PKGBUILD/.SRCINFO, and a
@@ -100,7 +108,9 @@ comparisons against retained real traces. Independent reviews pass. The complete
 [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for units, warmup, variability and scope.
 All approved temporary profiling access has been restored. Future permission
 changes still require an explicit owner decision; the product never changes them.
-All accepted roadmap items are now Done; do not invent further priorities.
+The original release items are Done. On 2026-10-15 the owner authorized the
+capability follow-up plan; R-018–R-022 track its implementation and qualification.
+Read docs/CAPABILITY_FOLLOWUP_PLAN.md and the current roadmap for that work.
 
 R-008 completes at **0.3.1** with a source-available no-presentation compute
 workflow on Nsight 2026.3.1.0, independent numerical validation and two actual

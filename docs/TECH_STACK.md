@@ -1,11 +1,51 @@
 # Technology Stack Evaluation
 
 Status: **The visual first-release group completes at 0.3.0: C++20/fastmcpp local stdio, CMake/Ninja source builds, deterministic Vulkan fixture, capture/job/artifact services and 22 tools. All nine source-repair scenarios and bounded serialized resource access are qualified on the two recorded Nsight releases; the clean 0.2.12 walkthrough passes 25 CPU checks and a fresh repair. See [VISUAL_RELEASE.md](VISUAL_RELEASE.md) for current scope; the versioned notes below retain implementation history. Compute correctness completes at 0.3.1 for the measured 2026.3 source-available path (COMPUTE.md); loopback HTTP completes at 0.3.2 (HTTP.md). Approved temporary profiling access enabled five successful GPU Trace probes; 0.3.3 adds bounded observed-export parsers and 0.3.4 adds shared asynchronous profiling/retained metric queries and 0.3.5 integrates performance fixture/runner validation, and the 0.3.6 development build adds bounded repeated profile comparison and passes actual source-repair acceptance. The R-009 group completes at 0.4.0 with final CPU/offline checks and pinned independent acceptance (PERFORMANCE.md).**
-Last updated: **2026-09-25**.
+Last updated: **2026-10-15**.
 
 This evaluation is separate from [ROADMAP.md](ROADMAP.md). The earlier Python
 recommendation has been superseded by the user's preference for C++ throughout.
 Keep the selected direction, remaining choices, and interview answers here.
+
+## 2026-10-15 capability follow-up evaluation
+
+The owner subsequently authorized implementation as R-018–R-022. R-018 uses the
+existing reader boundary; its 0.4.2 current-server retained-input validation is
+recorded in [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md). The remaining evaluation
+below preserves the assessment context; consult the roadmap for execution status.
+
+[R-017's assessment](CAPABILITY_FOLLOWUP_PLAN.md) retains the C++20/fastmcpp,
+shared service/process supervisor and documented Nsight adapter direction.
+It introduces no dependency, runtime configuration or implementation change.
+
+- Resource-byte activation uses the existing fingerprinted five-file generated
+  helper closure and confined optional 2026.3 worker. A matching pinned retained
+  source directory is available; the running 0.4.1 server has neither worker path
+  configured. Requalify bytes through current MCP before considering reader APIs.
+- The smallest proposed product increment adds a typed per-job environment map
+  over existing environment-array process launches, with a closed library/ICD/
+  desktop/layer allowlist. No shell wrapper or new process library is needed.
+- Header-only event/regime exports require a separate parser/query/comparison
+  compatibility change. Existing consumers assume a nonempty row vector; accepting
+  empty tables must preserve safe access and explicit unavailable coverage.
+- Effective draw-state interpretation would be a separate bounded evidence layer
+  over qualified documented exports/generated replay source, with command-buffer
+  execution identity and field-level provenance. The current literal source parser
+  is not an effective-state engine. A new public NVIDIA state API remains an
+  unverified alternative; no private format/RPC or GUI backend is selected.
+- Descriptor hydration and typed uniform/material decoding remain feasibility
+  gates. The fixed trusted hydration experiment is not a general parser; a wider
+  production helper closure requires a separate explicit scope decision and
+  qualification. No new reflection library or opaque descriptor decoder is selected.
+- Per-draw performance correlation needs actual same-profile export rows and
+  documented units/scope. Existing frame metrics and empty game event/regime tables
+  cannot supply that association. Optional application evidence stays separate.
+
+The detailed priorities, prerequisites and acceptance checks live in the linked
+plan. These are implementation candidates, not completed capabilities or newly
+committed roadmap work.
+
+## Earlier implementation evaluation
 
 At 0.2.3, a separate `capture_cpp` activity retains generated API source and
 resource files through the existing service/artifact path (16 current tools).

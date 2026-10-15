@@ -4,10 +4,12 @@
 #include "ngm/Hash.hpp"
 #include "ngm/Version.hpp"
 
+#include <algorithm>
 #include <csignal>
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 using Json = nlohmann::json;
@@ -36,7 +38,7 @@ std::string digest(std::string_view bytes) {
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     if(argc != 7) {
-        std::cerr << "SERVER STORE CASES_JSON RUN_ROOT WORKER_2026_3 WORKER_2026_2 required\n";
+        std::cerr << "SERVER STORE CASES_JSON RUN_ROOT WORKER_2026_3 WORKER_2026_2 required (use - to omit a worker)\n";
         return 2;
     }
     return ngm::check::run([&] {
@@ -59,20 +61,31 @@ int main(int argc, char** argv) {
                     {"cases", Json::array()},
                     {"evidence_origin", "retained_resource_mcp_validation"},
                     {"scope", "Retained source references and serialized bytes; no new capture or GPU execution"}};
-        report["workers"] = {
-            {"2026_3", {{"path", fs::canonical(argv[5]).string()}, {"sha256", ngm::sha256_file(argv[5])}}},
-            {"2026_2", {{"path", fs::canonical(argv[6]).string()}, {"sha256", ngm::sha256_file(argv[6])}}}};
+        report["workers"] = Json::object();
+        std::vector<std::string> server_arguments{
+            "--artifact-root", store.string(), "--artifact-max-bytes", "0", "--artifact-max-age-seconds", "0"};
+        for(unsigned index = 0; index < 2; ++index) {
+            const std::string path = argv[5 + index];
+            if(path.empty() || path == "-")
+                continue;
+            const std::string profile = index == 0 ? "2026_3" : "2026_2";
+            const auto worker = fs::canonical(path);
+            report["workers"][profile] = {{"path", worker.string()}, {"sha256", ngm::sha256_file(worker)}};
+            server_arguments.push_back(index == 0 ? "--resource-worker-2026-3" : "--resource-worker-2026-2");
+            server_arguments.push_back(worker.string());
+        }
+        require(!report.at("workers").empty(), "at least one explicit worker");
+        for(const auto& item : cases)
+            if(!item.contains("expected_error"))
+                require(report.at("workers").contains(item.at("profile").get<std::string>()),
+                        "every byte oracle has its matching configured worker");
         std::ofstream transcript(run / "transcript.ndjson");
         transcript.exceptions(std::ios::failbit | std::ios::badbit);
         std::cout << run << '\n' << std::flush;
         try {
             for(unsigned session = 0; session < 2; ++session) {
-                ngm::check::mcp::Client client(server.string(), "/nonexistent",
-                                               {"--artifact-root", store.string(), "--artifact-max-bytes", "0",
-                                                "--artifact-max-age-seconds", "0", "--resource-worker-2026-3",
-                                                fs::canonical(argv[5]).string(), "--resource-worker-2026-2",
-                                                fs::canonical(argv[6]).string()},
-                                               false, {}, {std::chrono::seconds(30), std::chrono::seconds(30)});
+                ngm::check::mcp::Client client(server.string(), "/nonexistent", server_arguments, false, {},
+                                               {std::chrono::seconds(30), std::chrono::seconds(30)});
                 int sequence = 1;
                 const auto request = [&](const char* method, const Json& params, bool expect_error = false) {
                     transcript << Json{{"session", session},
@@ -107,7 +120,14 @@ int main(int argc, char** argv) {
                 require(init.at("serverInfo").at("version") == ngm::project_version(), "server identity");
                 client.send({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}});
                 const auto tools = request("tools/list", Json::object());
-                require(tools.at("tools").size() == 22, "implemented tool count");
+                for(const auto* name :
+                    {"capabilities", "artifact_info", "capture_cpp_resources", "capture_cpp_resource"})
+                    require(std::any_of(tools.at("tools").begin(), tools.at("tools").end(),
+                                        [&](const auto& tool) { return tool.at("name") == name; }),
+                            std::string("required tool: ") + name);
+                const auto capabilities = call("capabilities", Json::object());
+                require(capabilities.at("operations").at("resource_bytes").at("available") == true,
+                        "reader configuration advertised");
                 if(session == 0)
                     save(run / "tools.json", tools);
                 for(std::size_t n = 0; n < cases.size(); ++n) {
@@ -128,6 +148,14 @@ int main(int argc, char** argv) {
                         continue;
                     }
                     const auto first = call("capture_cpp_resources", {{"capture_id", id}, {"limit", 7}});
+                    const auto invalid_reference =
+                        request("tools/call",
+                                {{"name", "capture_cpp_resource"},
+                                 {"arguments", {{"capture_id", id}, {"resource_ref", std::string(64, '0')}}}},
+                                true);
+                    require(invalid_reference.at("content")[0].at("text").get<std::string>().find(
+                                "Resource reference") != std::string::npos,
+                            "unknown resource reference refused");
                     const auto profile = item.at("profile").get<std::string>();
                     require(profile == "2026_3" || profile == "2026_2", "known oracle producer profile");
                     const auto version = profile == "2026_3" ? "2026.3.1.0" : "2026.2.0.0";

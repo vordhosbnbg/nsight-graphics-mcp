@@ -5,8 +5,8 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **All accepted items are Done: visual workflows at 0.3.0, compute at 0.3.1, local HTTP at 0.3.2, performance at 0.4.0, and Arch Linux packaging at 0.4.1. The shared stdio/HTTP surface has 26 tools. Qualification scopes remain recorded in their linked documents.**
-Last updated: **2026-09-25**.
+Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019–R-022 track launch environments, profile-table compatibility, selected-draw state and correlated timing/counters. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 26 tools; new capabilities require their own evidence.**
+Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
 The initial interview established the first-release requirements; all implementation
@@ -176,11 +176,83 @@ Item conventions:
 
 ## In Progress
 
+### R-019
+
+```text
+Status: In Progress
+Area: core/capture/mcp/cli/test
+Title: Expose controlled per-job launch environments
+Goal: Reproduce explicit library/ICD/backend launch conditions through the existing job lifecycle.
+Scope: Add a bounded allowlisted environment overlay shared by capture, C++ capture, profile and ngm-capture; apply it to discovery/collection/export before reserved-directory isolation; retain requested/applied provenance.
+Acceptance: CPU stand-ins and actual stdio/HTTP prove propagation, validation, queued-job isolation, defaults, cleanup and unchanged resource-worker/parent environments; separately qualify the runtime fixture path.
+Notes: Authorized by the owner on 2026-10-15. Step B; first product increment. Machine permissions/clocks are outside scope. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
+
 ## Pending
+
+### R-020
+
+```text
+Status: Pending
+Area: profile/inspection/mcp/test
+Title: Preserve valid header-only event and regime exports
+Goal: Keep frame metrics usable when a qualified GPU Trace export has no action/regime rows.
+Scope: Accept producer-qualified header-only event/regime tables; make metadata, queries and comparisons safe with explicit missing coverage; retain malformed-export rejection.
+Acceptance: Retained header shapes and frame rows parse; stand-in jobs, restart, queries and comparisons preserve provenance and never fabricate zero counters or durations.
+Notes: Authorized by the owner on 2026-10-15. Step C; complete before new live profiling. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
+
+### R-021
+
+```text
+Status: Pending
+Area: inspection/capture/mcp/test
+Title: Qualify selected-draw state in bounded evidence slices
+Goal: Expose evidence-supported pipeline/shader, depth/culling and viewport/scissor state for identified draw execution occurrences, then assess descriptors/constants/values.
+Scope: Qualify documented interfaces and retained source grammar, add a separate state interpreter/adapter with capture-local execution selection, per-field provenance and deterministic refusals; qualify later state/value slices only where evidence establishes them.
+Acceptance: Independent fixture API/execution records, static/dynamic disagreement and lifecycle/refusal matrices pass; retained and fresh matching-tool evidence supports every advertised field; unresolved executed-state/value correspondence remains explicitly unavailable.
+Notes: Authorized by the owner on 2026-10-15. Step D; documented interfaces only. Wider proprietary hydration helper closure requires a separate owner scope decision; the current authorization does not silently extend it. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
+
+### R-022
+
+```text
+Status: Pending
+Area: profile/capture/mcp/test
+Title: Qualify correlated draw timing and counter scopes
+Goal: Expose supported action/marker durations and counter scopes using actual same-profile exported evidence.
+Scope: Add typed retained per-action/HES settings; probe labelled repeated/reused fixture workloads, audit exported associations/units and implement bounded queries for demonstrated scopes.
+Acceptance: Actual exported rows support unambiguous correlation and independently checked timing/units/overhead; each counter has verified scope; unavailable documented evidence receives a retained limitation outcome; two-release claims require both releases.
+Notes: Authorized by the owner on 2026-10-15. Step E; no private trace decoder, implicit permission changes or fabricated draw counters. Application witnesses remain a separate evidence source. See docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
 
 ## Blocked
 
 ## Done
+
+### R-018
+
+```text
+Status: Done
+Area: inspection/test/configuration/docs
+Title: Activate and requalify the existing resource-byte reader
+Goal: Make the matching 2026.3 worker usable by the operator and verify current-server resource bytes against independently retained inputs.
+Scope: Build the fingerprint-qualified existing worker, run confinement and retained MCP checks in an isolated store, support one configured profile in the retained harness, configure the verified worker path, and retain pinned qualification evidence.
+Acceptance: Exact shader bytes/hash and split ranges match the independent oracle; incorrect references/profiles refuse; helper/database/source/worker provenance and pins survive restart; configuration advertises the reader without claiming runtime enforcement from discovery alone.
+Notes: Authorized by the owner on 2026-10-15 as step A of docs/CAPABILITY_FOLLOWUP_PLAN.md. No new resource API, generated helper closure, raised limits or GPU capture is required. Completed at 0.4.2: 31/31 CPU checks pass; actual confinement and two retained one-profile MCP runs verify exact shader bytes/ranges/provenance/refusal/restart pins. The verified worker is configured for new Codex server processes; existing connections need reconnecting. Qualification is pinned as bundle-133f94fc5a57cc411bc5eb00a8f1a5b6 in the external configured store; docs/RESOURCE_QUERIES.md records exact paths and scope.
+```
+
+### R-017
+
+```text
+Status: Done
+Area: analysis/capture/profile/mcp/docs
+Title: Assess draw-state, resource-reader, timing and launch-environment follow-up
+Goal: Prepare a prioritized implementation and feasibility plan for the owner's selected-draw state, existing resource-byte reader, correlated timing/counters and per-job launch-environment needs.
+Scope: Read current policy/implementation and retained eternity-forge 4K-band evidence; separate existing configuration from new implementation; document evidence limits, prerequisites, acceptance checks and the smallest useful increment in docs/CAPABILITY_FOLLOWUP_PLAN.md; record supporting stack evaluation in docs/TECH_STACK.md.
+Acceptance: The plan covers all four requested needs, preserves executed-state and cross-run correlation limits, identifies a concrete matching retained helper input and current configuration gaps, and specifies CPU/retained/future GPU validation without changing application code or eternity-forge.
+Notes: Planning-only assessment ran 2026-10-14–15 and completed at unchanged 0.4.1. Live capability/help observations, retained helper hashes/pin/producer checks and raw game-table inspection were performed; no build/tests, reader execution, live capture, profiling or machine controls were run. Resource reads are implemented but unconfigured; header-only profile exports and the retained reader harness's old 22-tool assertion need follow-up. The proposed first product increment is allowlisted per-job launch environment; effective draw state remains the main objective and requires documented evidence qualification. No implementation items or new capability claims are created by this completion.
+```
 
 ### R-016
 

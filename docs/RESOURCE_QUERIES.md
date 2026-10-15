@@ -112,3 +112,41 @@ Exact results and limitations are in [BUILD_VALIDATION.md](BUILD_VALIDATION.md).
 The complete evidence is pinned as `bundle-6365322f8eb3922893e1d2256983f732` in
 `artifacts/nsight-resource-query-evidence`, including independent acceptance and
 788 referenced pins.
+
+## 0.4.2 retained-input activation, 2026-10-15
+
+R-018 requalifies the existing 2026.3 reader using the current **0.4.2** source
+server and exact helpers from the pinned retained 0.2.12 capture
+`bundle-0ae9ebf56c4cbaa146c955c127786616`. This is offline serialized-input
+qualification; no new capture, replay or GPU execution was performed.
+
+The one-profile `ngm_retained_resource_integration` runner now checks the tools
+it needs and accepts `-` for an omitted worker. Its CMake run target passes only
+configured workers and builds those dependencies. With an initialized isolated
+managed store, the actual MCP calls verify shader handle 22 through its listed
+reference: **2,700 bytes**, SHA-256
+`cdc87c7eed07e6909af5e182cbaf46636002634279f598a26b42a64064b1cc9b`.
+Whole and two split reads agree; the end offset returns no bytes. An unknown
+reference is refused, exact producer/helper/worker/source/database hashes are
+checked, and source/read pins and retained bytes survive a second server session.
+`ngm_resource_read_check_run` covers mismatched profiles and process failures;
+`ngm_worker_confinement_check_run` passes actual Landlock/seccomp enforcement on
+Linux 7.2.7-zen1-1-zen x86-64. GCC is 16.2.1, CMake 4.4.4, GCC Debug preset.
+
+Qualification is pinned as `bundle-133f94fc5a57cc411bc5eb00a8f1a5b6` in
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/artifacts`, containing the exact
+worker, MCP transcripts, input cases, host identities and source-call inventory.
+The importing connection is the existing installed **0.4.1** server; the nested
+validation report records the **0.4.2** test server identity and hashes.
+The independent source and eight read bundles remain pinned in
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/reader-4922vn1v/verified-store`.
+The initial uninitialized-store refusal is retained and recorded as I-037.
+
+The verified worker is installed separately at
+`/home/vordhosbn/.local/lib/nsight-graphics-mcp/workers/0.4.2/ngm-resource-worker-2026_3`.
+The Codex `nsight_graphics` launch arguments now include that absolute
+`--resource-worker-2026-3` path. A new process using those exact operator arguments
+reports the configured reader. Already-open MCP connections keep their startup
+configuration until reconnected. The installed server remains 0.4.1, and no
+active server's artifact root was changed. The default/package build still omits
+proprietary workers; the 2026.2 profile remains optional and unconfigured.
