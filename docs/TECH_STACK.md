@@ -576,8 +576,9 @@ Nsight Compute realtime-accumulator documentation cannot establish the exact
 Graphics counters' precision. The official
 [Nsight Perf SDK entry point](https://developer.nvidia.com/nsight-perf-sdk/get-started)
 requires NVIDIA sign-in, confirmed by a read-only browser visit; no SDK is
-available in the inspected local toolchains. The prerequisite observations are
-retained in pinned `bundle-8837d11efb3fa1f8487ff80da02d061b` (I-100).
+available in the inspected local toolchains. I-100 records the prerequisite
+observations. Temporary discovery outputs were cleaned up and their shared
+import unpinned under the owner's 2026-10-16 retention policy.
 
 On 2026-10-16 the owner declined the proposed separate Nsight Perf SDK counter
 backend and explicitly chose **“Keep Nsight Graphics only.”** No evaluation or

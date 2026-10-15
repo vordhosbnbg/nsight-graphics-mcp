@@ -47,14 +47,15 @@ qualified source-local buffer/image writes through the confined optional worker.
 Fresh uniform, storage/image and dynamic-array captures pass independent source
 checks and restart/pin checks. See [descriptor writes](docs/DESCRIPTOR_WRITES.md).
 
-The **0.5.9 development slice** adds `capture_draw_values`: a bounded model of
+At **0.5.9**, `capture_draw_values` supplies a bounded model of
 source-visible uniform values at selected C++ submission/draw occurrences. It
 checks descriptor writes/copies, coherent uploads, completion boundaries and
 actual SPIR-V layouts before returning typed bits and provenance. This remains
 source evidence; GPU invocation/register observation and numeric Graphics
-Capture event correspondence are unavailable. R-024's validated evidence package
-awaits the owner storage-budget decision before publication; the roadmap records
-this remaining blocker.
+Capture event correspondence are unavailable. R-024 completes for this supported
+source interface after independent value/image, source-repair and restart checks.
+Validation run outputs are temporary; compact results and reproduction steps are
+recorded in [BUILD_VALIDATION.md](docs/BUILD_VALIDATION.md).
 
 ## Example workflows
 

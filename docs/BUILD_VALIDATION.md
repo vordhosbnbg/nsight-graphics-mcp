@@ -1,5 +1,18 @@
 # Build and development validation
 
+Retention update (**2026-10-16**): the owner requested temporary validation data
+and cleanup of development archives. Generated run trees referenced here have
+been removed; development-only imports in the shared store are unpinned for
+normal pruning. Historical pin/availability statements describe the original
+runs. Results and reproduction instructions remain; fresh verification requires
+rerunning the relevant checks. Full archive publication is not an acceptance gate.
+
+After cleanup, the GCC Debug configure and both optional worker builds pass with
+the seven required helper inputs kept under ignored `build/local-toolchains/`.
+The existing artifact, value-source-contract and value-timeline CPU checks pass
+(**3/3**, **38.88 seconds**). Their temporary outputs are removed afterward;
+no product code or new GPU qualification is part of this documentation cleanup.
+
 ## Arch Linux packaging (R-016, 0.4.1)
 
 Date: **2026-09-25**. Product **0.4.1**, package **0.4.1-1**, x86-64 Arch Linux
@@ -2785,14 +2798,9 @@ Its result remains a generated-source uniform visibility model, with
 `captured_gpu_execution_correspondence: false`; it does not observe shader
 invocations/registers or join numeric Graphics Capture event IDs.
 
-Working evidence is retained under
-`/home/vordhosbn/.local/share/nsight-graphics-mcp/roadmap-resolution-aytro126`.
-The new complete qualification snapshot has **not** been published to the
-central artifact store. That store has insufficient remaining protected budget;
-the proposed 2 GiB → 4 GiB increase awaits an owner decision. Limits/configuration
-and all older pins are unchanged. Native experiment bundles and query/child
-attempts are explicitly pinned in their existing isolated working stores;
-these paths are not a substitute for final qualification publication.
+R-024 completes for this bounded source interface after the checks below.
+The owner ended blanket archival on 2026-10-16; temporary run data is cleaned
+up afterward. The proposed central archive and quota increase are withdrawn.
 
 The `r024-value-mcp-reference-aware` collector passes **835** actual schema-valid
 MCP results. Three fresh matching **2026.3.1.0/build 38722833** direct C++
@@ -2849,28 +2857,8 @@ ngm_check --parallel 2` with serial CTest execution. The retained receipt in
 `r024-value-public-final-aggregate` verifies all **285** source inputs unchanged
 through the run. The scoped source-contract, timeline, stdio and HTTP checks
 also pass before the native matrix. The current server/fixture hashes match the
-frozen tested binaries above. R-024 is Blocked on the pending storage-budget
-decision before final qualification publication.
-
-The prepared, independently reconstructed qualification package is
-`r024-value-qualification-prep` (**106,961,591 bytes / seven payloads**). Its
-lossless XZ archive retains **16,396 paths / 4,793 unique content blobs**,
-including every native payload, preserved failed attempt and the exact source
-snapshot at **581cd31d3d5fd3edda85164403523dfa5b86d0d5**. The portable verifier
-passes file reconstruction, all 51 CPU receipts/source hashes, all 1,157 final
-MCP schemas, nine intended errors, 72 independent typed draw checks, 24 restart
-reads, child/native pins and the three exact repaired images. This package is
-prepared and verified, **not centrally published or marked complete**.
-
-Archive SHA-256:
-`360740cfb506e43a22f5a6a9a27eb60edc7047052c047176040ac2a773af4dfd`.
-Path-inventory SHA-256:
-`1ffddc2026383fe8160e6b4e886010607a045ba0f73c0bbc2f9d0804bf6939ae`.
-Payload-inventory SHA-256:
-`9a7102df3c025fcf158260d962c6971df916357a552ca97c3cefdfdef03a84bf`.
-The current 2 GiB store cannot accommodate it while preserving existing pins;
-the proposed owner budget decision remains pending. Documentation/publication
-bookkeeping follows the frozen source without changing the tested code.
+tested binaries above. These are completed validation results; archival and
+central publication are not completion requirements.
 
 ### R-026 native multi-pass feasibility after the Graphics-only decision
 
@@ -2893,16 +2881,7 @@ table. First-pass labels do not establish all-pass marker correspondence. This
 is a successful collection probe with **unqualified semantics**, not a new
 product option or R-026 completion (I-102).
 
-`r026-native-evidence-prep` holds **seven payloads / 4,581,533 bytes**, including
-a lossless **495-path / 426-blob** snapshot, both complete attempt trees,
-original traces/exports/witnesses, frozen fixture/supervisor, source identities
-and a portable verifier. Reconstruction, two successful receipts, two preserved
-precondition refusals, private six-call inputs and exact raw cells pass.
-Archive SHA-256:
-`a4ab20a67d14db27c28e38d3ce83d4e8b838a5eafac2a3843661db1c19d9680e`.
-The **4,473,424-byte** archive alone exceeds the current **3,410,198-byte** free
-central budget; no import, limit change, unpin or pruning is attempted. The
-package is prepared/verified and **not centrally published or pinned**. R-026
-is Blocked on a usable documented Graphics definition/scope interface; its
-evidence publication also awaits the existing storage decision. No first-party
-code changes or repeated CPU builds/tests accompany this documentation update.
+Temporary native probe data and the unnecessary archive are cleaned up after
+recording these findings. R-026 remains Blocked on the documented definition/scope
+prerequisite, independently of storage. This documentation/cleanup change does
+not rerun or extend the historical GPU qualification.

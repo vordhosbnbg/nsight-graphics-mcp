@@ -15,14 +15,15 @@ diagnostic workflows. Guidance and the dated local baseline: [AGENTS.md](../AGEN
 - Record enough context to reproduce the attempt: documented entry point and
   source, exact arguments or a minimal SDK example, workload/build identity,
   configuration, and tool/SDK/GPU/driver versions as relevant.
-- Describe expected and observed results separately, including exit status and
-  the relevant error or missing data. Retain raw evidence as local artifacts;
-  commit only small, sanitized excerpts or fixtures, not large captures/logs.
-- Automatic artifact retention was selected in round 8. Explicitly pin the evidence
-  bundles relied on by each entry and record their IDs/retention state; a link does
-  not itself protect data from pruning. If evidence is intentionally removed later,
-  update the entry to mark it unavailable while preserving the reproduction steps
-  and sanitized findings. R-012 tracks the storage and pinning implementation.
+- Describe expected and observed results separately, with the relevant status
+  and error or missing data. Record concise reproducible findings; routine
+  private harness/build mistakes need no permanent entry.
+- As requested by the owner on 2026-10-16, raw validation outputs are temporary.
+  Retain a minimized regression input or unresolved bug reproduction only for a
+  concrete ongoing purpose. Do not pin/archive every investigation. The old
+  run IDs and pin statements below are historical: local run trees have been
+  cleaned up and shared development imports are unpinned for normal pruning.
+  Preserve reproduction steps and narrow findings when raw data is discarded.
 - State the narrow conclusion supported by the evidence: a configuration error,
   prerequisite, version-specific failure, missing documented path, or inconclusive
   result. Do not label a capability universally unsupported from one failed probe.
@@ -913,7 +914,7 @@ Reproduction: Exact command arguments or minimal SDK example and prerequisites.
 Expected result:
 Observed result: Exit status, error, or missing data.
 Evidence: Artifact locations and a small sanitized excerpt where useful.
-Retention: Explicitly pinned evidence-bundle IDs, or unavailable evidence and why.
+Retention: A concrete ongoing purpose for any retained input, or that temporary output was cleaned up.
 Conclusion: Supported finding and remaining uncertainty.
 Current limitation:
 Revisit condition:
@@ -2882,12 +2883,9 @@ no value claim is based on the replay snapshots.
   The subsequent documented native multi-pass probe succeeds (I-102), without
   qualifying counter semantics or attribution. This is inconclusive about all
   possible public interfaces and does not complete R-026.
-- **Evidence/retention:** Complete/pinned
-  `bundle-8837d11efb3fa1f8487ff80da02d061b` retains all eight discovery/receipt/
-  browser/documentation-observation payloads. Its importer reports 0.4.1,
-  separately from the inspected 2026.3 tool and 0.5.9 project. The small record
-  fits the existing quota; no limit, older pin, installed backend or machine
-  setting is changed.
+- **Retention:** Temporary discovery output was cleaned up under the owner's
+  2026-10-16 policy; its former shared import is unpinned for normal pruning.
+  The version-qualified findings and revisit condition above remain the record.
 
 ### I-101 — Private counter probe omitted the CLI output-directory prerequisite
 
@@ -2937,13 +2935,7 @@ no value claim is based on the replay snapshots.
   before further qualification. The separate Perf SDK proposal was declined.
   Product profiling remains single-pass; no flag/schema/parser changes or new
   physical counter claims are made.
-- **Evidence/retention:** `r026-native-multi-pass-prepared-output/summary.json`
-  independently checks both receipts/settings, exact frozen fixture identity,
-  private six-call inputs and all raw frame/regime positions. Both original
-  attempt trees, traces, exports, witnesses, harnesses, frozen executable and
-  supervisor are retained in the independently reconstructed
-  `r026-native-evidence-prep` snapshot: 495 paths/426 blobs, seven payloads /
-  4,581,533 bytes. It is prepared/verified, not centrally published or pinned;
-  its 4,473,424-byte archive exceeds the remaining central budget. See
-  BUILD_VALIDATION.md for hashes and the pending storage decision. This is an
-  inconclusive capability probe, not R-026 acceptance evidence.
+- **Retention:** Raw runs and the unnecessary archive were cleaned up after
+  checking the two successful receipts/settings, private six-call inputs and
+  exact frame/regime cells. The findings and reproduction settings above remain.
+  No persistent archive or quota increase is required by this investigation.

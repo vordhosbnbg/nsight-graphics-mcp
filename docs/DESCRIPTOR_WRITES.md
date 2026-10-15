@@ -1,10 +1,11 @@
 # Source descriptor writes
 
-The **0.5.9 development slice** additionally implements the
-[source-visible draw uniform model](#source-visible-draw-uniform-values-059-development)
-below. Its verified qualification package awaits the owner storage-budget
-decision before publication. The following source-write qualification retains
-its 0.5.8 identity and scope.
+The **0.5.9 implementation** additionally supplies the
+[source-visible draw uniform model](#source-visible-draw-uniform-values-059)
+below. R-024 completes at 0.5.9 for that bounded source interface after actual
+repair and independent checks. The following source-write qualification retains
+its 0.5.8 identity and scope. Historical artifact references describe the original
+runs; temporary outputs are cleaned up after validation.
 
 At **0.5.8**, `capture_cpp_descriptor_writes` brings the shared stdio/HTTP surface
 to **33 tools**. It lists literal descriptor-update calls in retained matching
@@ -13,7 +14,7 @@ listed call through the owner-approved confined seven-file worker.
 
 Results describe source-scoped writes. They do not establish which update was
 visible to a selected draw, an effective dynamic-buffer address, GPU-written
-contents or a shader's typed material value. **R-024 remains In Progress**;
+contents or a shader's typed material value. **At 0.5.8 R-024 was In Progress**;
 copies, resource/update lifetimes and actual shader type/layout evidence still
 need their own qualification. Earlier recorded descriptor bindings and dynamic
 offsets retain their separate [contract](DRAW_STATE.md).
@@ -145,7 +146,7 @@ verifier reconstructs every file and passes **313** total schema-valid results
 oracles and the preserved failures. The installed 0.4.1 importer identity stays
 separate from the tested 0.5.8 server/worker.
 
-## Source-visible draw uniform values (0.5.9 development)
+## Source-visible draw uniform values (0.5.9)
 
 `capture_draw_values` lists bounded draw occurrences from a matching direct C++
 capture, then optionally composes source descriptor updates, buffer uploads and
@@ -223,6 +224,7 @@ GPU readback is checked separately against independent renderer images; it is
 not product evidence of a shader invocation value.
 
 The actual descriptor-source repair and final CPU/publication receipts are
-recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md). R-024 is Blocked on the
-pending storage-budget decision before final qualification publication; the
-source model is not a broader GPU-state or register-debugging capability.
+recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md). R-024 completes for this
+source interface; general GPU-state/register inspection remains unavailable.
+The owner ended blanket archival on 2026-10-16: temporary validation outputs are
+cleaned up, and central publication is not a completion gate.

@@ -76,8 +76,11 @@ application measurements. The selected 2 GiB/30-day defaults remain configurable
 revisit them after the advanced and profiling workloads are measured.
 
 `pin(id, true)` persists protection; `pin(id, false)` releases it. Pinning does not
-remove bytes from usage. Investigation evidence and verification baselines must
-be explicitly pinned: an artifact reference alone provides no protection.
+remove bytes from usage. Use pins for data the user needs to retain or a concrete
+ongoing regression/bug investigation; a reference alone provides no protection.
+Development validation outputs are temporary by the owner's 2026-10-16 decision.
+After recording concise results, release development-only pins and remove scratch
+run trees. Do not archive complete runs or require central imports to finish work.
 `import_directory()` copies an existing evidence directory into raw/imported/
 and defaults to pinned. It never changes the source or follows source links.
 Its required paths are relative to the source directory.

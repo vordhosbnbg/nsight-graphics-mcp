@@ -245,8 +245,10 @@ GPU reservation until cleanup is confirmed. EOF requests job shutdown and waits
 for owned work to finish; the server reports failed cleanup on stderr and exits
 nonzero. Completed artifact references survive restarts; job snapshots do not.
 
-Pin investigation evidence and retained verification baselines explicitly: a
-reference alone does not protect data. Default retention is 30 days and 2 GiB;
+Pin artifacts explicitly when the user needs longer retention or a concrete
+ongoing regression/bug investigation requires them; a reference alone does not
+protect data. Routine validation outputs are temporary and development-only pins
+are released after checks finish. Default retention is 30 days and 2 GiB;
 zero disables the corresponding limit. Protected bundles can leave the quota
 exceeded. Failed/interrupted attempts remain identifiable rather than appearing
 as complete captures. Imported investigation/baseline directories provide a way
