@@ -1576,3 +1576,55 @@ shader-stage isolation as unavailable; it resolves none of the wider I-043
 identity/counter limitations. See PROFILE_MARKERS.md and the complete/pinned
 `bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. R-022's remaining scope/overhead
 assessment stays open.
+
+### I-044 — Repeated timing-control measurements do not isolate causal overhead
+
+- **Context:** R-022, source-built **0.4.11**, matching Nsight
+  **2026.3.1.0/build 38722833**, RTX 3080 Ti / 615.71.09, existing KDE
+  Wayland/Xwayland-XCB desktop, diagnostic shaders and unaltered clocks.
+- **Reproduction:** Run `ngm_profile_correlation_integration` with
+  `--repeat-overhead`, the explicit matching-driver overlay and the declared
+  PROFILE_OVERHEAD.md plan: four fresh off/on pairs, reversed alternate order,
+  30 warmup presents, one collected frame, seed 42 and 1024×512.
+- **Expected/observed:** All eight profiles and both baselines succeed; exact
+  marker/API inputs and 326 private timestamped submissions verify. Scene
+  export/timestamp differences are 32–96 ns within the declared tolerance.
+  Paired on/off ratios are 0.999616, 1.009751, 1.002107 and 0.994629. Mixed
+  changes and uncontrolled desktop/clocks/power do not isolate a stable causal
+  instrumentation cost. The median paired ratio is 1.000861, not a correction
+  factor. All 92 telemetry probes succeed but do not resolve interval-local
+  clock stability. Profiling access observations match before/after.
+- **Evidence/retention:** PROFILE_OVERHEAD.md and BUILD_VALIDATION.md identify
+  complete/pinned **bundle-8d667f47f660fc46a582f440ee786c5e**. All eight native sources are
+  independently pinned in the external `overhead-final-u6kqwk8_/profile-overhead-Bft1vF/store`.
+  The declared plan, every sample/pair, raw exports, private witnesses, telemetry,
+  actual MCP transcript/schemas and independent audit are retained.
+- **Revisit:** A separately approved controlled experiment could constrain
+  clocks/background work and quantify uncertainty at a declared scope. This
+  result is inconclusive, not proof of zero cost or universal unmeasurability.
+  Product durations retain overhead; no correction or implicit machine-setting
+  change is introduced.
+
+### I-045 — Equivalent fixture API calls do not determine exported counter totals
+
+- **Context/reproduction:** The same eight successful 0.4.11 profiles in I-044,
+  with identical executable/shaders, scene inputs and private frame-30 records.
+  Independently compare all 146 frame-metric cells per run to exact MCP pages;
+  inspect the selected scene regime in each timing-on profile.
+- **Expected/observed:** Six direct API calls occur in every selected scene.
+  Raw `FE_A.TriageSCG.fe__draw_count.sum` frame cells are 10 in six runs and
+  71 in two. The two 71 sources are `bundle-8dc3fef15a44ca51541a56ee98dbdda1`
+  and `bundle-148ebca11a80506eec7f88999c0008f8`. Timing-on scene cells are
+  7, 7, 7 and 3. ZCull/PROP/instruction totals also differ between these
+  equivalent API inputs. Cause, physical normalization and exact application
+  attribution are unresolved. All 1,168 raw frame cells and 80 selected raw
+  facts verify; literal zero remains zero.
+- **Evidence/retention:** The complete/pinned I-044 qualification and all eight
+  independent native source pins retain exact names/text, raw table hashes,
+  exported paths and private API records. No source is excluded as an outlier.
+- **Revisit:** A version/architecture-qualified documented definition, attribution
+  boundary and independent new-input audit are needed before translating these
+  cells into exact application draw counts or isolated-draw/fragment work.
+  NVIDIA's GPU Trace guide states that collection includes other GPU activity;
+  that alone does not establish the cause of this particular difference. No
+  private trace decoder or inferred frame-to-draw division is selected.

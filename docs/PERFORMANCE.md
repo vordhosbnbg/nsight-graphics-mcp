@@ -10,6 +10,12 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+At **0.4.11**, the [repeated control assessment](PROFILE_OVERHEAD.md) adds four
+fresh off/on pairs, explicit warmup, independent scene timestamps and complete
+raw frame-cell comparisons. Timing sanity passes; causal overhead and application
+counter attribution remain unresolved. All observations stay retained, and no
+correction or new physical/per-draw counter meaning enters product results.
+
 At **0.4.10**, [profile_marker](PROFILE_MARKERS.md) exposes the qualified
 single-frame unique-path subset through the shared 29-tool surface. It returns
 exported marker duration in ms and up to eight requested raw regime metrics,

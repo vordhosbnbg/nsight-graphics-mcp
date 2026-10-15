@@ -74,6 +74,17 @@ Qualification is pinned as `bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. See
 In Progress for the remaining scope/overhead assessment. The installed/live
 server remains 0.4.1; the source-built surface now has **29 tools**.
 
+At **0.4.11**, step E's repeated control assessment passes two baselines and
+eight fresh profiles in four alternate-order off/on pairs after 30 warmup
+presents. The independent audit verifies 326 timestamped submissions, 32–96 ns
+scene agreement, all 1,168 frame cells and 913 schema-valid MCP results with
+restart pins. Mixed timing changes retain an inconclusive causal-overhead
+outcome; varying raw counter totals retain unresolved application attribution.
+See [PROFILE_OVERHEAD.md](PROFILE_OVERHEAD.md), I-044/I-045 and pinned
+`bundle-8d667f47f660fc46a582f440ee786c5e`. R-022 stays In Progress for its final
+scope and conditional-outcome audit. No new product tool or installed-server
+change occurs.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

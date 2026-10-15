@@ -2021,3 +2021,73 @@ code changes follow the passing aggregate.
 Repeated paths, multi-column sample identity, general action/queue/submission
 mapping, isolated draw counters and physical scaling remain explicit limitations
 under I-043. New 2026.2 marker support remains unqualified.
+
+## 0.4.11 repeated collection-control assessment, 2026-10-15
+
+This slice adds `--repeat-overhead` to the existing opt-in C++
+`ngm_profile_correlation_integration` runner. Product behavior, **29 tools**,
+artifact/index version 1, the shader/dependency inventory and proprietary helper
+closure remain unchanged. [PROFILE_OVERHEAD.md](PROFILE_OVERHEAD.md) records the
+predeclared scope, eight-launch order, warmup, tolerances and all measurements.
+
+Source is based on **2b3dbac** with explicitly dirty 0.4.11 changes. GCC **16.2.1**,
+CMake **4.4.4**, Ninja **1.13.2**, Linux **7.2.7-zen1-1-zen**, RTX **3080 Ti** /
+**615.71.09**, matching Nsight **2026.3.1.0/build 38722833** and the existing
+KDE Wayland/Xwayland-XCB path remain recorded. Exact executable, shader, overlay
+and desktop identities are retained. No permission, clock, driver, display or
+other-application change is performed; access observations match before/after.
+
+Verified commands:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_profile_correlation_integration
+/absolute/build/tests/ngm_profile_correlation_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/build/ngm-vulkan-fixture \
+  /absolute/build/shaders/fixture /absolute/Nsight-installation \
+  /absolute/validation-parent /absolute/launch-environment.json --repeat-overhead
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+Both direct-workload baselines pass, with synchronization validation active/clean
+on the validation baseline. All **eight** fresh one-frame profiles succeed in
+four alternate-order pairs after **30** warmup presents. Independent auditing
+verifies **326** private timestamped submissions, exact marker/API input trees
+and all selected frame-30 scene durations, with **32–96 ns** export/timestamp
+differences inside the declared max(0.025 ms, 25%) tolerance. Every source job
+confirms owned cleanup, released GPU reservation and its own persistent pin.
+
+All **913** actual MCP results pass JSON Schema 2020-12 and text/structured parity:
+profile ×8, job_status ×817, artifact_info ×16, profile_metadata ×16,
+profile_metrics ×40 and profile_marker ×16. Metadata/event/scene query results
+and pins remain identical after server restart. The complete **1,168** raw frame
+cells match actual MCP pages; **80** selected raw counter facts preserve exact
+names/text, source hashes and unresolved units/physical aggregation.
+
+Private scene off/on medians are **0.333424 / 0.333872 ms**; paired ratios are
+**0.999616, 1.009751, 1.002107, 0.994629**. Mixed changes under uncontrolled
+desktop/clocks/power remain inconclusive as causal overhead. All **92** read-only
+telemetry probes succeed, but do not prove interval-local clock stability.
+Raw frame draw-count cells vary **10/71** while every selected scene has six
+private API draw calls; timing-on scene regime cells vary **7/7/7/3**. I-044 and
+I-045 retain these limitations without excluding samples or inferring a cause.
+
+All **36/36 serial CPU checks pass, zero skipped, in 353.15 s**
+(353.13 s summed CPU-test time). The CPU aggregate runs after GPU
+collection; no concurrent hardware matrix is present. Scoped formatting,
+document-link and whitespace checks pass. No first-party code changes follow
+the successful aggregate.
+
+The native root is
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/overhead-final-u6kqwk8_/profile-overhead-Bft1vF`.
+All eight complete source profiles are independently pinned in its `store`.
+The consolidated qualification is complete/pinned as **bundle-8d667f47f660fc46a582f440ee786c5e**.
+It reports **12,878,496 bytes / 458 files**, including **40** original raw text
+exports and **259** first-party source/fixture files.
+It retains the declared plan, every request/response/sample, raw text exports,
+private API/timestamp witnesses, independent verifier/audit, telemetry/access
+observations, exact source/diff and final CPU receipt. Imported payload/source/
+binary hashes and released retention state verify. This selected evidence is
+not a full native-profile backup or typed import. The generic importer remains
+installed **0.4.1**; payload identities bind **0.4.11** collection/reader binaries.
+The installed/live server is unchanged. New 2026.2 support remains unqualified.
+R-022 stays In Progress for its final scope/conditional-outcome audit.

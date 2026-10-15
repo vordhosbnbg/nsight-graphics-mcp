@@ -71,6 +71,19 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-022's repeated control assessment completes at **0.4.11**, retaining **29
+tools**. The opt-in C++ runner mode collects four alternate-order off/on pairs
+after 30 warmup presents. Two baselines/eight fresh matching 2026.3 profiles pass,
+with 326 independently checked timestamped submissions, 32–96 ns scene timing
+agreement, all 1,168 raw frame cells and 913 actual MCP schemas/restart pins.
+All **36 CPU checks** pass. Causal overhead remains inconclusive and varying
+hardware counter cells do not establish application draw/fragment attribution
+(I-044/I-045). See docs/PROFILE_OVERHEAD.md and docs/BUILD_VALIDATION.md.
+Qualification is pinned as `bundle-8d667f47f660fc46a582f440ee786c5e`; all eight native sources
+are separately pinned. No machine setting, helper closure or installed server
+is changed. R-022 remains In Progress for the final scope/conditional-outcome
+audit; the earlier versioned qualifications below retain their identities.
+
 The bounded R-022 marker-query slice completes at **0.4.10**, bringing the
 shared stdio/HTTP surface to **29 tools**. `profile_marker` returns duration in
 ms and up to eight raw regime metrics for a uniquely associated qualified

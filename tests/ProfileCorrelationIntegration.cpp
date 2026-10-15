@@ -75,19 +75,25 @@ void verify_witness(const Json& witness, const std::string& scenario, const std:
 int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     return ngm::check::run([&] {
-        require(argc == 7, "SERVER FIXTURE SHADERS NSIGHT_ROOT OUTPUT_PARENT LAUNCH_ENV_JSON required");
+        const bool overhead = argc == 8 && std::string_view(argv[7]) == "--repeat-overhead";
+        require(argc == 7 || overhead,
+                "SERVER FIXTURE SHADERS NSIGHT_ROOT OUTPUT_PARENT LAUNCH_ENV_JSON [--repeat-overhead] required");
         const auto server = fs::canonical(argv[1]), fixture = fs::canonical(argv[2]), shaders = fs::canonical(argv[3]);
         const auto nsight = fs::canonical(argv[4]), parent = fs::absolute(argv[5]);
         const auto overlay = load(fs::canonical(argv[6])).get<ngm::LaunchEnvironment>();
         const auto selection = ngm::validate_launch_environment(overlay);
         fs::create_directories(parent);
-        auto pattern = (parent / "profile-correlation-XXXXXX").string();
+        auto pattern = (parent / (overhead ? "profile-overhead-XXXXXX" : "profile-correlation-XXXXXX")).string();
         require(mkdtemp(pattern.data()), "unique correlation validation directory");
         const fs::path run(pattern);
         fs::copy_file(__FILE__, run / "ProfileCorrelationIntegration.cpp");
         fs::create_directories(run / "native-witnesses");
         const auto fixture_hash = ngm::sha256_file(fixture);
+        const std::vector<const char*> scenarios =
+            overhead ? std::vector<const char*>{"timing-direct"}
+                     : std::vector<const char*>{"timing-direct", "timing-indexed", "timing-reuse"};
         Json report{{"status", "running"},
+                    {"mode", overhead ? "repeated_collection_control" : "correlation_matrix"},
                     {"scope", "Collection/feasibility matrix and independent private timestamp witnesses; public "
                               "correlation, counter scopes and timing sanity remain a separate export audit"},
                     {"project_version", ngm::project_version()},
@@ -104,11 +110,23 @@ int main(int argc, char** argv) {
                       {"scope", "whole scene envelope; same profile only"}}},
                     {"baselines", Json::array()},
                     {"profiles", Json::array()}};
+        if(overhead)
+            report["measurement_plan"] = {
+                {"pairs", 4},
+                {"time_every_action_order", {false, true, true, false, false, true, true, false}},
+                {"warmup_presents", 30},
+                {"collected_frames", 1},
+                {"scope", "Fresh-launch same-workload collection-control comparison; whole scene private timestamps "
+                          "and exported marker range, not isolated draw execution"},
+                {"summary", "Each launch is one observation; retain every pair, group medians and ranges. No "
+                            "selective outlier removal or overhead subtraction"},
+                {"causal_limit", "Clocks, desktop load and power state are uncontrolled; even repeated differences "
+                                 "do not establish a stable causal per-marker instrumentation cost"}};
         save(run / "report.json", report);
         std::cout << run << '\n' << std::flush;
         try {
             for(const bool validation : {true, false})
-                for(const auto* scenario : {"timing-direct", "timing-indexed", "timing-reuse"}) {
+                for(const auto* scenario : scenarios) {
                     const auto directory = run / (std::string(validation ? "validation-" : "baseline-") + scenario);
                     fs::create_directory(directory);
                     auto environment = ngm::capture_environment();
@@ -222,9 +240,13 @@ int main(int argc, char** argv) {
                 client.send({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}});
                 if(pass == 0) {
                     report["tools"] = request("tools/list", Json::object());
-                    for(const auto* scenario : {"timing-direct", "timing-indexed", "timing-reuse"})
-                        for(unsigned collection = 0; collection < 5; ++collection) {
-                            const bool single = collection == 4, action = collection % 2 == 1 || single;
+                    for(const auto* scenario : scenarios)
+                        for(unsigned collection = 0; collection < (overhead ? 8u : 5u); ++collection) {
+                            const bool single = overhead || collection == 4;
+                            const bool action = overhead ? report.at("measurement_plan")
+                                                               .at("time_every_action_order")[collection]
+                                                               .get<bool>()
+                                                         : collection % 2 == 1 || single;
                             const std::string delimiter = collection < 2 || single ? "frames" : "submits";
                             const auto key = std::string(scenario) + '-' + std::to_string(collection);
                             const auto witness_path = run / "native-witnesses" / (key + ".json");
@@ -241,7 +263,7 @@ int main(int argc, char** argv) {
                                                  {"settings",
                                                   {{"architecture", "Ampere GA10x"},
                                                    {"delimiter", delimiter},
-                                                   {"start_after", 5},
+                                                   {"start_after", overhead ? 30 : 5},
                                                    {"limit", single ? 1 : 3},
                                                    {"duration_ms", 1000},
                                                    {"time_every_action", action},
@@ -249,6 +271,10 @@ int main(int argc, char** argv) {
                             const auto submitted = call("profile", arguments);
                             report["profiles"].push_back(
                                 {{"key", key}, {"request", arguments}, {"submission", submitted}});
+                            if(overhead) {
+                                report["profiles"].back()["pair_index"] = collection / 2;
+                                report["profiles"].back()["order_in_pair"] = collection % 2;
+                            }
                             save(run / "report.json", report);
                             Json state;
                             const auto deadline = std::chrono::steady_clock::now() + 150s;
@@ -277,6 +303,27 @@ int main(int argc, char** argv) {
                                                   {{"profile_id", id}, {"table", "event_durations"}, {"limit", 100}});
                             require(item["events"]["next_offset"].is_null(),
                                     "complete bounded marker export fits audit page");
+                            if(overhead) {
+                                item["scene_query"] =
+                                    call("profile_marker", {{"profile_id", id},
+                                                            {"event_row_index", 1},
+                                                            {"metrics", {"FE_A.TriageSCG.fe__draw_count.sum"}}});
+                                item["frame_duration"] =
+                                    call("profile_metrics", {{"profile_id", id}, {"table", "frame_duration"}});
+                                item["frame_metrics"] = Json::array();
+                                for(std::size_t offset = 0;;) {
+                                    auto page = call("profile_metrics", {{"profile_id", id},
+                                                                         {"table", "frame_metrics"},
+                                                                         {"offset", offset},
+                                                                         {"limit", 100}});
+                                    const auto next = page.at("next_offset");
+                                    item["frame_metrics"].push_back(std::move(page));
+                                    if(next.is_null())
+                                        break;
+                                    require(next.get<std::size_t>() > offset, "advancing bounded frame metric page");
+                                    offset = next.get<std::size_t>();
+                                }
+                            }
                             item["witness"] = load(witness_path);
                             verify_witness(item["witness"], scenario, fixture_hash);
                             save(run / "report.json", report);
@@ -293,6 +340,12 @@ int main(int argc, char** argv) {
                                 "identical offline marker export");
                         require(call("artifact_info", {{"artifact_id", id}}).at("pinned") == true,
                                 "independent source pins survive restart");
+                        if(overhead)
+                            require(call("profile_marker", {{"profile_id", id},
+                                                            {"event_row_index", 1},
+                                                            {"metrics", {"FE_A.TriageSCG.fe__draw_count.sum"}}}) ==
+                                        item.at("scene_query"),
+                                    "identical offline scene range or explicit timing-off refusal");
                     }
                 require(client.finish() == 0, "correlation server exits cleanly");
             }

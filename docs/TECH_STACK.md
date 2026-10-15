@@ -9,6 +9,15 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.11 repeated-control assessment reuses the explicit C++ correlation
+runner with a separate opt-in mode and a predeclared alternate-order plan.
+Eight fresh source-built collections retain private timestamp/API inputs,
+actual MCP queries and every raw frame cell. A read-only external monitor keeps
+telemetry/access observations separate from product evidence. No dependency,
+product query, physical counter interpretation or machine control is added.
+Repeated scene timings pass sanity checks while causal overhead and application
+counter attribution remain unresolved; see PROFILE_OVERHEAD.md and I-044/I-045.
+
 The 0.4.10 marker query separates a pure bounded event/regime path interpreter
 from the existing retained-profile inspection adapter. The adapter holds one
 artifact lease across provenance/hash validation, table parsing and result
