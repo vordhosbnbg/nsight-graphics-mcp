@@ -15,6 +15,15 @@ ngm_add_check(ngm_worker_confinement_check SOURCES WorkerConfinementCheck.cpp LI
     ARGS "$<TARGET_FILE:ngm_worker_confinement_probe>" DEPENDS ngm_worker_confinement_probe)
 set_tests_properties(ngm_worker_confinement_check PROPERTIES SKIP_RETURN_CODE 77)
 ngm_add_jobs_checks()
+ngm_add_check(ngm_descriptor_bounds_check SOURCES DescriptorBoundsCheck.cpp LIBRARIES ngm_core)
+if(TARGET ngm_descriptor_helper_2026_3)
+    add_executable(ngm_descriptor_hydrator_integration EXCLUDE_FROM_ALL DescriptorHydratorCheck.cpp)
+    target_link_libraries(ngm_descriptor_hydrator_integration PRIVATE ngm_core ngm_descriptor_helper_2026_3)
+    ngm_first_party(ngm_descriptor_hydrator_integration)
+    add_custom_target(ngm_descriptor_hydrator_integration_run
+        COMMAND "$<TARGET_FILE:ngm_descriptor_hydrator_integration>"
+        DEPENDS ngm_descriptor_hydrator_integration USES_TERMINAL VERBATIM)
+endif()
 ngm_add_nsight_checks()
 ngm_add_artifact_checks()
 ngm_add_capture_checks()

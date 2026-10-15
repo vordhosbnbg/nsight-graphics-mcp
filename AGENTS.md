@@ -121,6 +121,20 @@ deleted overlay without changing the installed driver, permissions or clocks.
 The installed 0.4.1 server and exact five-file 0.4.2 worker stay unchanged.
 The following slice records retain their historical scope and build identities.
 
+The **0.5.7 R-024 foundation** adds the owner-approved optional seven-file
+descriptor worker with recorded pointer/copy bounds instrumentation, aligned
+opaque-input relocation and existing fail-closed confinement. All **41 CPU
+checks** pass in **400.32 seconds**; ten retained 0.5.6 source-local reads match
+the existing byte worker and source registrations. Four worker refusals and a
+changed-helper configure rejection pass. Complete/pinned
+**bundle-8e3eb665326adc38968783d5809c7973** retains **336** verified payloads,
+including its lossless **278-member** snapshot and failed I-076 attempt; its
+imported verifier also checks 40 ancestor source/input files. There is no new
+MCP tool or selected-draw lifetime/typed-value claim. **R-024 stays In Progress**,
+R-026 Pending. See docs/DESCRIPTOR_WORKER.md and the approved scope in
+docs/DESCRIPTOR_WORKER_PLAN.md. Installed five-file worker/server and machine
+policies are unchanged. The following records describe earlier slices.
+
 The **0.5.3 R-025 foundation** adds bounded consecutive Graphics Capture intervals
 through core/MCP/CLI and preserves raw plural range metadata. Defaults remain one;
 counts above one are qualified only on matching 2026.3. All **37 final CPU checks**,
@@ -477,6 +491,16 @@ Recheck its availability when evaluating new documented integration options.
   exception follows the optional NGFX header policy; it does not permit network
   acquisition or replacement of pinned submodule dependencies. See
   [docs/RESOURCE_WORKER.md](docs/RESOURCE_WORKER.md).
+
+- On 2026-10-15 the owner explicitly approved
+  [docs/DESCRIPTOR_WORKER_PLAN.md](docs/DESCRIPTOR_WORKER_PLAN.md): the optional
+  matching 2026.3 descriptor worker may additionally compile only the exact
+  fingerprinted `VulkanStructHydrator.cpp/.h`, with confined execution and
+  recorded bounds instrumentation in isolated copies. Preserve original/derived
+  hashes and the instrumentation patch. This seven-file exception does not
+  authorize generated replay/application code, a wider helper closure, machine
+  changes or unverified execution-time values. The existing five-file resource
+  worker remains independent. R-024 still requires its full acceptance checks.
 
 - Track project dependency sources under `external/` as exact-commit git
   submodules, including required transitive sources. Initialize them explicitly

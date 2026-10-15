@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(NsightGraphicsMCP VERSION 0.5.6 LANGUAGES C CXX)
+project(NsightGraphicsMCP VERSION 0.5.7 LANGUAGES C CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Only Linux builds are currently supported.")
@@ -44,6 +44,8 @@ include(cmake/Inspection.cmake)
 ngm_add_inspection()
 include(cmake/ResourceWorker.cmake)
 ngm_add_resource_workers()
+include(cmake/DescriptorWorker.cmake)
+ngm_add_descriptor_worker()
 
 add_executable(nsight-graphics-mcp src/server/Main.cpp)
 target_link_libraries(nsight-graphics-mcp PRIVATE ngm_core fastmcpp_core)

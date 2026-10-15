@@ -2655,3 +2655,55 @@ with its source hash/length; `artifact_info` confirms complete/pinned/not in use
 The code snapshot precedes only final documentation/pin bookkeeping. The installed
 **0.4.1** importer remains distinct from the tested **0.5.6** source/binaries and
 unchanged **0.4.2** worker. **R-025 is Done**; R-024 and R-026 remain open.
+
+## 0.5.7 confined descriptor worker, R-024 foundation, 2026-10-15
+
+The owner explicitly approves the exact two-file `VulkanStructHydrator.cpp/.h`
+extension and recorded bounds instrumentation. [DESCRIPTOR_WORKER_PLAN.md](DESCRIPTOR_WORKER_PLAN.md)
+records the decision; [DESCRIPTOR_WORKER.md](DESCRIPTOR_WORKER.md) documents the
+implemented optional build and internal protocol. Only seven fingerprinted
+generated helper files are used, with original/derived hashes and a unified
+instrumentation patch. No replay/application code, wider helper closure or
+dependency download is involved. There is no new MCP tool; the surface stays
+**32** and **R-024 stays In Progress** for selected-draw history and typed values.
+
+The final GCC Debug aggregate passes **41/41 CPU checks** in **400.32 seconds**
+with `CTEST_PARALLEL_LEVEL=1`. The new `ngm_descriptor_bounds_check` and existing
+`ngm_worker_confinement_check` pass; MCP/HTTP pass in **28.60/6.75 seconds**.
+The explicitly invoked, optional `ngm_descriptor_hydrator_integration_run` passes
+single/multiple buffer writes and image arrays, distinct tokens and malformed
+pointer/count/input/output/extension controls. A changed helper fingerprint
+refuses during configure, before compiling a worker.
+
+Ten complete/pinned 0.5.6 C++ source inputs pass supervised confined reads with
+empty environments, regular output files and confirmed cleanup. All input
+lengths/hashes match the independently supervised existing byte worker. Every
+source-local serialized object type/ID matches its exact source registrations;
+the ten measured uniform-buffer writes have binding/element zero and range
+0/16 bytes. This does not infer typed material values or a selected GPU draw's
+descriptor lifetime. Four invalid argument/missing-handle controls refuse with
+no stdout and confirmed cleanup.
+
+I-076 retains the initial combined bounds/alignment failure. Seven database
+blocks have pointer alignment remainder four. Relocating opaque bytes into
+aligned storage preserves the helper's relative-offset contract and all bounds
+checks; the corrected matrix passes without weakening alignment validation.
+The initial frozen worker and failed attempt remain distinct from final worker
+SHA-256 `375272fed5ce3936005e25e1a37277b4c9c92cd549f4da1d6d9c0c176fc9337e`.
+ELF inspection finds only `libstdc++`, `libm`, `libgcc_s` and `libc`; the static
+helper archive contains exactly the database, scope and hydrator object files.
+
+Complete/pinned **bundle-8e3eb665326adc38968783d5809c7973** retains **336** payloads
+(**8,138,832 bytes**), including all **278** lossless snapshot members, original/
+instrumented helpers and patch, first-party source, frozen worker/check binaries,
+successful/failed attempts, actual requests/receipts, opaque-byte oracles and
+CPU/build/ELF logs. The imported portable verifier passes every member and
+payload hash, the ten source-local descriptor/byte comparisons, seven alignment
+corrections, four worker refusals and configure rejection. It also verifies
+**40** exact source/input payloads directly against the already pinned 0.5.6
+ancestor **bundle-168c040e6fa84e7efd645b16a5413735**, retaining original captures
+without duplicate history. `artifact_info` confirms complete/pinned/not in use.
+The source snapshot precedes final documentation/pin bookkeeping only. No new
+GPU operation, installed server/worker activation or machine setting change
+occurs. Installed importer **0.4.1** and byte worker **0.4.2** remain separate
+from the tested **0.5.7** source/optional worker. R-026 remains Pending.

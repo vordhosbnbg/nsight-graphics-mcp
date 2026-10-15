@@ -2293,3 +2293,44 @@ Progress; no new GPU work or machine-policy change occurs in this reader slice.
   in a fresh run. Keep the original unsupported case distinct; do not silently
   resize a workload or relax its pixel/timestamp acceptance. No display setting
   or machine policy change is needed.
+
+**Final retention for I-074/I-075:** Complete/pinned
+**bundle-168c040e6fa84e7efd645b16a5413735** retains all original failed controls
+alongside the completed 0.5.6 timestamp/repair qualification. Its lossless archive
+and per-member inventory preserve the exact logs, plans, receipts and runtime
+identities. The imported portable verifier passes. See DRAW_TIMING_VALIDATION.md.
+
+### I-076 — Descriptor hydration rejects an unaligned database block
+
+- **Context/reproduce:** After the owner's explicit two-file extension approval,
+  the first uncommitted 0.5.7 confined worker reads the ten retained 0.5.6 C++
+  inputs. Exact fingerprints and optional real-helper synthetic checks pass.
+  The first analysis input succeeds; input
+  `bundle-10b54f1670fcc352f300cdd39e26eec8`, handle 10, write count one,
+  output allocation 88, exits 2 during hydration with the combined input-bounds/
+  alignment diagnostic. Cleanup is confirmed and stdout is empty.
+- **Observed/correction:** The database reader does not guarantee Vulkan
+  structure alignment. Copy opaque resource bytes into aligned storage before
+  invoking the helper, retaining its relative-offset contract and all range/
+  alignment checks. The final measured pointer remainder for this input is four
+  bytes. Seven of ten sources have that remainder. All ten corrected reads pass,
+  and each full input SHA-256/length matches the separately supervised existing
+  byte worker. This establishes the alignment correction for these cases; it
+  does not qualify arbitrary descriptor lifetime/type evidence.
+- **Evidence:** `r024-worker-probe` preserves its frozen initial worker SHA-256
+  `22c0da5e6c1dfadcc03d86e67176db44095f67c452f1f6234deacf618c33f047`,
+  original helper/patch/bounds snapshots, harness, failed/successful receipts and
+  logs. `r024-worker-aligned` retains the corrected ten-input matrix, exact
+  source registrations, opaque-byte comparisons and four expected refusals.
+  These external working records await the 0.5.7 qualification publication.
+- **Revisit:** Keep relocation and pointer/copy checks together; do not weaken
+  alignment checks or equate a database block pointer with an ABI-aligned
+  structure. New descriptor shapes and source/tool profiles need their own
+  independently checked inputs. No GPU or machine setting change occurs.
+
+**Final I-076 retention:** Complete/pinned
+**bundle-8e3eb665326adc38968783d5809c7973** retains all 336 new qualification
+payloads and the complete initial/corrected worker attempts. Its imported
+portable verifier passes the ten source/opaque-byte comparisons and seven
+alignment corrections, plus all source/input hashes against the pinned 0.5.6
+ancestor. The 41-check CPU suite passes; R-024 remains In Progress.

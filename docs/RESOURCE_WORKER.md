@@ -122,3 +122,8 @@ The interface uses NVIDIA's documented generated resource helper, not a private
 database decoder. Primary references: [Generate C++ Capture](https://docs.nvidia.com/nsight-graphics/UserGuide/generate-cpp-activity.html),
 [Landlock](https://docs.kernel.org/userspace-api/landlock.html), and
 [seccomp filtering](https://docs.kernel.org/userspace-api/seccomp_filter.html).
+
+The separately approved [descriptor write worker](DESCRIPTOR_WORKER.md) starts
+at 0.5.7 with two additional exact helper files and recorded bounds instrumentation.
+It does not alter this five-file byte-reader protocol or activate a public
+descriptor/execution-time query. R-024 retains its separate acceptance checks.
