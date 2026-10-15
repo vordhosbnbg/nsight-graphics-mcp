@@ -132,10 +132,14 @@ void check_metadata_schema(const Json& observed) {
     const auto minimal = ngm::parse_nsight_metadata(R"({"metadata_version":1})");
     require(!minimal.uuid && !minimal.nsight_version && !minimal.nsight_version_build_id && !minimal.primary_api &&
                 !minimal.primary_gpu && !minimal.driver_vendor && !minimal.driver_version && !minimal.os_information &&
-                !minimal.process_name && !minimal.request_time && !minimal.captured_frame && !minimal.resolution &&
-                !minimal.non_portable && !minimal.d3d12_core_version && !minimal.has_unsupported_operation &&
-                !minimal.graphics_apis && !minimal.graphics_features && !minimal.collection,
+                !minimal.process_name && !minimal.request_time && !minimal.captured_frame && !minimal.captured_frames &&
+                !minimal.resolution && !minimal.non_portable && !minimal.d3d12_core_version &&
+                !minimal.has_unsupported_operation && !minimal.graphics_apis && !minimal.graphics_features &&
+                !minimal.collection,
             "missing optional fields are absent, not invented empty strings or false booleans");
+    const auto multiple = ngm::parse_nsight_metadata(R"({"metadata_version":1,"captured_frames":"7 - 9"})");
+    require(multiple.captured_frames == "7 - 9" && !multiple.captured_frame,
+            "multiple-interval range text stays distinct from a single captured frame without inferred numbering");
     const auto empty = ngm::parse_nsight_metadata(
         R"({"metadata_version":1,"graphics_apis":{},"_metadata_collection_":{"warnings":[]}})");
     require(empty.graphics_apis && empty.graphics_apis->empty() && empty.collection && !empty.collection->info &&
@@ -152,7 +156,7 @@ void check_metadata_schema(const Json& observed) {
     }
     for(const auto* field : {"uuid", "nsight_version", "nsight_version_build_id", "primary_api", "primary_gpu",
                              "driver_vendor", "driver_version", "os_information", "process_name", "request_time",
-                             "captured_frame", "resolution", "non_portable", "d3d12_core_version"}) {
+                             "captured_frame", "captured_frames", "resolution", "non_portable", "d3d12_core_version"}) {
         auto value = observed;
         value[field] = nullptr;
         rejected(Error::InvalidField, [&] { ngm::parse_nsight_metadata(value.dump()); });

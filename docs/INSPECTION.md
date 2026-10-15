@@ -1,5 +1,11 @@
 # Capture inspection evidence
 
+At **0.5.3**, the typed metadata result also preserves optional raw
+`captured_frames` text separately from `captured_frame`. The observed multi-interval
+value is `"7 - 9"`; missing fields stay null. This does not infer application-frame
+or timing-sample IDs. [MULTI_INTERVAL_CAPTURE.md](MULTI_INTERVAL_CAPTURE.md) records
+the source qualification and the versioned notes below keep their earlier scope.
+
 The 0.3.1 compute extension accepts one additional observed graphics metadata
 shape on Nsight 2026.3.1.0/build 38722833: an empty `primary_api` with explicit
 Vulkan API/feature inventories, no unsupported operation, and matching retained

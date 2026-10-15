@@ -416,6 +416,7 @@ void invalid_workflow_check(const std::string& server, const Scratch& scratch) {
         call(client, "artifact_import", {{"source", scratch.path.string()}, {"required_outputs", {"../file"}}}));
     const Json valid_capture{{"executable", server}, {"working_directory", scratch.path.string()}};
     const Json invalid_capture_fields{{"capture_frame", 1},
+                                      {"frame_count", 601},
                                       {"delimiter", "automatic"},
                                       {"timeout_ms", 600001},
                                       {"pin", 1},

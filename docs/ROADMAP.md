@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay completes at 0.5.2 on its measured matching 2026.3 path; R-024–R-026 remain Pending in their accepted priority order and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface now has 30 tools; installed server/worker configuration is unchanged.**
+Planning state: **R-023 fresh Graphics Capture reliability completes at 0.5.1 on the measured 2026.3 path. R-027 standalone GPU replay completes at 0.5.2 on its measured matching 2026.3 path; R-025 draw timing correlation is In Progress; R-024 and R-026 remain Pending and require documented evidence. The completed R-018–R-022 group retains its 0.5.0 conditional scope. The shared surface now has 30 tools; installed server/worker configuration is unchanged.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -183,6 +183,18 @@ Item conventions:
 
 ## In Progress
 
+### R-025
+
+```text
+Status: In Progress
+Area: profile/inspection/capture/mcp/test
+Title: Associate timings with captured draw occurrences
+Goal: Identify the draw, submission and occurrence to which a reported GPU timing belongs, including repeated markers and reused recordings.
+Scope: Qualify documented action/queue/submission/sample identities and any capture-to-profile correspondence, then add bounded correlation queries for demonstrated producer-specific scopes. Preserve the existing unique single-frame marker-range contract.
+Acceptance: Direct/indexed draws, nested/repeated and multi-draw markers, reused command buffers and multiple collected intervals have independent occurrence/timestamp validation. Results retain unambiguous original identities, units and source provenance through restart. Ambiguous or unsupported joins refuse; row order, equal counts and matching numeric IDs alone never establish correspondence. Actual new correlation is required for completion.
+Notes: Priority 3, accepted by the owner on 2026-10-15. Follow-up to I-043, I-039 and the completed conditional R-022 assessment; see docs/PROFILE_SCOPE_FEASIBILITY.md. Stable documented execution identifiers or an equivalently demonstrated association are required. Existing profile_marker support does not resolve this item. Supports R-024 and draw-level work in R-026; neither is a prerequisite for this investigation. Private queue/draw label probes now preserve unique submission and leaf paths, and profiling/generated C++ from the same saved input preserves original labels. Live multi-interval timing columns still repeat first-frame paths; the raw regime table separately contains all three interval paths. Replay-pass triggers and startup failures require distinct qualification. The 0.5.3 multi-interval capture foundation passes all 37 final CPU checks (368.46 seconds), serial MCP/CLI exact image checks, replay/range identity checks, 154 actual schema-valid results and restarts. Both raw captured_frame/captured_frames strings are exposed without inferred IDs. Complete/pinned bundle-487017236ba14e318c20a04bbc66dd5a retains all 2082 verified payloads and 21 native pins, with exact collection/final build identities. See docs/MULTI_INTERVAL_CAPTURE.md and docs/BUILD_VALIDATION.md. Source-leased replay profiling, literal call association, independent per-draw timestamps and the full correlation acceptance remain unfinished; no public draw-timing correlation is claimed yet.
+```
+
 ## Pending
 
 ### R-024
@@ -195,18 +207,6 @@ Goal: Establish which descriptor resources and typed uniform/material values a s
 Scope: Qualify a documented selected-event evidence path, resource/range/write lifetimes and type/layout schemas; implement bounded queries with per-field provenance and explicit unsupported coverage. Preserve the distinction between recorded bindings or uploaded bytes and execution-time values.
 Acceptance: Independent fixture oracles verify descriptor contents, resource ranges and typed values at selected draw occurrences, including updates between draws. Fresh capture/rebuild/recapture, bounded MCP results, exact source/tool/reader identities and restart/pin checks pass. Unknown lifetime, shader selection or type evidence refuses rather than inferring a value; a limitation report alone does not complete the item.
 Notes: Priority 2, accepted by the owner on 2026-10-15. Follow-up to I-039 and the completed conditional R-021 assessment; see docs/DRAW_STATE_FEASIBILITY.md. Requires proven captured-event identity from R-025 or an independently qualified state interface before execution-time claims. The current five-file worker exception is unchanged; a wider proprietary helper closure still requires a separate owner decision. Missing documented evidence remains an explicit prerequisite, not a promised backend capability.
-```
-
-### R-025
-
-```text
-Status: Pending
-Area: profile/inspection/capture/mcp/test
-Title: Associate timings with captured draw occurrences
-Goal: Identify the draw, submission and occurrence to which a reported GPU timing belongs, including repeated markers and reused recordings.
-Scope: Qualify documented action/queue/submission/sample identities and any capture-to-profile correspondence, then add bounded correlation queries for demonstrated producer-specific scopes. Preserve the existing unique single-frame marker-range contract.
-Acceptance: Direct/indexed draws, nested/repeated and multi-draw markers, reused command buffers and multiple collected intervals have independent occurrence/timestamp validation. Results retain unambiguous original identities, units and source provenance through restart. Ambiguous or unsupported joins refuse; row order, equal counts and matching numeric IDs alone never establish correspondence. Actual new correlation is required for completion.
-Notes: Priority 3, accepted by the owner on 2026-10-15. Follow-up to I-043, I-039 and the completed conditional R-022 assessment; see docs/PROFILE_SCOPE_FEASIBILITY.md. Stable documented execution identifiers or an equivalently demonstrated association are required. Existing profile_marker support does not resolve this item. Supports R-024 and draw-level work in R-026; neither is a prerequisite for this investigation.
 ```
 
 ### R-026

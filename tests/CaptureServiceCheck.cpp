@@ -168,6 +168,39 @@ int main(int argc, char** argv) {
                     "frame-boundary delimiter is the sole delimiter passed to the capture executable");
             require(ngm::parse_capture_delimiter("vk_frame_boundary") == boundary_request.delimiter,
                     "native delimiter parser accepts the explicit extension boundary");
+            auto multiple = request;
+            multiple.frame_count = 3;
+            const auto collection = service.capture(multiple);
+            require(completed(service, collection).state == ngm::JobState::succeeded,
+                    "multiple intervals retain one coordinated native capture");
+            const auto collection_report =
+                nlohmann::json::parse(service.artifacts().read(collection.artifact_id, "raw/report.json"));
+            const auto collection_args =
+                collection_report.at("capture").at("arguments").get<std::vector<std::string>>();
+            const auto count_option = std::find(collection_args.begin(), collection_args.end(), "--frame-count");
+            require(collection_report.at("capture_settings").at("frame_count") == 3 &&
+                        count_option != collection_args.end() && std::next(count_option) != collection_args.end() &&
+                        *std::next(count_option) == "3",
+                    "retained request and launched argument array preserve the selected interval count");
+            for(const auto count : {std::uint64_t{0}, std::uint64_t{601}}) {
+                multiple.frame_count = count;
+                bool rejected = false;
+                try {
+                    service.capture(multiple);
+                } catch(const std::invalid_argument&) {
+                    rejected = true;
+                }
+                require(rejected, "out-of-range interval counts are refused before submission");
+            }
+            multiple.frame_count = 3;
+            multiple.format = ngm::CaptureFormat::Cpp;
+            bool rejected = false;
+            try {
+                service.capture(multiple);
+            } catch(const std::invalid_argument&) {
+                rejected = true;
+            }
+            require(rejected, "C++ capture cannot silently ignore graphics frame_count");
         }
         {
             ngm::CaptureService service(options);

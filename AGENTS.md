@@ -76,7 +76,7 @@ restore fresh Graphics Capture reliability; expose proven descriptor contents/
 execution-time values; associate timings with draw occurrences; qualify counter
 meaning/application attribution; qualify standalone GPU replay. Implementation
 of all five is authorized. **R-023 completes at 0.5.1** and **R-027 at 0.5.2**;
-**R-024–R-026 remain Pending**. Follow docs/ROADMAP.md for evidence dependencies
+**R-025 is In Progress; R-024 and R-026 remain Pending**. Follow docs/ROADMAP.md for evidence dependencies
 and acceptance. R-024–R-026 require documented evidence before any
 new execution-time or physical attribution capability can be claimed.
 
@@ -102,6 +102,18 @@ all **741** verified payloads and nine independently pinned native bundles.
 See docs/REPLAY.md and docs/BUILD_VALIDATION.md. New 2026.2 replay support,
 general pixel/frame/event correspondence and timing accuracy are not claimed.
 No machine setting or installed server/worker is changed.
+
+The **0.5.3 R-025 foundation** adds bounded consecutive Graphics Capture intervals
+through core/MCP/CLI and preserves raw plural range metadata. Defaults remain one;
+counts above one are qualified only on matching 2026.3. All **37 final CPU checks**,
+serial MCP/CLI exact image checks, replay and **154** actual schemas/restarts pass.
+All **2,082** payloads and **21** native pins verify in complete/pinned
+**bundle-487017236ba14e318c20a04bbc66dd5a**. See docs/MULTI_INTERVAL_CAPTURE.md.
+Private same-input replay profiling/literal-label probes are promising, but no
+public draw timing correlation query or independent per-draw timestamp acceptance
+exists yet. R-025 stays In Progress; R-024 and R-026 remain Pending. The surface
+stays 30 tools; installed configuration, helper closure and machine policies are
+unchanged. I-053–I-061 preserve failures and corrected serial qualification.
 
 The **R-018–R-022 capability follow-up group completes at 0.5.0** with **29
 tools**. Reader activation, launch controls, empty-table compatibility, bounded

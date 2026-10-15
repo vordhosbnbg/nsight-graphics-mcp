@@ -443,6 +443,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
             capture.working_directory = request.working_directory;
             capture.capture_file = root / "raw/capture.ngfx-capture";
             capture.capture_frame = request.capture_frame;
+            capture.frame_count = request.frame_count;
             switch(request.delimiter) {
                 case CaptureDelimiter::Present:
                     capture.delimiter = NsightDelimiter::Present;
@@ -538,6 +539,7 @@ Json replay_metadata_identity(const std::string& raw) {
     retain("process_name", metadata.process_name);
     retain("request_time", metadata.request_time);
     retain("captured_frame", metadata.captured_frame);
+    retain("captured_frames", metadata.captured_frames);
     retain("resolution", metadata.resolution);
     return identity;
 }
@@ -682,6 +684,7 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
     if((request.format != CaptureFormat::Graphics && request.format != CaptureFormat::Cpp &&
         request.format != CaptureFormat::Profile) ||
        (request.format != CaptureFormat::Profile && request.profile != ProfileSettings{}) ||
+       (request.format != CaptureFormat::Graphics && request.frame_count != 1) ||
        (request.format == CaptureFormat::Profile && (request.delimiter != CaptureDelimiter::Present ||
                                                      request.capture_frame != 2 || request.cpp_wait_frames != 2)) ||
        (request.format == CaptureFormat::Cpp &&
@@ -692,10 +695,10 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
             "C++ capture requires wait_frames 2..1000000 and no graphics delimiter/frame options");
     }
     if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.capture_frame < 2 ||
-       request.arguments.size() > 256 || !request.application_provenance.is_object() ||
-       request.application_provenance.dump().size() > 65536) {
-        throw std::invalid_argument(
-            "Capture requires timeout 1..600000 ms, frame >= 2, at most 256 arguments, and bounded provenance");
+       request.frame_count < 1 || request.frame_count > 600 || request.arguments.size() > 256 ||
+       !request.application_provenance.is_object() || request.application_provenance.dump().size() > 65536) {
+        throw std::invalid_argument("Capture requires timeout 1..600000 ms, frame >= 2, frame_count 1..600, at most "
+                                    "256 arguments, and bounded provenance");
     }
     if(!request.executable.is_absolute() || !request.working_directory.is_absolute()) {
         throw std::invalid_argument("Application executable and working_directory must be absolute paths");
@@ -741,7 +744,7 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
                     {"environment", nullptr},
                     {"capture_settings",
                      {{"capture_frame", request.capture_frame},
-                      {"frame_count", 1},
+                      {"frame_count", request.frame_count},
                       {"delimiter", delimiter},
                       {"timeout_ms", request.timeout.count()}}},
                     {"sdk",

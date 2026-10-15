@@ -26,6 +26,10 @@ shared GPU scheduling and cleanup are qualified separately from the fixture's
 independent replay-image comparisons. The older 2026.2 replay path remains
 unqualified.
 
+The **0.5.3** [capture interval option](docs/MULTI_INTERVAL_CAPTURE.md) retains
+several consecutive intervals in one file on the qualified matching 2026.3 path.
+Raw range metadata is available; draw timing correlation remains in development.
+
 ## Example workflows
 
 **Diagnose a rendering defect**

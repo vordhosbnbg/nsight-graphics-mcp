@@ -281,6 +281,7 @@ NsightMetadata parse_nsight_metadata(std::string_view text) {
     result.process_name = optional_string(document, "process_name", string_bytes);
     result.request_time = optional_string(document, "request_time", string_bytes);
     result.captured_frame = optional_string(document, "captured_frame", string_bytes);
+    result.captured_frames = optional_string(document, "captured_frames", string_bytes);
     result.resolution = optional_string(document, "resolution", string_bytes);
     result.non_portable = optional_string(document, "non_portable", string_bytes);
     result.d3d12_core_version = optional_string(document, "d3d12_core_version", string_bytes);

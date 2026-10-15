@@ -1809,3 +1809,180 @@ assessment stays open.
 - **Revisit:** Preserve typed JSON boundaries and restore protection before
   deliberately releasing a retention lease; do not weaken production pruning
   to satisfy a test that asks for an expired bundle.
+
+### I-053 — Unique queue labels do not recover multi-interval timing columns
+
+- **Context:** R-025 private fixture compiled against 0.5.2, matching Nsight
+  2026.3.1.0/build 38722833, RTX 3080 Ti / 615.71.09, existing KDE/Xwayland
+  and explicit matching-driver overlay. No machine settings change.
+- **Reproduction:** Label every queue submission with its explicit application
+  frame/occurrence and every direct/indexed call with a unique draw leaf. Retain
+  nested/repeated and two-draw human markers, reused recordings and the independent
+  private API/scene-timestamp witness. Profile one and three presents through MCP.
+- **Observed:** One interval exports two distinct submission roots and 12 unique
+  draw leaf paths. Three intervals export a 34-row event tree with only frame-5
+  labels and three repeated `time_ms` columns/values. The separate 102-row regime
+  table contains frame-5/6/7 paths, with repeated metric columns. The two tables
+  have different observed identity coverage; row order cannot repair it.
+- **Outcome:** The original multi-column timing association remains unavailable.
+  The single-interval path is a candidate for explicit source association, not a
+  completed public draw timing API. Raw draw-count cells inside known one-call
+  leaves are zero; that does not establish their physical scope or diagnose why.
+- **Evidence/retention:** Native complete/pinned profiles
+  `bundle-31a0d8e79be6bf67529aa45ea10df3af` and
+  `bundle-778b8da3a34df02b7d582bd1b6a67778`, plus C++ capture
+  `bundle-41ff2210f8d58d7cc4add01636d14e7e`, in the isolated
+  `r025-queue-experiment/store`; exact requests/private patch/build and raw
+  tables are retained with the R-025 foundation qualification.
+- **Revisit:** A documented timing-column identity or separately qualified
+  selected-interval export can change this outcome. Do not infer columns from
+  equal values/counts, regime row order or the application witness.
+
+### I-054 — Replay profiling exports a different start trigger
+
+- **Reproduction:** Generate a C++ capture and a GPU Trace from the same pinned
+  single-interval `.ngfx-capture`, using the matching public replayer's sibling
+  ELF as the unmodified target. Request a one-frame trace after one frame.
+- **Expected/observed:** Capture-of-replay succeeds and preserves literal queue/
+  draw labels. GPU Trace also exits successfully and exports those same labels,
+  but reports `Start After: Replay Pass Start` instead of the requested frame
+  trigger. The generic product profile validator correctly rejects the settings
+  disagreement and retains a failed/pinned bundle with confirmed cleanup.
+- **Boundary:** This is a candidate distinct replay-profile contract. It does
+  not justify accepting a changed trigger for arbitrary ordinary profile jobs.
+  The documented SDK trigger later produces this header explicitly (I-059).
+- **Evidence:** 0.5.2 native source
+  `bundle-3a27c156d43faef21d33ddf324e93b92`, C++ result
+  `bundle-c2fbb069e009bae7557c8a85aee5502d`, and failed profile
+  `bundle-cd0fad690b5c94c51b7b3f5e3f116319`, all independently pinned in
+  `r025-replay-experiment/store`; matching runtime as I-053.
+- **Revisit:** Add a separate source-validated replay-profile operation with exact
+  trigger and input identity checks; preserve generic profile validation.
+
+### I-055 — Start-at-zero replay trace does not finish after exporting tables
+
+- **Reproduction:** Profile the private three-interval saved capture with the
+  matching replayer, 20 loops, frame trigger zero and a one-frame limit.
+- **Observed:** Tables are exported, but the operation does not finish within
+  the 120-second job deadline. The coordinator reports `timed_out`; its stop
+  token makes the subprocess report cancellation. Owned cleanup is confirmed.
+  The failed artifact is not promoted to a successful typed profile.
+- **Evidence:** Native failed/pinned
+  `bundle-7891e499a927d804ac9be0179091c217` in
+  `r025-multi-interval-experiment/store`, with requests, reproduction information,
+  available exports and process logs. Same 0.5.2/2026.3 runtime as I-053.
+- **Revisit:** Use a documented trigger that starts after target readiness and
+  qualify teardown separately. Exported files alone do not establish completion;
+  the internal cause remains unproven. I-058 retains the finite-loop control.
+
+### I-056 — Replay frame request and exported selection disagree
+
+- **Reproduction:** On the same three-interval input, request a trace after
+  three frames, with one collected frame and 20 replayer loops.
+- **Observed:** Reproduction information reports `2 Frames`, and event labels
+  identify original application frame 9. The generic settings validator refuses
+  the changed request. A separate explicit after-two-frames request succeeds
+  with frame-9 labels. No wraparound rule or internal clamping cause is inferred.
+- **Evidence:** Failed/pinned `bundle-8fa15b7151110cf22a1f1ebcb9779b62` in
+  `r025-multi-interval-selected/store`; successful independently pinned
+  `bundle-d3887e1ba8249f14fa79f4a0a0e2f5e3` in
+  `r025-multi-interval-complete/store`. Independent C++ captures at waits 3/4/5
+  retain frame-7/8/9 literal submission labels from that exact input.
+- **Revisit:** Qualify selectors against retained source labels and exported
+  settings for each supported shape; do not manufacture an interval join by
+  modulo arithmetic. Other producers remain unqualified.
+
+### I-057 — Interval-count CPU check reuses an existing variable name
+
+- **Context/reproduction:** The first 0.5.3 aggregate build adds a local operation
+  result named `unqualified` in NsightCheck.cpp, which already declares a later
+  installation variable with that name in the same scope.
+- **Observed/resolution:** Compilation fails on the conflicting declarations.
+  Rename the new result `unqualified_multiple`; no product behavior changes for
+  this correction. The full 37-check aggregate then passes in 372.66 seconds
+  before the subsequent plural-range metadata addition. Final validation is
+  recorded in BUILD_VALIDATION.md.
+- **Evidence/revisit:** The complete first-failure log is retained as
+  `r025-multicapture-cpu-first-failure.log` in the foundation qualification.
+  Keep distinct typed observation names when extending the shared check scope.
+
+### I-058 — One finite replay loop does not fix start-at-zero profiling
+
+- **Reproduction:** Repeat I-055 directly through the owned C++ process runner,
+  changing replay loops to one and the outer deadline to 30 seconds. Retain a
+  bounded `/proc` observation of that runner's own process tree.
+- **Observed:** The target connects and presents, then the tool waits for a GPU
+  Trace report and reports a connection error. No usable table export is produced
+  before timeout; owned cleanup is confirmed. The owned observations do not show
+  a Zenity process. Neither a crash nor the underlying connection cause is proven.
+- **Evidence:** `r025-first-interval-finite` retains exact argv, tool/runner hashes,
+  process observations, stdout/stderr and the timeout receipt. Runner 0.5.1 is
+  distinct from the 0.5.2 experiment fixture and 2026.3 tools.
+- **Revisit:** A delayed documented trigger is a different control; the SDK
+  trigger in I-059 succeeds without establishing this failure's internal cause.
+
+### I-059 — Private GPU probes overlap; serial qualification replaces them
+
+- **Observed:** The first 0.5.3 product capture validation and a private
+  SDK-triggered replay profile overlap in time. This is experiment orchestration
+  outside the shared product job coordinator. Both finish with owned cleanup,
+  but the overlap is unsuitable as timing qualification.
+- **Correction:** Retain the initial outputs explicitly as overlapping evidence.
+  Await each confirmed terminal handle before starting another GPU check. The
+  repeated product MCP/CLI captures, replay and restarts pass serially; the
+  SDK-triggered profile then passes in a fresh isolated run with exit zero and
+  confirmed cleanup. No clock, permission, display or background-process changes.
+- **Actual SDK control:** Use help-advertised `--start-with-ngfx-sdk`, replacing
+  the frame trigger, with the same three-interval input, 20 replay loops and a
+  one-frame limit. Exported `Replay Pass Start` selects literal original frame-7
+  labels. Separate after-one/after-two frame controls expose frame-8/frame-9
+  labels; each has matching C++ capture evidence. This remains a private candidate
+  until a typed source-validated product operation and correlation checks exist.
+- **Evidence:** Initial `r025-product-validation` / `r025-replay-sdk-trigger` and
+  corrected `r025-product-serial` / `r025-replay-sdk-serial` are retained separately
+  with exact requests, binary identities, receipts and native pins. The serial
+  product collection validates 118 actual tool results against advertised schemas.
+- **Revisit:** Serialize private GPU experiments as well as product jobs; preserve
+  trigger semantics and never use the overlapping samples as a clean comparison.
+
+### I-060 — Multi-interval range text is missing from the typed metadata view
+
+- **Observed:** A successful three-interval capture exports
+  `captured_frames: "7 - 9"` instead of the single `captured_frame` field. The
+  original typed parser ignored the plural field and returned null for the
+  singular field, losing available range text.
+- **Correction:** Add a separate optional raw string to the parser, retained
+  inspection result, advertised closed schema and replay header identity checks.
+  Missing fields stay null; neither field is converted into application frame
+  IDs, a numeric interval list or profile sample identities.
+- **Evidence:** Serial native source `bundle-59a280028a05a9eedfd7d29e876dd0ba`
+  has the observed plural range; the default-one source
+  `bundle-420c3ddae43aed8e42acc1f98a010f72` retains singular `"7"`. Both remain
+  independently pinned in `r025-product-serial/store`. Collection and final
+  reader binaries/source are retained separately; final parser/schema/GPU replay
+  checks are recorded in BUILD_VALIDATION.md.
+- **Revisit:** Qualify any changed producer field types explicitly. Raw range
+  text does not establish original GPU event or timing-column correspondence.
+
+### I-061 — Foundation evidence verifier initially fails to parse
+
+- **Context/observed:** The private 0.5.3 qualification verifier has an extra
+  closing parenthesis in its CSV reader helper and raises `SyntaxError` before
+  checking any evidence. It does not establish a product or Nsight failure.
+- **Correction:** Remove the extra parenthesis and run the complete verifier.
+  It passes the 118 serial collection schemas, 36 final reader/replay schemas,
+  exact image/hash/range checks, compressed binary identities and all 21 native
+  pins. The original failing script and diagnostic remain in the snapshot's
+  `verifiers/failed-verify-foundation.*` files.
+- **Revisit:** Treat verifier execution as required evidence; a written script
+  or an unexecuted intended check does not establish acceptance.
+
+**Shared retention for I-053–I-061:** Complete/pinned
+**bundle-487017236ba14e318c20a04bbc66dd5a** retains all **2,082** verified payloads,
+including all 21 native bundles and their independent pins, plain supervised
+probes, exact requests, raw tables, failed/overlapping controls, collection/final
+source and compressed executable identities, CPU logs and portable verifier.
+Source/imported hashes and lengths match; the imported verifier passes. The
+snapshot qualifies the 0.5.3 interval-capture/range foundation and preserves
+private feasibility evidence; R-025 remains In Progress. Importer 0.4.1 and each
+actual tested build remain distinct.

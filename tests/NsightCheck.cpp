@@ -231,6 +231,15 @@ int main(int argc, char** argv) {
         auto legacy_capture = capture_options(scratch.path, target, "legacy low disk capture");
         legacy_capture.context.environment["NGM_PROFILE_OLD_RELEASE"] = "1";
         require_success(ngm::run_nsight_capture(legacy, legacy_capture));
+        auto multiple = capture_options(scratch.path, target, "multiple capture intervals");
+        multiple.frame_count = 3;
+        require_success(ngm::run_nsight_capture(installation, multiple));
+        auto old_multiple = capture_options(scratch.path, target, "old multiple capture intervals");
+        old_multiple.frame_count = 3;
+        const auto unqualified_multiple = ngm::run_nsight_capture(legacy, old_multiple);
+        require(unqualified_multiple.outcome == ngm::NsightOutcome::Unavailable && !unqualified_multiple.launched &&
+                    unqualified_multiple.process.cleanup_confirmed,
+                "older multi-interval collection is unqualified before launch; single interval remains available");
 
         const auto replay_options = [&](const std::string& name) {
             ngm::NsightReplayOptions replay;

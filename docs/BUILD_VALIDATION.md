@@ -2360,3 +2360,80 @@ C/C++/math runtimes; vendored code remains static. No installed server/worker,
 proprietary helper closure, profiling access, driver, clock or desktop setting
 changes. **R-024–R-026 remain Pending** and require their actual documented
 state/correlation/counter evidence; R-027 completion does not satisfy them.
+
+## 0.5.3 consecutive capture intervals, R-025 foundation, 2026-10-15
+
+This slice keeps **R-025 In Progress** and the shared surface at **30 tools**.
+`capture.frame_count` and `ngm-capture --frame-count` expose the existing backend's
+bounded 1..600 interval control, default one. Counts above one require matching
+**2026.3.1.0/build 38722833**; older single-interval behavior remains available.
+Non-graphics formats reject the option. The exact count is retained in report/
+manifest provenance. The typed metadata view preserves the producer's separate
+plural `captured_frames` raw string and singular `captured_frame`, with missing
+fields null. Replay compares both fields against its fresh matching header.
+[MULTI_INTERVAL_CAPTURE.md](MULTI_INTERVAL_CAPTURE.md) defines the contract.
+
+The first CPU build exposed a check-local name collision (I-057), with its full
+failure log retained. After correction, all **37 CPU checks** pass in **372.66
+seconds**, before adding the plural metadata field. The **final** full serial
+GCC Debug aggregate passes **37/37** in **368.46 seconds**:
+`cmake --build --preset linux-gcc-debug --target ngm_check_all -j 4`.
+It includes the actual tool-boundary producer gate, shared service count/format/
+bounds checks, HTTP count-three forwarding, closed MCP input validation, raw
+plural-field parser cases, replay, linkage and installation checks.
+
+Serial actual hardware uses RTX 3080 Ti / kernel driver **615.71.09**, existing
+KDE Wayland-Xwayland/XCB and the explicit matching-driver library/ICD overlay.
+The private queue-label fixture retains its **0.5.2** build identity; process
+supervision helper **0.5.1** is distinct from the **0.5.3** server/CLI. Baselines
+at application frames **6, 7, 8, 9, 10** are declared and run independently before
+the captures, with exact executable/shader/GPU/runtime inputs retained.
+
+| Serial product case | Native artifact | Result |
+| --- | --- | --- |
+| MCP frame 7, omitted count (default 1) | `bundle-420c3ddae43aed8e42acc1f98a010f72` | Complete/pinned; embedded RGB8 equals only the preselected frame-7 oracle |
+| MCP frame 7, count 3 | `bundle-59a280028a05a9eedfd7d29e876dd0ba` | Complete/pinned; embedded RGB8 equals only the frame-9 oracle; raw range is `"7 - 9"` |
+| CLI frame 7, count 3 | Recorded in the serial CLI receipt | Complete/pinned; image exactly equals the MCP count-three output |
+| Standalone replay of the count-three source | Serial and final-reader receipts | Both succeed with capture-time/observed input hashes equal and cleanup confirmed |
+
+The serial collection validates **118** actual successful results against its
+advertised schemas. Two restarts preserve metadata/pins. That collection precedes
+the additive plural-range parser/schema/identity extension. The final reader
+then validates **36** actual results against its own advertised schemas, exposes
+singular `"7"` versus plural `"7 - 9"`, completes a new actual GPU replay of the
+retained multi-interval input, and repeats two restart checks without changing
+source payloads. Thus **154** qualified results retain their actual build
+identities. Frozen collection/final server and CLI binaries and source are
+separate; no byte-identical-build claim is made across that parser change.
+
+R-025's private feasibility probes yield a concrete next path, not a public
+correlation query. Unique queue/submission and per-draw leaf labels survive a
+single-interval profile and literal generated C++ source. Profiling and generating
+C++ from the **same saved capture** preserve original source labels. A three-
+interval input has independently retained C++ views for original labelled frames
+7/8/9. The documented SDK trace trigger yields `Replay Pass Start` and frame-7
+labels with exit zero/cleanup; explicit after-one/after-two-frame profiles expose
+frame-8/frame-9 labels. Ordinary generic profile validation still refuses changed
+settings. Multi-column live timing exports remain ambiguous: the event tree has
+only first-interval paths while regime rows contain all three intervals.
+
+I-053–I-061 retain the exact failures, startup controls, settings disagreements,
+initial overlapping GPU probes, correction and verifier parse error. The initial
+product/SDK overlap is retained and excluded from clean timing qualification;
+corrected product and SDK runs are explicitly serialized. No physical counter
+interpretation, causal overhead correction, independent per-draw timestamp
+validation, general frame-number formula or public draw-timing correlation is
+claimed. Those requirements remain in R-025/R-026; R-024 remains Pending.
+
+Complete/pinned qualification **bundle-487017236ba14e318c20a04bbc66dd5a** retains
+**2,082** verified payloads (**114,076,046 bytes**). It includes all **21** separately
+pinned native success/failure bundles, plain supervised CLI probes, raw exports,
+requests/transcripts, failed and successful controls, source/build identities,
+CPU logs, and the portable verifier. Frozen executables are losslessly gzip-
+compressed with independently checked original lengths/SHA-256. Every source/
+imported payload hash/length matches; the imported verifier passes all 154
+schemas, images/ranges/input hashes, binary identities and native pin checks.
+`artifact_info` confirms complete/pinned/not in use. The installed importer
+remains **0.4.1** and its identity is kept separate from tested **0.5.3** builds.
+No installed server/worker, helper closure, permission, driver, clock, desktop
+or other machine setting changes.

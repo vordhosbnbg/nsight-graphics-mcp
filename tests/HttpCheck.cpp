@@ -290,6 +290,7 @@ int main(int argc, char** argv) {
                 args.push_back("--wait");
             return client.tool("capture", {{"executable", argv[3]},
                                            {"working_directory", scratch.path.string()},
+                                           {"frame_count", wait ? 1 : 3},
                                            {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
                                            {"arguments", args},
                                            {"timeout_ms", 20000},
@@ -303,6 +304,7 @@ int main(int argc, char** argv) {
                 .at("text")
                 .get<std::string>());
         require(overlay_report.at("environment").at("SDL_VIDEODRIVER") == "x11" &&
+                    overlay_report.at("capture_settings").at("frame_count") == 3 &&
                     overlay_report.at("launch_environment").at("requested").at("SDL_VIDEODRIVER") == "x11",
                 "actual HTTP capture accepts and retains the same job overlay");
         const auto invalid_overlay =

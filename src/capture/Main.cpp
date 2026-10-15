@@ -26,7 +26,8 @@ int main(int argc, char** argv) {
     if(argc == 2 && std::string_view(argv[1]) == "--help") {
         std::cout
             << "Usage: ngm-capture --artifact-root DIR --executable PATH --working-directory DIR\n"
-               "  [--nsight-root DIR] [--argument TEXT ...] [--capture-frame N] [--timeout-ms N]\n"
+               "  [--nsight-root DIR] [--argument TEXT ...] [--capture-frame N] [--frame-count 1..600] [--timeout-ms "
+               "N]\n"
                "  [--application-output-option NAME] [--provenance-json PATH] [--pin]\n"
                "  [--delimiter present|graphics_capture_api|vk_frame_boundary]\n"
                "  [--format graphics|cpp] [--wait-frames N (cpp only)]\n"
@@ -73,6 +74,8 @@ int main(int argc, char** argv) {
                 request.application_output_option = value;
             } else if(key == "--capture-frame") {
                 request.capture_frame = integer(value, "--capture-frame");
+            } else if(key == "--frame-count") {
+                request.frame_count = integer(value, "--frame-count");
             } else if(key == "--format") {
                 if(value != "graphics" && value != "cpp") {
                     throw std::invalid_argument("--format must be graphics or cpp");
@@ -111,9 +114,10 @@ int main(int argc, char** argv) {
             }
         }
         if((request.format == ngm::CaptureFormat::Cpp &&
-            (seen.contains("--capture-frame") || seen.contains("--delimiter"))) ||
+            (seen.contains("--capture-frame") || seen.contains("--frame-count") || seen.contains("--delimiter"))) ||
            (request.format == ngm::CaptureFormat::Graphics && seen.contains("--wait-frames"))) {
-            throw std::invalid_argument("--wait-frames is for cpp; --capture-frame and --delimiter are for graphics");
+            throw std::invalid_argument(
+                "--wait-frames is for cpp; --capture-frame, --frame-count and --delimiter are for graphics");
         }
         ngm::CaptureService service(std::move(options));
         const auto timeout = request.timeout;

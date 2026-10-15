@@ -150,7 +150,7 @@ Schema metadata_schema() {
     auto required = Json::array();
     for(const auto* name : {"uuid", "nsight_version", "nsight_version_build_id", "primary_api", "primary_gpu",
                             "driver_vendor", "driver_version", "os_information", "process_name", "request_time",
-                            "captured_frame", "resolution", "non_portable", "d3d12_core_version"}) {
+                            "captured_frame", "captured_frames", "resolution", "non_portable", "d3d12_core_version"}) {
         properties[name] = nullable(string_schema(NsightEvidenceLimits::maximum_string_bytes));
     }
     properties["metadata_version"] = integer_schema(1, 1);
@@ -1185,49 +1185,54 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                  return Json(service().replay(std::move(request)));
              });
 
-    add_tool(tools, "capture",
-             object_schema({{"executable", string_schema(4096, 1)},
-                            {"arguments", array_schema(string_schema(4096), 256)},
-                            {"launch_environment", launch_environment_schema()},
-                            {"working_directory", string_schema(4096, 1)},
-                            {"capture_frame", integer_schema(2)},
-                            {"delimiter",
-                             {{"type", "string"},
-                              {"minLength", 1},
-                              {"maxLength", 20},
-                              {"enum", {"present", "graphics_capture_api", "vk_frame_boundary"}}}},
-                            {"timeout_ms", integer_schema(1, 600000)},
-                            {"pin", boolean_schema()},
-                            {"application_output_option", string_schema(64)}},
-                           {"executable", "working_directory"}),
-             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
-                           {"identity", "artifact_id"}),
-             "Submit asynchronous Nsight capture of a fresh application. Absolute executable and working directory "
-             "are required; arguments are bounded strings. Defaults: frame 2, timeout 120000 ms, pin false. "
-             "Optional application_output_option appends an option and a fresh output directory for application "
-             "evidence, kept distinct from Nsight exports. The delimiter defaults to present. "
-             "graphics_capture_api requires an application that initializes the NGFX SDK and emits its own "
-             "boundaries. vk_frame_boundary requires the application to enable VK_EXT_frame_boundary and emit "
-             "frame-end submissions. capture_frame counts the selected delimiters, not application frame indices. "
-             "Poll job_status; submission is not capture success.",
-             false, false, [this](const Json& arguments) {
-                 CaptureRequest request;
-                 request.executable = absolute_path(arguments.at("executable"), true);
-                 request.working_directory = absolute_path(arguments.at("working_directory"));
-                 request.arguments = arguments.value("arguments", std::vector<std::string>{});
-                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
-                 request.capture_frame = arguments.value("capture_frame", std::uint64_t{2});
-                 request.delimiter = parse_capture_delimiter(arguments.value("delimiter", "present"));
-                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
-                 request.pin = arguments.value("pin", false);
-                 request.application_output_option = arguments.value("application_output_option", "");
-                 if(!request.application_output_option.empty() &&
-                    (request.application_output_option.front() != '-' ||
-                     request.application_output_option.find_first_of(" \t\r\n") != std::string::npos)) {
-                     throw std::invalid_argument("application_output_option must be one option starting with '-'");
-                 }
-                 return Json(service().capture(std::move(request)));
-             });
+    add_tool(
+        tools, "capture",
+        object_schema({{"executable", string_schema(4096, 1)},
+                       {"arguments", array_schema(string_schema(4096), 256)},
+                       {"launch_environment", launch_environment_schema()},
+                       {"working_directory", string_schema(4096, 1)},
+                       {"capture_frame", integer_schema(2)},
+                       {"frame_count", integer_schema(1, 600)},
+                       {"delimiter",
+                        {{"type", "string"},
+                         {"minLength", 1},
+                         {"maxLength", 20},
+                         {"enum", {"present", "graphics_capture_api", "vk_frame_boundary"}}}},
+                       {"timeout_ms", integer_schema(1, 600000)},
+                       {"pin", boolean_schema()},
+                       {"application_output_option", string_schema(64)}},
+                      {"executable", "working_directory"}),
+        object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                      {"identity", "artifact_id"}),
+        "Submit asynchronous Nsight capture of a fresh application. Absolute executable and working directory "
+        "are required; arguments are bounded strings. Defaults: frame 2, frame_count 1, timeout 120000 ms, pin false. "
+        "frame_count retains 1..600 consecutive delimiter intervals in one file; counts above one require the "
+        "qualified matching 2026.3 producer. It does not establish profile sample or application-frame identity. "
+        "Optional application_output_option appends an option and a fresh output directory for application "
+        "evidence, kept distinct from Nsight exports. The delimiter defaults to present. "
+        "graphics_capture_api requires an application that initializes the NGFX SDK and emits its own "
+        "boundaries. vk_frame_boundary requires the application to enable VK_EXT_frame_boundary and emit "
+        "frame-end submissions. capture_frame counts the selected delimiters, not application frame indices. "
+        "Poll job_status; submission is not capture success.",
+        false, false, [this](const Json& arguments) {
+            CaptureRequest request;
+            request.executable = absolute_path(arguments.at("executable"), true);
+            request.working_directory = absolute_path(arguments.at("working_directory"));
+            request.arguments = arguments.value("arguments", std::vector<std::string>{});
+            request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
+            request.capture_frame = arguments.value("capture_frame", std::uint64_t{2});
+            request.frame_count = arguments.value("frame_count", std::uint64_t{1});
+            request.delimiter = parse_capture_delimiter(arguments.value("delimiter", "present"));
+            request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+            request.pin = arguments.value("pin", false);
+            request.application_output_option = arguments.value("application_output_option", "");
+            if(!request.application_output_option.empty() &&
+               (request.application_output_option.front() != '-' ||
+                request.application_output_option.find_first_of(" \t\r\n") != std::string::npos)) {
+                throw std::invalid_argument("application_output_option must be one option starting with '-'");
+            }
+            return Json(service().capture(std::move(request)));
+        });
     add_tool(tools, "capture_cpp",
              object_schema({{"executable", string_schema(4096, 1)},
                             {"arguments", array_schema(string_schema(4096), 256)},

@@ -33,6 +33,8 @@ struct CaptureRequest {
     std::filesystem::path working_directory;
     CaptureFormat format = CaptureFormat::Graphics;
     std::uint64_t capture_frame = 2;
+    // Consecutive selected delimiter intervals in one Graphics Capture file.
+    std::uint64_t frame_count = 1;
     // Generate C++ Capture's distinct --wait-frames control, not a graphics
     // capture delimiter ordinal. SDK delimiters are unavailable in this mode.
     std::uint64_t cpp_wait_frames = 2;

@@ -389,6 +389,7 @@ Json metadata_json(const NsightMetadata& value) {
                 {"process_name", optional(value.process_name)},
                 {"request_time", optional(value.request_time)},
                 {"captured_frame", optional(value.captured_frame)},
+                {"captured_frames", optional(value.captured_frames)},
                 {"resolution", optional(value.resolution)},
                 {"non_portable", optional(value.non_portable)},
                 {"d3d12_core_version", optional(value.d3d12_core_version)},

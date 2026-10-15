@@ -90,6 +90,7 @@ struct NsightMetadata {
     // These fields are strings in the observed export; do not normalize them
     // into a frame number, dimensions, boolean, or timestamp without a contract.
     std::optional<std::string> captured_frame;
+    std::optional<std::string> captured_frames;
     std::optional<std::string> resolution;
     std::optional<std::string> non_portable;
     std::optional<std::string> d3d12_core_version;

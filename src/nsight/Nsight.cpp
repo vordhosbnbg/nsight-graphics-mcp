@@ -426,6 +426,12 @@ NsightOperationResult run_nsight_capture(const NsightInstallation& installation,
         if(options.capture_frame < 2 || options.frame_count < 1 || options.frame_count > 600) {
             throw std::runtime_error("Capture frame must be >= 2 and frame count must be in [1, 600]");
         }
+        if(options.frame_count > 1 &&
+           (installation.capture.version != "2026.3.1.0" || installation.capture.build != "38722833")) {
+            result.outcome = NsightOutcome::Unavailable;
+            result.message = "Multiple capture intervals are qualified only for Nsight 2026.3.1.0/build 38722833";
+            return result;
+        }
         const auto target = executable_path(options.executable);
         const auto working_directory = directory_path(options.working_directory, "Application working directory");
         const auto arguments = target_arguments(options.arguments);
