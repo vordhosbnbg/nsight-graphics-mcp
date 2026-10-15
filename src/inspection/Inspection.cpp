@@ -1,16 +1,25 @@
 #include "ngm/Inspection.hpp"
 
+#include "CppReplay.hpp"
 #include "DescriptorProfiles.hpp"
 #include "PushState.hpp"
+#include "ReplayValues.hpp"
 #include "ResourceProfiles.hpp"
+#include "ValueExecutionState.hpp"
+#include "ValueSourceContract.hpp"
+#include "ValueTimeline.hpp"
 #include "ngm/CppEvidence.hpp"
 #include "ngm/DescriptorRead.hpp"
 #include "ngm/DrawState.hpp"
 #include "ngm/Hash.hpp"
 #include "ngm/NsightEvidence.hpp"
+#include "ngm/SpirvUniforms.hpp"
+#include "ngm/Version.hpp"
 
 #include <algorithm>
 #include <array>
+#include <charconv>
+#include <fstream>
 #include <map>
 #include <set>
 #include <utility>
@@ -658,6 +667,45 @@ namespace {
 struct StateInputs {
     Json parsed, identities, resources;
 };
+Json capture_database_inputs(const Capture& capture, const Json& anchors) {
+    const auto project = capture.cpp_index.at("project_directory").get<std::string>();
+    Json result = Json::object();
+    for(const auto* name : {"data.bin", "data.bin.rec"}) {
+        const auto found = std::find_if(anchors.begin(), anchors.end(),
+                                        [&](const Json& file) { return file.at("path") == project + '/' + name; });
+        require(found != anchors.end(), "Captured database fingerprint is missing");
+        result[name] = {{"bytes", found->at("bytes")}, {"sha256", found->at("sha256")}};
+    }
+    return result;
+}
+DescriptorReadRequest descriptor_request(const Capture& capture, const Json& anchors, const Json& parsed,
+                                         const Json& reference, const std::filesystem::path& worker, bool pin,
+                                         std::chrono::steady_clock::time_point deadline) {
+    const auto expected = Json::parse(descriptor_profile_json);
+    const auto project = capture.cpp_index.at("project_directory").get<std::string>();
+    Json paths = Json::object();
+    for(const auto& [name, digest] : expected.at("original_files").items()) {
+        (void)digest;
+        const auto root = project + '/' + name, alternate = project + "/include/" + name;
+        const bool at_root = capture.files.contains(root);
+        const bool nested = name == "VulkanStructHydrator.h" && capture.files.contains(alternate);
+        if(at_root == nested)
+            fail(Error::ExportUnavailable, "Descriptor helper source is absent or ambiguous: " + name);
+        paths[name] = at_root ? root : alternate;
+    }
+    DescriptorReadRequest request;
+    request.capture_id = capture.info.summary.id;
+    request.project_directory = project;
+    request.reference = reference;
+    request.registrations = parsed.at("registrations");
+    request.helper_profile = expected;
+    request.helper_paths = std::move(paths);
+    request.expected_inputs = capture_database_inputs(capture, anchors);
+    request.worker = worker;
+    request.pin = pin;
+    request.deadline = deadline;
+    return request;
+}
 struct FingerprintedCppSources {
     std::vector<CppSource> sources;
     Json anchors;
@@ -988,35 +1036,8 @@ Json InspectionService::cpp_descriptor_writes(const std::string& capture_id, con
              "Descriptor update or typed source registrations are unqualified; inspect unsupported forms");
     if(workers_.descriptor_nsight_2026_3.empty())
         fail(Error::ExportUnavailable, "Configure --descriptor-worker-2026-3 before decoding source descriptor writes");
-    const auto expected = Json::parse(descriptor_profile_json);
-    const auto project = capture.cpp_index.at("project_directory").get<std::string>();
-    Json helper_paths = Json::object(), inputs = Json::object();
-    for(const auto& [name, digest] : expected.at("original_files").items()) {
-        (void)digest;
-        const auto root = project + '/' + name, alternate = project + "/include/" + name;
-        const bool at_root = capture.files.contains(root);
-        const bool nested = name == "VulkanStructHydrator.h" && capture.files.contains(alternate);
-        if(at_root == nested)
-            fail(Error::ExportUnavailable, "Descriptor helper source is absent or ambiguous: " + name);
-        helper_paths[name] = at_root ? root : alternate;
-    }
-    for(const auto* name : {"data.bin", "data.bin.rec"}) {
-        const auto file = std::find_if(anchors.begin(), anchors.end(),
-                                       [&](const Json& ref) { return ref.at("path") == project + '/' + name; });
-        require(file != anchors.end(), "Descriptor input fingerprint is missing");
-        inputs[name] = {{"bytes", file->at("bytes")}, {"sha256", file->at("sha256")}};
-    }
-    DescriptorReadRequest request;
-    request.capture_id = capture_id;
-    request.project_directory = project;
-    request.reference = *found;
-    request.registrations = parsed.at("registrations");
-    request.helper_profile = expected;
-    request.helper_paths = helper_paths;
-    request.expected_inputs = inputs;
-    request.worker = workers_.descriptor_nsight_2026_3;
-    request.pin = pin;
-    request.deadline = deadline;
+    const auto request =
+        descriptor_request(capture, anchors, parsed, *found, workers_.descriptor_nsight_2026_3, pin, deadline);
     auto read = read_cpp_descriptor_writes(artifacts_, request);
     const auto writes = read.at("writes").get<std::vector<Json>>();
     read.erase("writes");
@@ -1028,6 +1049,352 @@ Json InspectionService::cpp_descriptor_writes(const std::string& capture_id, con
     } catch(const InspectionError& error) {
         throw InspectionError(error.code(), std::string(error.what()) + "; descriptor read artifact " +
                                                 result.at("read").at("artifact_id").get<std::string>());
+    }
+}
+
+Json InspectionService::draw_values(const std::string& capture_id, const std::string& execution_ref,
+                                    const std::string& section, std::size_t offset, std::size_t limit, bool pin) const {
+    page_arguments(offset, limit);
+    if((execution_ref.empty() && (pin || (section != "executions" && section != "unsupported"))) ||
+       (!execution_ref.empty() &&
+        (execution_ref.size() != 64 || execution_ref.find_first_not_of("0123456789abcdef") != std::string::npos ||
+         (section != "executions" && section != "values"))))
+        throw std::invalid_argument("List executions/unsupported, or read a listed execution_ref; pin requires a read");
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    auto capture = load_capture(artifacts_, capture_id, true);
+    auto [sources, anchors] = validated_cpp_sources(artifacts_, capture, deadline);
+    const auto input_text = anchors.dump();
+    const auto input_hash = sha256(std::as_bytes(std::span(input_text.data(), input_text.size())));
+    const auto parsed = detail::parse_cpp_replay(sources, detail::ReplayParseScope::Values);
+    auto candidates = detail::value_execution_candidates(parsed);
+    const auto reference_for = [&](const Json& selection) {
+        const auto text = Json{
+            {"interface", "ngm-cpp-draw-values-v1"},
+            {"capture_id", capture_id},
+            {"inputs_sha256", input_hash},
+            {"selection",
+             selection}}.dump();
+        return sha256(std::as_bytes(std::span(text.data(), text.size())));
+    };
+    for(auto& row : candidates["executions"])
+        row["execution_ref"] = reference_for(row.at("selection"));
+    auto result = cpp_base_result(capture);
+    result["evidence_origin"] = "nsight_generated_cpp_draw_values";
+    result["schema_profile"] = std::string(capture.profile->name) + "-draw-values-v1";
+    result["selection_domain"] = "generated_cpp_captured_submission";
+    result["captured_gpu_execution_correspondence"] = false;
+    result["association_scope"] =
+        "Bounded generated-source uniform visibility model for one captured C++ submission; "
+        "no live invocation/register observation or join to numeric graphics-inventory event IDs";
+    result["input_files"] = anchors;
+    result["inputs_sha256"] = input_hash;
+    result["executions_total"] = candidates.at("executions").size();
+    result["unsupported_total"] = candidates.at("unsupported").size();
+    result["executions"] = Json::array();
+    result["unsupported"] = Json::array();
+    result["values"] = Json::array();
+    result["values_total"] = 0;
+    result["execution"] = nullptr;
+    result["values_status"] = "not_read";
+    result["reason"] = nullptr;
+    result["artifact_id"] = nullptr;
+    result["report_path"] = nullptr;
+    result["read_artifacts"] = Json::array();
+    result["section"] = section;
+    if(execution_ref.empty())
+        return page_result(std::move(result), section.c_str(), candidates.at(section).get<std::vector<Json>>(), offset,
+                           limit, [](const Json& row) { return row; });
+    const auto selected = std::find_if(candidates.at("executions").begin(), candidates.at("executions").end(),
+                                       [&](const Json& row) { return row.at("execution_ref") == execution_ref; });
+    if(selected == candidates.at("executions").end())
+        fail(Error::ExportUnavailable,
+             "Draw-value reference is absent, foreign or stale; list this capture's value candidates");
+    if(workers_.descriptor_nsight_2026_3.empty() || workers_.nsight_2026_3.empty())
+        fail(Error::ExportUnavailable,
+             "Draw values require matching --descriptor-worker-2026-3 and --resource-worker-2026-3");
+    const auto project = capture.cpp_index.at("project_directory").get<std::string>();
+    const auto database = capture_database_inputs(capture, anchors);
+    auto writer = artifacts_.begin({{"evidence_origin", "nsight_cpp_draw_value_query"},
+                                    {"capture_id", capture_id},
+                                    {"execution_ref", execution_ref},
+                                    {"report_path", "raw/draw-values.json"}},
+                                   {"raw/draw-values.json"}, pin);
+    Json report{{"schema_version", 1},
+                {"project_version", project_version()},
+                {"evidence_origin", "nsight_cpp_draw_value_query"},
+                {"capture_id", capture_id},
+                {"execution_ref", execution_ref},
+                {"input_files", anchors},
+                {"inputs_sha256", input_hash},
+                {"database_inputs", database},
+                {"status", "preparing"},
+                {"source_contract", Json::array()},
+                {"descriptor_reads", Json::array()},
+                {"resource_reads", Json::array()},
+                {"raw_values", Json::array()}};
+    const auto flush = [&] {
+        const auto text = report.dump(2) + '\n';
+        if(text.size() > 16U * 1024U * 1024U)
+            fail(Error::LimitExceeded, "Draw-value retained report exceeds 16 MiB");
+        std::ofstream file(writer.raw_directory() / "draw-values.json", std::ios::binary);
+        file.exceptions(std::ios::failbit | std::ios::badbit);
+        file << text;
+        file.close();
+    };
+    const auto checkpoint = [&] {
+        if(std::chrono::steady_clock::now() >= deadline)
+            fail(Error::LimitExceeded, "Draw-value query exceeded its shared twenty-second deadline");
+    };
+    std::size_t requests = 0, returned_bytes = 0;
+    const auto budget = [&](std::size_t bytes = 0) {
+        checkpoint();
+        returned_bytes += bytes;
+        if(requests > 32 || returned_bytes > 1024U * 1024U)
+            fail(Error::LimitExceeded,
+                 "Draw values exceed 32 parent reads or 1 MiB of returned byte/structure payloads");
+    };
+    try {
+        flush();
+        // Source semantics only. These exported helpers are fingerprinted and
+        // inspected as text; none is compiled or executed by this query.
+        const std::map<std::string, std::string> contract{
+            {"VulkanReplay.cpp", "a4e0f9ddbb097b8bc131a55eb574e9306b74222a84ed5f67365bc3ad39a46bfa"},
+            {"include/VulkanReplay.h", "74e2ea544c8552d17616d8a3800210647580d76f6fd64b076dd631f4f2df5f4c"},
+            {"include/VulkanHelpers.h", "e2ae3909a03e35167d47590ed883c4281e7b4723e03c9787d3ad68bfc8045448"},
+            {"ReplayProcedures.cpp", "f889fbdbc6bb134e95f67ad9942ea2b41230b3c25e6ee01f40b5ea590cb50108"},
+            {"Application.cpp", "53ccbd68bfc44264e8cedd5f141b186cf5fdfbc626b55482142c68807687c5b3"},
+            {"CommonReplay.cpp", "43916f87a901740ddb38a02cc02085d2c0e65e1e85cb608ebb4d21eeeb1196d7"}};
+        for(const auto& [name, hash] : contract) {
+            const auto path = project + '/' + name;
+            (void)inventoried(capture, path, 2U * 1024U * 1024U);
+            const auto raw_hash = artifacts_.fingerprint(capture_id, path, 2U * 1024U * 1024U, deadline);
+            auto contract_hash = raw_hash;
+            if(name == "ReplayProcedures.cpp") {
+                const auto raw_text = artifacts_.read(capture_id, path, 65536);
+                require(sha256(std::as_bytes(std::span(raw_text.data(), raw_text.size()))) == raw_hash,
+                        "Replay procedures changed while reading the source contract");
+                const auto text = detail::canonical_value_procedures(raw_text);
+                contract_hash = sha256(std::as_bytes(std::span(text.data(), text.size())));
+            }
+            if(contract_hash != hash)
+                fail(Error::ExportUnavailable, "Exported draw-value source contract is unqualified: " + name);
+            report["source_contract"].push_back(
+                {{"path", path},
+                 {"sha256", raw_hash},
+                 {"contract_sha256", contract_hash},
+                 {"canonicalization", name == "ReplayProcedures.cpp" ? "literal-prototypes-v1" : "none"}});
+        }
+        auto descriptors = inspect_cpp_descriptor_updates(sources);
+        require(descriptors.at("registration_coverage_complete") == true,
+                "Draw values require complete typed source registrations");
+        for(auto& ref : descriptors["updates"]) {
+            const auto text =
+                Json{{"capture_id", capture_id}, {"inputs_sha256", input_hash}, {"source_ref", ref.at("source_ref")}}
+                    .dump();
+            ref["update_ref"] = sha256(std::as_bytes(std::span(text.data(), text.size())));
+        }
+        std::vector<Json> updates;
+        for(const auto* calls : {&parsed.initial_state, &parsed.frame})
+            for(const auto& call : *calls)
+                if(call.name == "VulkanHelper_UpdateDescriptorSetsFromDatabase" && call.arguments.size() == 6 &&
+                   detail::number(call.arguments[1]) != 0) {
+                    const Json* found = nullptr;
+                    for(const auto& ref : descriptors.at("updates"))
+                        if(ref.at("source") == call.source) {
+                            require(!found, "Ambiguous descriptor source reference in value query");
+                            found = &ref;
+                        }
+                    if(!found || found->at("readable") != true || detail::number(call.arguments[4]) != 0)
+                        fail(Error::ExportUnavailable,
+                             "Draw-value descriptor source write is outside the qualified reader profile");
+                    updates.push_back(*found);
+                }
+        if(updates.size() > 32)
+            fail(Error::LimitExceeded, "Draw-value source write count exceeds the parent-read budget");
+        std::vector<Json> descriptor_reads;
+        for(const auto& ref : updates) {
+            ++requests;
+            budget();
+            report["current_operation"] = {{"kind", "descriptor_write"}, {"reference", ref}};
+            flush();
+            auto read = read_cpp_descriptor_writes(artifacts_, descriptor_request(capture, anchors, descriptors, ref,
+                                                                                  workers_.descriptor_nsight_2026_3,
+                                                                                  pin, deadline));
+            budget(number(read, "output_used_bytes"));
+            result["read_artifacts"].push_back(read.at("artifact_id"));
+            auto receipt = read;
+            receipt.erase("writes");
+            report["descriptor_reads"].push_back(std::move(receipt));
+            descriptor_reads.push_back(std::move(read));
+        }
+        const auto references = inspect_cpp_resources(sources).at("resources");
+        const auto profile = Json::parse(resource_profiles_json).at("2026_3");
+        const auto read_resource = [&](const Json& ref, std::size_t first, std::size_t bytes) {
+            ++requests;
+            budget();
+            if(bytes == 0 || bytes > 65536)
+                fail(Error::LimitExceeded, "A draw-value resource read exceeds 64 KiB");
+            report["current_operation"] = {
+                {"kind", "resource"}, {"reference", ref}, {"offset", first}, {"length", bytes}};
+            flush();
+            auto read = read_cpp_resource(
+                artifacts_, {capture_id, project, ref, profile, workers_.nsight_2026_3, first, bytes, pin, deadline});
+            require(read.at("capture_id") == capture_id && read.at("inputs") == database &&
+                        read.at("offset") == first && read.at("returned_bytes") == bytes,
+                    "Draw-value byte reader differs from the exact capture snapshot/range");
+            budget(bytes);
+            result["read_artifacts"].push_back(read.at("artifact_id"));
+            auto receipt = read;
+            receipt.erase("data");
+            report["resource_reads"].push_back(std::move(receipt));
+            return read;
+        };
+        const auto unhex = [](const Json& read) {
+            const auto& text = read.at("data").get_ref<const std::string&>();
+            require(text.size() <= 131072 && text.size() % 2 == 0, "Draw-value reader returned invalid hex extent");
+            std::vector<std::byte> bytes;
+            bytes.reserve(text.size() / 2);
+            for(std::size_t at = 0; at < text.size(); at += 2) {
+                unsigned value = 0;
+                const auto [end, error] = std::from_chars(text.data() + at, text.data() + at + 2, value, 16);
+                require(error == std::errc{} && end == text.data() + at + 2,
+                        "Draw-value reader returned invalid hex bytes");
+                bytes.push_back(std::byte(value));
+            }
+            require(bytes.size() == read.at("returned_bytes") && sha256(bytes) == read.at("sha256").get<std::string>(),
+                    "Draw-value returned byte digest differs from its parent receipt");
+            return bytes;
+        };
+        auto model = detail::value_draw_plans(
+            parsed, capture_id, database, descriptor_reads,
+            [&](const Json& stage) {
+                const Json* found = nullptr;
+                const auto first = number(stage.at("module_source"), "byte_offset");
+                const auto size = number(stage.at("module_source"), "byte_count");
+                for(const auto& ref : references) {
+                    const auto& source = ref.at("source");
+                    const auto at = number(source, "byte_offset");
+                    if(ref.at("handle") == stage.at("resource_handle") && ref.at("readable") == true &&
+                       ref.at("conditional") == false && ref.at("expected_bytes") == stage.at("declared_bytes") &&
+                       source.at("path") == stage.at("module_source").at("path") && at >= first && at - first < size &&
+                       number(source, "byte_count") <= size - (at - first)) {
+                        require(!found, "Ambiguous source accessor for selected value shader");
+                        found = &ref;
+                    }
+                }
+                if(!found)
+                    fail(Error::ExportUnavailable, "Selected value shader has no unique readable byte source");
+                auto read = read_resource(*found, 0, number(stage, "declared_bytes"));
+                return detail::ValueShader{unhex(read), std::move(read)};
+            },
+            deadline);
+        checkpoint();
+        result["section"] = "values";
+        result["execution"] = *selected;
+        result["artifact_id"] = writer.id();
+        result["report_path"] = "raw/draw-values.json";
+        std::vector<Json> values;
+        if(model.at("status") != "qualified_source_draw_value_plans") {
+            result["values_status"] = "unavailable";
+            result["reason"] = model.at("reason");
+            report["model_refusal"] = model;
+        } else {
+            const auto found =
+                std::find_if(model.at("executions").begin(), model.at("executions").end(),
+                             [&](const Json& row) { return reference_for(row.at("selection")) == execution_ref; });
+            require(found != model.at("executions").end(),
+                    "Selected source-value occurrence differs from its candidate");
+            report["selection_plan"] = *found;
+            std::map<std::string, Json> byte_cache;
+            for(const auto& plan : found->at("plans")) {
+                checkpoint();
+                const auto length = number(plan, "prefix_bytes"), base = number(plan, "effective_offset");
+                require(length > 0 && length <= 65536, "Selected uniform prefix exceeds bounds");
+                std::vector<std::byte> bytes(length);
+                std::vector<bool> covered(length, false);
+                for(const auto& part : plan.at("upload").at("segments")) {
+                    const auto& payload = part.at("payload");
+                    const Json* ref = nullptr;
+                    for(const auto& r : references)
+                        if(r.at("handle") == payload.at("handle") && r.at("source") == payload.at("source") &&
+                           r.at("macro") == payload.at("accessor") &&
+                           r.at("expected_bytes") == payload.at("expected_bytes") && r.at("readable") == true &&
+                           r.at("conditional") == false) {
+                            require(!ref, "Ambiguous uniform upload byte accessor");
+                            ref = &r;
+                        }
+                    if(!ref)
+                        fail(Error::ExportUnavailable, "Latest uniform upload has no exact readable source accessor");
+                    const auto first = number(part, "payload_offset"), count = number(part, "length");
+                    const auto offset_ = number(part, "buffer_offset");
+                    require(offset_ >= base && offset_ - base <= length && count > 0 &&
+                                count <= length - (offset_ - base),
+                            "Uniform assembly segment escapes its selected prefix");
+                    const auto cache_key = ref->at("resource_ref").get<std::string>() + ':' + std::to_string(first) +
+                                           ':' + std::to_string(count);
+                    if(!byte_cache.contains(cache_key))
+                        byte_cache.emplace(cache_key, read_resource(*ref, first, count));
+                    const auto& read = byte_cache.at(cache_key);
+                    require(read.at("total_bytes") == payload.at("required_bytes"),
+                            "Uniform source byte extent differs from the modeled upload");
+                    const auto data = unhex(read);
+                    for(std::size_t i = 0; i < count; ++i) {
+                        const auto at = offset_ - base + i;
+                        require(!covered[at], "Uniform assembly segments overlap");
+                        covered[at] = true;
+                        bytes[at] = data.at(i);
+                    }
+                }
+                require(std::all_of(covered.begin(), covered.end(), [](bool value) { return value; }),
+                        "Uniform assembly has a byte-coverage hole");
+                const auto decoded = decode_spirv_uniform_read(plan.at("uniform_read"), bytes);
+                const auto& uniform = plan.at("uniform_read");
+                Json row{{"stage", plan.at("shader").at("stage")},
+                         {"module", plan.at("shader").at("module")},
+                         {"module_sha256", plan.at("shader_effects").at("module_sha256")},
+                         {"entry_point", plan.at("shader_effects").at("entry_point")},
+                         {"descriptor_set", uniform.at("descriptor_set")},
+                         {"binding", uniform.at("binding")},
+                         {"array_element", 0},
+                         {"buffer", plan.at("buffer")},
+                         {"effective_offset", base},
+                         {"effective_range", plan.at("effective_range")},
+                         {"member_offset", uniform.at("offset")},
+                         {"variable_name", uniform.at("variable_name")},
+                         {"block_name", uniform.at("block_name")},
+                         {"member_name", uniform.at("member_name")},
+                         {"load_word_offset", uniform.at("word_offset")},
+                         {"scalar", decoded.at("scalar")},
+                         {"components", decoded.at("components")},
+                         {"evidence",
+                          {{"artifact_id", writer.id()},
+                           {"report_path", "raw/draw-values.json"},
+                           {"value_index", values.size()}}}};
+                report["raw_values"].push_back({{"value", row}, {"source_plan", plan}});
+                values.push_back(std::move(row));
+            }
+            result["values_status"] = values.empty() ? "not_applicable" : "qualified_source_values";
+        }
+        result["execution"]["value_status"] = result.at("values_status");
+        result["values_total"] = values.size();
+        report["status"] = "succeeded";
+        report["result"] = page_result(result, "values", values, offset, limit, [](const Json& row) { return row; });
+        report["parent_read_count"] = requests;
+        report["returned_payload_bytes"] = returned_bytes;
+        checkpoint();
+        flush();
+        artifacts_.publish_success(writer);
+        return report.at("result");
+    } catch(const std::exception& error) {
+        report["status"] = "failed";
+        report["error"] = std::string(error.what()).substr(0, 4096);
+        try {
+            flush();
+            artifacts_.publish_failure(writer, "Draw-value inspection failed; inspect raw/draw-values.json");
+        } catch(...) { /* An interrupted/unpublished writer remains protected. */
+        }
+        throw InspectionError(Error::ExportUnavailable, std::string(error.what()).substr(0, 2048) +
+                                                            "; draw-value evidence artifact " + writer.id());
     }
 }
 } // namespace ngm

@@ -153,6 +153,14 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "bounds instrumentation, confined execution and typed source registrations. Configuration "
                        "alone does not verify a reader or kernel. These are source writes; selected-draw visibility, "
                        "effective addresses and shader values remain unavailable."}}},
+          {"draw_values",
+           {{"available", storage},
+            {"status", storage ? "source_candidates_available" : "missing_prerequisites"},
+            {"reason", "capture_draw_values lists capture-bound source candidates without workers. Selected source "
+                       "uniform modeling requires both configured 2026.3 descriptor/resource workers and exact "
+                       "exported-helper, database, shader, allocation and completion evidence. Unknown effects refuse "
+                       "all values; reads/failures retain provenance under quota. This source model does not observe "
+                       "live invocations/registers or establish numeric graphics-inventory event correspondence."}}},
           {"profile_markers",
            {{"available", storage},
             {"status", storage ? "qualified_export_subset" : "missing_prerequisites"},
@@ -282,7 +290,7 @@ Json output_schema() {
         }}
     })json");
     for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers",
-                                 "replay", "timing_collection", "draw_timings", "descriptor_writes"}) {
+                                 "replay", "timing_collection", "draw_timings", "descriptor_writes", "draw_values"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }

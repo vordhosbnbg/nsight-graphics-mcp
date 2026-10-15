@@ -2460,3 +2460,400 @@ all 41 native bundle instances. Its imported portable verifier reconstructs all
 from final qualified runs. All 43 CPU checks pass in 433.91 seconds. The
 0.5.8 query qualifies source descriptor writes; R-024 remains In Progress for
 its selected-draw lifetime/type/value and repair acceptance.
+
+### I-084 — SPIR-V corruption test selects a valid result ID
+
+- **Context/reproduce:** The first uncommitted 0.5.9 bounded uniform reflection
+  check compiles the fixture fragment and an independent float/signed/unsigned
+  block shader. Positive layout/bit decoding checks run before the adversarial
+  cases; one case expects a malformed undefined member-index reference.
+- **Observed/correction:** The test selects `bound - 1`, which is a defined
+  composite-construction result in this actual shader. The component correctly
+  returns unavailable for a nonconstant index instead of a malformed-ID error.
+  Select the out-of-bound ID `bound` for that malformed test. Also target the
+  literal's actual padding word in the separate padding case. Keep the semantic
+  nonconstant-index refusal distinct from structural invalidity.
+- **Evidence/revisit:** `r024-spirv-first` retains the original source, check
+  executable and both source-compiled modules; `r024-spirv-first-cpu.log` retains
+  the failure. These are working evidence for the unfinished 0.5.9 component.
+  Use actual ID definitions, not an assumed hole below the bound, for future
+  corruption controls. No public typed-value API or GPU behavior is qualified.
+
+### I-085 — Value-source parser initially refuses the generated progress log
+
+- **Context/reproduce:** The uncommitted 0.5.9 value-only syntax check passes,
+  along with four existing source/state/timing regression checks. A private
+  first-party probe reads five retained matching 2026.3 C++ projects: fresh
+  uniform, combined and dynamic-array inputs, an original timing input and a
+  same-input timing-analysis project.
+- **Observed:** All five refuse with `value initialization log statement is
+  unqualified`, before any values or partial memory graph can be returned.
+  Each actual setup uses the literal progress log
+  `NV_MESSAGE_VERBOSE("Initializing resources...(%d/%d)", 1, g_ResourceInitFunctionCount)`.
+  The new value parser initially accepts only one literal logging argument.
+- **Correction/evidence:** Preserve `r024-values-syntax`, its frozen probe,
+  five input/hash/refusal records and initial parser/test source. Add only this
+  exact bounded progress form alongside the single-literal form; the counter
+  symbol is a logging operand and is never evaluated. Arbitrary expressions or
+  helper calls in a log remain unqualified. Recheck actual sources separately.
+- **Revisit:** New logging forms need literal syntax qualification; do not skip
+  arbitrary executable argument expressions. This is a source-parser refusal,
+  not a driver/capture/hydrator failure or evidence of execution-time values.
+
+**Second I-085 probe:** `r024-values-syntax-progress` retains the corrected log
+parser, frozen probe and five new source refusals. The next guards identify a
+conditional block unrelated to buffer/memory definitions, missing value-only
+`VkImageLayout` declarations and the direct query-pool initialization helper.
+Preserve these results separately; they do not qualify a successful source plan.
+Restrict conditional refusal to the memory effects being collected while
+retaining the existing typed whitelist for unrelated resource blocks. Add exact
+layout/query syntax and tests; unknown or conditional memory effects still refuse.
+
+**Third I-085 probe:** `r024-values-syntax-initial-forms` passes the fresh uniform,
+combined and dynamic-array source projects with 8/15/21 resolved objects and
+26/41/45 setup effects, respectively. The original timing input still refuses
+its `VkQueryPipelineStatisticFlags` cast; the same-input analysis source still
+refuses an unrecognized resource declaration. Preserve both refusals, add exact
+value-only query syntax and improve the bounded declaration diagnostic before
+repeating those inputs. No execution-time values are returned.
+
+**Fourth I-085 probe:** `r024-values-syntax-query-flags` also passes the original
+timing source (eight objects, thirty setup effects, nine memory-definition
+calls). The same-input replay source identifies the remaining exact declaration
+as `VkPhysicalDeviceVulkan13Features`. That standard pinned-header type is added
+only to the Values policy; existing RecordedState/Timing grammar is unchanged.
+
+### I-086 — Physical-memory metadata extraction assumes the wrong helper arity
+
+- **Context/reproduce:** The uncommitted 0.5.9 Values syntax path adds captured
+  physical-memory properties and device identity. Its handwritten CPU check
+  passes, then all five retained projects refuse with `physical memory-property
+  interface is unqualified` in `r024-values-syntax-memory-types`.
+- **Observed/correction:** The initial extractor assumes five arguments for
+  `VulkanHelper_GetCompatiblePhysicalDevice`. The actual exported
+  `include/VulkanReplay.h` declares seven: instance, device index, physical
+  properties, queue-family count, queue-family properties, memory properties and
+  physical-device output. Read that exact primary interface and preserve its
+  argument positions; memory properties are argument five (zero-based), not
+  three. The unrelated large physical limits remain opaque source provenance.
+- **Evidence/revisit:** The failed probe, all five source/hash/refusal records,
+  initial parser/check source and exported-header identity stay in
+  `r024-values-syntax-memory-types`; original captures remain pinned. Correct
+  both the implementation and independent fixture interface before rereading
+  actual projects. This is an implementation assumption, not unavailable Nsight
+  memory evidence. No helper or replay/application source is compiled.
+
+**Corrected I-086 interface probe:** `r024-values-syntax-memory-interface` passes
+all four original-application projects and preserves the seven-argument memory
+metadata. The replay-generated timing project next refuses the exact standard
+`VkDevicePrivateDataCreateInfo` declaration, whose source is retained. Qualify
+that declaration only in Values, then repeat the replay input. The static memory
+model remains separate from upload visibility and shader execution.
+
+**Memory-model follow-through:** `r024-value-memory-native` now validates static
+bindings/properties for all four original-application projects (2/3/2/3 buffers).
+Its replay-derived source still refuses the standard buffer-device-address
+feature declaration. A bounded inventory of that project's declarations finds
+four remaining types: `VkPhysicalDeviceBufferDeviceAddressFeatures`,
+`VkMemoryAllocateFlags`, `VkMemoryAllocateFlagsInfo` and
+`VkMemoryOpaqueCaptureAddressAllocateInfo`. Preserve the refusal and add only
+these source forms to Values. Address-qualified memory semantics remain a
+separate gate; accepting syntax alone cannot establish a shader value.
+
+### I-087 — Replay-derived memory graph encounters an allocation extension chain
+
+- **Context/reproduce:** The value-only syntax parser now passes all five
+  retained matching 2026.3 source projects with no unsupported object records.
+  `r024-value-memory-address-syntax` preserves their complete parser results.
+  Four original-application static memory graphs pass; the replay-derived graph
+  refuses `unsupported structure type or pNext`.
+- **Observed:** The replay export uses a standard `VkMemoryAllocateFlagsInfo`
+  chain and `VkMemoryOpaqueCaptureAddressAllocateInfo`. The initial memory model
+  accepts only a null allocation `pNext`. Accepting source types does not prove
+  their allocation semantics. Keep this refusal separate from the successful
+  source parsing and original-application binding checks.
+- **Next evidence:** Read the official Vulkan extension contracts and interpret
+  only a bounded, non-repeated address/capture allocation chain with no device
+  mask. Preserve opaque address metadata without claiming a live GPU address.
+  Unknown chains, cycles and device-group masks must refuse. New CPU controls
+  and the actual replay-derived source need their own result before exposure.
+- **Independent check:** `r024-memory-properties` retains a separately invoked,
+  read-only C++ Vulkan query under the existing matching process-local runtime.
+  Its six memory types, heap identities and flags agree exactly with ten buffer
+  facts across the four original source projects; cleanup is confirmed. This
+  validates those captured properties, not host-upload ordering or GPU values.
+
+**Bounded-chain follow-through:** `r024-value-memory-allocation-extensions`
+passes all five retained source projects and their static memory graphs, including
+the replay-derived input (two buffers). The focused source/memory checks pass in
+0.28 seconds. The memory model retains address/capture flags and source provenance
+for at most the two named allocation structures; unknown, repeated, cyclic,
+device-mask and contradictory forms refuse. Opaque capture metadata is not
+interpreted as a live GPU address. These working results remain separate from
+selected-draw upload/lifetime proof and the unfinished public R-024 query.
+
+### I-088 — Upload history's conservative refusal state rejects a later modeled write
+
+- **Context/reproduce:** The first uncommitted 0.5.9 upload-history check builds,
+  then fails in its unknown-GPU-write control with `mapped buffer list is
+  duplicated or differs from its captured allocation`. Earlier checks exercise
+  overlapping byte ranges, map/binding offsets, finite-wait refusal, exact queue
+  completion and destroyed allocations.
+- **Observed/correction:** A deliberately invalidated buffer remains a known
+  live allocation. The parser mistakenly conflates its conservative value
+  refusal with a missing static binding, so a subsequent syntactically valid
+  upload throws. Check the static binding identity separately. Preserve the
+  unavailable value after that upload; this change does not infer recovery from
+  an unknown GPU effect. Also retain exact prior-use/completion source receipts
+  with writes that occur after a proven completion boundary.
+- **Evidence/revisit:** `r024-value-upload-first` retains the original component,
+  test executable, source, configure/build output and failed CPU result. Verify
+  the conservative value refusal and source provenance independently before
+  composing a public selected-draw query. No GPU value is qualified by this
+  handwritten source test.
+
+**Corrected I-088 CPU result:** The focused upload-history check passes in
+0.02 seconds in `r024-value-upload-corrected`. Completion receipts bind each
+later upload to its prior submission and exact queue-idle or infinite wait-all
+source boundary. Finite waits and status-only calls receive no completion credit.
+These are source-model checks, not GPU execution observations.
+
+### I-089 — Private composition harness assumes the wrong retained-input JSON shape
+
+- **Context/reproduce:** The private first-party source composition probe builds,
+  then its Python collector stops before executing any input with `string indices
+  must be integers`. It is preparing three already retained 0.5.8 source/write
+  projects; no new capture or helper process is launched.
+- **Observed/correction:** `DescriptorRead` results store `inputs` as a dictionary
+  keyed by `data.bin` and `data.bin.rec`, each with byte count/hash. The collector
+  incorrectly assumes a list with a `snapshot_path` field. Iterate the two
+  literal keys and hash their actual `raw/input/` snapshots after checking the
+  complete, pinned manifest. Do not infer any descriptor or value failure.
+- **Evidence/revisit:** `r024-value-composition-native` retains the first probe,
+  parser/component snapshots, build receipts, original harness and error. Repeat
+  with the observed result shape in a separate output directory. Product code
+  and the running CPU aggregate are unchanged by this collector correction.
+
+**Corrected I-089 source projection:** `r024-value-composition-inputs` passes
+all three retained uniform/storage-image/dynamic-array projects: 20 descriptor
+elements and seven buffer upload ranges. Every retained parent input hash, native
+pin and source-call span is checked. The projections match the prior independent
+fixture API/source-name oracle; one recorded uniform binding joins to the exact
+SPIR-V/load layout and four independently decoded float values. All 48 CPU checks
+pass in 451.48 seconds before subsequent fixture work. These are working
+source-model results with GPU correspondence explicitly false.
+
+### I-090 — Fresh value-history export exceeds the existing timing grammar
+
+- **Context/reproduce:** The new uncommitted 0.5.9 `timing-values` fixture changes
+  mapped uniform bytes and copies descriptors between three completed/rerecorded
+  submissions. Application-only validation passes 54 per-submission GPU images
+  against 30 separate original renderer oracles and 252 draw timestamp checks.
+  Collect its first fresh matching 2026.3 C++ capture, Graphics Capture and
+  same-input C++/GPU Trace analysis using the qualified 0.5.8 collection server.
+- **Observed:** All three jobs succeed with confirmed owned cleanup. The source
+  write listing has three supported initialization updates and three unsupported
+  copy operations within the existing source-query scope. The subsequent
+  `capture_draw_timings` call refuses `invalid_export: unsupported declaration
+  type`. The collector incorrectly treats this expected unqualified new grammar
+  as a collection failure and stops before the other two cases.
+- **Evidence/revisit:** `r024-value-captures` retains all requests, 167 successful
+  schema results, the exact tool refusal, complete/pinned native bundles and
+  private application witnesses/images. Keep collection success distinct from
+  reader support. Inspect the actual new declarations/call forms, qualify only
+  their bounded timing/value interpretation, and retain the refusal when resuming
+  the remaining captures. No wider helper compilation or universal capability
+  conclusion follows from this result.
+
+### I-091 — Copy-only source calls use the documented helper's invalid database sentinel
+
+- **Context/reproduce:** Run the frozen Values syntax/memory probe on the first
+  fresh value-history original C++ project and its same-input analysis project.
+  Both refuse `unsupported expression operator` in `r024-value-fresh-syntax`.
+- **Observed:** The actual copy-only helper calls have zero writes, zero output
+  bytes, a literal `VkCopyDescriptorSet` list and
+  `Serialization::DATABASE_HANDLE(-1)`. The initial Values parser supports only
+  nonnegative database handles; it must not treat this sentinel as a readable
+  resource or permit it on a nonempty write request.
+- **Evidence/revisit:** Preserve both source/hash/refusal records and the frozen
+  probe identity. Qualify only this exact sentinel in the source grammar and
+  require its zero-write/copy-only context in the lifetime interpreter, with
+  negative controls for nonempty writes and other negative values. No helper
+  file or serialized format extension is needed to interpret literal copies.
+
+### I-092 — Fault input's same-input C++ collection stops while entering frame debugger mode
+
+- **Context/reproduce:** The resumed 0.5.8 collector successfully creates the
+  `timing-values-error` original C++ capture and Graphics Capture, then requests
+  the qualified matching 2026.3 one-interval, 20-loop C++/60-loop trace analysis
+  of that exact saved capture. The earlier reference analysis succeeds.
+- **Observed:** The C++ phase exits 1 after about nine seconds while saving the
+  frame-2 function stream: `Preparing to enter frame debugger mode... Failed`.
+  There is no timeout, signal or process error, and owned cleanup is confirmed.
+  Stderr contains only Qt's existing locale notices; no root cause is established.
+- **Evidence/revisit:** Failed/pinned native
+  `bundle-3dc74b2aceb6ce142e0fb0c93601514f` retains the exact source snapshot,
+  metadata, request/report and C++ stdout/stderr under
+  `r024-value-captures/store`; the successful source is
+  `bundle-17a64761193c6888615c25984fc917cf`. The continuation transcript retains
+  298 total successful schema results before stopping. Retry the same retained
+  input under unchanged policy after examining its data/phase behavior. Do not
+  attribute the failure to the deliberately wrong descriptor, permissions,
+  clocks or the driver without evidence.
+
+### I-093 — Replay-derived uniform snapshots do not prove the original frame's updates
+
+- **Context/reproduce:** Decode the two literal 16-byte uniform initialization
+  resources (handles 8/9) in the successful reference same-input C++ analysis
+  with the already qualified confined 0.4.2 byte worker. Compare all four raw
+  float32 words to the original application's three frame-7 private API/mapped
+  memory records. Verify both database hashes before/after the reads.
+- **Observed:** Both reads succeed with confirmed cleanup, but neither matches
+  any frame-7 buffer record. The replay-derived frame has no corresponding
+  uniform mapped-update calls; its other mapped updates concern readback memory.
+  The original direct C++ capture preserves six uniform updates. The two capture
+  paths' three application GPU images agree exactly with each other; the
+  original native captured log export is empty. This establishes an exported
+  evidence discrepancy, not the cause or the actual replayed shader values.
+- **Evidence/revisit:** `r024-replay-uniform-inputs` retains exact input snapshots,
+  worker/supervisor identities, receipts, decoded bytes and source-frame
+  comparisons; `r024-value-injection-image-comparison.json` retains image
+  identities. `r024-replay-help` preserves the matching replayer help. Test
+  documented replay/reset or capture tracking controls and independently check
+  the resulting values; do not promote an initial snapshot or final image match
+  to a per-draw value proof. The existing timing association has a separate
+  call/path scope and does not establish resource-value correspondence.
+
+**I-091 correction:** `r024-copy-sentinel` passes six focused syntax/lifetime and
+existing source/state/timing checks in 3.90 seconds. Only literal `-1` is newly
+normalized in Values; the interpreter permits it exclusively for zero writes,
+zero bytes and a nonempty literal copy list. Nonempty writes, other negative
+handles and a sentinel-only no-op refuse. `r024-fresh-sentinel-syntax` then parses
+both new original/replay-derived projects and their static memory graphs. The
+replay-derived allocations still report their independent address/helper-flag
+  qualification limits; no execution-time value is exposed.
+
+**I-093 replay-control results:** After the I-094 harness correction,
+`r024-replay-value-controls-prepared` successfully captures the same retained
+reference input under default reset, forced all-region reset with initialized-in-
+frame detection disabled, no reset, and capture/replay-address preservation
+disabled. All four supervised runs exit zero with confirmed cleanup. Every
+generated frame still has zero uniform mapped updates. Confined byte reads in
+`r024-value-control-bytes` show the same two initial payloads in all four cases:
+they match phase 9, including original frame 6/submission 2, and none of the three
+frame-7 updates. The original direct C++ export's six mapped-update payloads all
+match its private frame-7 API witness exactly. This narrows the discrepancy to
+the exported replay path under these measured controls; it does not establish
+the contents actually read by a replayed GPU invocation or qualify the direct
+state interface by itself. Fresh documented capture-memory controls are tested
+separately; no system setting or proprietary compilation changes are involved.
+
+**I-093 fresh capture-memory controls:** `r024-native-memory-controls` completes
+three fresh native captures and subsequent C++ captures with write-watch disabled,
+uncached-memory demotion disabled, and write-watch plus Vulkan capture/replay
+allocation overrides disabled. Matching 2026.3 tools, the unchanged fixture,
+seed/dimensions/frame and process-local runtime are recorded. All six supervised
+processes succeed with confirmed cleanup, but the three replay-derived frames
+again contain no uniform updates. `r024-native-control-bytes` confirms their two
+uniform initialization payloads have the same phase-9 words as the earlier
+replays. These controls do not restore the required history. The original direct
+C++ source path remains a separate candidate for independent state qualification;
+no value claim is based on the replay snapshots.
+
+### I-094 — Private replay controls omit the required existing output directory
+
+- **Context/reproduce:** The private default 200-loop replay control in
+  `r024-replay-value-controls` exits 1. Its attempted continuation in
+  `r024-replay-value-controls-corrected` stops on the first reset-control case.
+- **Observed/correction:** Both actual stdout files say `No such output
+  directory` followed by `Invalid general options`; neither starts capture.
+  The first collector requires supervisor exit zero, and the continuation allows
+  0/1 although this supervisor returns 2 for a confirmed child failure. An
+  earlier note incorrectly described this as another frame-debugger failure.
+  Create the output directory before launch and classify the child receipt
+  against the supervisor's actual return contract. Preserve both original
+  attempts and their errors; they add no evidence about I-092 or I-093.
+- **Evidence/revisit:** Both working directories retain exact scripts, requests,
+  stdout/stderr and cleanup-confirmed receipts. Repeat in a fresh directory;
+  require actual capture output before interpreting reset behavior. No machine
+  policy changes or additional proprietary compilation are involved.
+
+### I-095 — New value-selection check reuses an existing test-local identifier
+
+- **Context/reproduce:** Build `ngm_value_source_check_run` after adding query/
+  readback selection controls to the uncommitted 0.5.9 check.
+- **Observed/correction:** Compilation reports conflicting declarations of
+  `copy`: the new readback source string and an existing descriptor-copy parse
+  result occupy the same lambda scope. Rename the source string to
+  `readback_copy`; no product/parser behavior changes are needed.
+- **Evidence/revisit:** `r024-value-selection-first` retains the exact test
+  source and repeated failing build receipt/logs. This first-party test build
+  error provides no Nsight compatibility or value-evidence conclusion. Run the
+  corrected check before relying on its negative controls.
+
+### I-096 — Captured-fence validation precedes the older queue-device control
+
+- **Context/reproduce:** The uncommitted source-value composition check gains
+  captured command-pool reset/family and fence device/reset/pending validation.
+  Its positive two-submission case passes; a negative reason assertion fails.
+- **Observed/correction:** A deliberately foreign queue device now refuses at
+  the stronger same-device submission-fence guard, before the previous
+  command-buffer/queue comparison. The test still expects the older message.
+  Match the new guard and print expected/observed reasons on future failures;
+  retain the unavailable/empty-result requirement. Add separate pool reset,
+  family and missing-fence-reset controls so each intended guard is exercised.
+- **Evidence/revisit:** `r024-value-pool-fence-cpu` retains the exact original
+  sources, failed check executable, three compiled shader inputs and build/test
+  receipts/logs. This is a test expectation change, not a relaxed lifetime rule
+  or new producer/GPU qualification.
+
+### I-097 — First value-query parent build omits a source-value helper include
+
+- **Context/reproduce:** Build the uncommitted 0.5.9 inspection service after
+  adding candidate listing and the retained, bounded descriptor/shader/upload
+  composition parent. No new MCP tool is registered yet.
+- **Observed/correction:** Compilation cannot resolve `detail::number` without
+  `ReplayValues.hpp`. A byte-digest comparison also puts `std::string` on the
+  left of a JSON value, repeating I-077's pinned-library overload constraint.
+  Include the owning header and extract the validated digest string explicitly.
+- **Evidence/revisit:** `r024-value-service-first` retains original sources,
+  compiler diagnostics and the failed receipt. Rebuild the focused existing
+  inspection/descriptor checks and the value timeline before testing real
+  retained inputs. This is a first-party compile failure, not Nsight or worker
+  compatibility evidence.
+
+### I-098 — Generated replay procedure declarations have unstable ordering
+
+- **Context/reproduce:** The first private 0.5.9 `InspectionService::draw_values`
+  query lists 18 candidates from retained direct C++ capture
+  `bundle-cfbe3e0dc5cb1bc1c9c660a1a07da19d`, then refuses the selected read at
+  the exact `ReplayProcedures.cpp` fingerprint before launching a helper.
+- **Observed/correction:** Three matching 2026.3.1.0/build 38722833 exports have
+  distinct raw procedure hashes. The difference is only ordering of 15 literal
+  function prototypes in the prologue; their executable bodies and the other
+  five checked source files are identical. Normalize only the complete, unique,
+  bounded set of exact prototypes before the first body. Preserve all other
+  bytes and record both raw and canonical hashes; refuse unknown, duplicate,
+  missing or executable prototype forms. A CPU check covers those boundaries.
+- **Evidence/revisit:** `r024-value-service-native-first` retains the failed
+  source/probe/receipt and pinned failed query bundle
+  `bundle-5a0eaf33076df243dc612742925982c5` in the direct-capture experiment
+  store. `r024-value-procedures-order.json` records all three raw hashes and
+  their common canonical hash. Repeat the parent query after the scoped fix;
+  this refusal establishes no GPU, shader-value or worker incompatibility.
+
+### I-099 — Private value collector assumes a large proof is inline text
+
+- **Context/reproduce:** The first `r024-value-mcp` collector queries the new
+  0.5.9 tool through stdio against the retained reference direct C++ capture.
+  Candidate pagination and the first typed read, its six child reads and pins
+  pass their advertised schemas; the collector then parses `artifact_read.text`.
+- **Observed/correction:** The full provenance report is 74,117 bytes, beyond
+  `artifact_read`'s existing 65,536-byte inline cap. The product correctly returns
+  `reference_only` with a local path and `text: null`; the private collector
+  incorrectly passes null to the JSON parser. Honor the documented reference,
+  verify its expected retained path/extent and inspect that file externally.
+- **Evidence/revisit:** `r024-value-mcp` retains the original collector, frozen
+  server, transcript, tool schemas and failed audit. Repeat in a fresh directory
+  with reference-aware collection. The product query and inline bound require
+  no change; this is not evidence of a failed shader/value extraction.

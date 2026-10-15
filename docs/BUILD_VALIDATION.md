@@ -2775,3 +2775,79 @@ successful and **four** failed descriptor-read bundles and the original controls
 The seven retained tool errors comprise six intended worker/configuration
 refusals plus the initial unmarked-store harness error. Final documentation/pin
 bookkeeping follows the frozen source snapshot; product code is identical.
+
+## 0.5.9 source-visible draw uniform model, R-024 development (2026-10-16)
+
+This slice adds `capture_draw_values` to the shared **34-tool** stdio/HTTP
+surface. It composes authenticated descriptor/resource reads with bounded
+source memory, upload, descriptor-copy and submitted-shader lifetime proofs.
+Its result remains a generated-source uniform visibility model, with
+`captured_gpu_execution_correspondence: false`; it does not observe shader
+invocations/registers or join numeric Graphics Capture event IDs.
+
+Working evidence is retained under
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/roadmap-resolution-aytro126`.
+The new complete qualification snapshot has **not** been published to the
+central artifact store. That store has insufficient remaining protected budget;
+the proposed 2 GiB → 4 GiB increase awaits an owner decision. Limits/configuration
+and all older pins are unchanged. Native experiment bundles and query/child
+attempts are explicitly pinned in their existing isolated working stores;
+these paths are not a substitute for final qualification publication.
+
+The `r024-value-mcp-reference-aware` collector passes **835** actual schema-valid
+MCP results. Three fresh matching **2026.3.1.0/build 38722833** direct C++
+captures cover `timing-values` / `timing-values-error`, seed **931** at
+**224×160**, and a second correct input, seed **1307** at **192×144**. Each
+captured frame has three submissions with six draws each, coherent host updates,
+descriptor copies and explicit completion boundaries. All **54** selected draws
+match **216** independent float component words, the private API witness and
+separate original-renderer GPU image oracles. Nine missing-worker/foreign-ID
+refusals pass; **18** repeat selected reads over two server restarts preserve
+source identities, values and source/query/child pins. All original native
+payload hashes remain unchanged. Earlier failed collectors remain retained.
+
+The `r024-value-repair-diagnosis` record identifies the wrong secondary palette
+copy in submission occurrence two. The original image has **10,754** differing
+pixels / maximum channel delta **147** against the independent correct oracle.
+`r024-value-repair-build` edits the actual repository's `update_values` source
+selection, invokes the normal `ngm-vulkan-fixture` CMake build, and freezes the
+regenerated source identity, binary and exact patch. It then restores the
+deliberate fault source byte-for-byte and rebuilds the original binary. Both
+build identities contain the hashes of their actual source inputs.
+
+`r024-value-repair` uses the same `timing-values-error`, seed/resolution and
+wait-frame inputs with that repaired binary. Fresh native capture
+**bundle-3d612579f1428a28b2610c8ca25b07ff** succeeds with confirmed owned-process
+cleanup and no retained GPU reservation. All **three** application GPU readback
+images exactly match independent correct phase/source oracles through the
+public image comparison tool. All **18** selected draw values match independent
+reference bits, and **six** repeated reads over two restarts preserve values and
+pins. All **322** actual tool results pass their advertised schemas. This
+application readback remains a separate evidence source from the value model.
+
+Exact frozen SHA-256 identities:
+
+| Component | SHA-256 |
+| --- | --- |
+| 0.5.9 server | `3c43c559c5245b115d4cde1cb4f3b565fdf287805aa8c2509dd91908f142a72f` |
+| Original/restored 0.5.9 fixture | `a14ff46c45bcb2be5dd6e8bc2d323f47a0d679ccf8d2e2ee354889fafea66773` |
+| Repaired 0.5.9 fixture | `44c0dce22748de7a1deb3f5e5ade31c80eeae01cbbaf8ffd99274dd55c8fde74` |
+| Existing 0.4.2 byte worker | `355360840cb4a8b313e9148e688996064a8dcdd337b198f1e0225786b7518963` |
+| Existing 0.5.8 descriptor worker | `4c31cce685f4bf6d76e61cde1b909ad0ed5647587f25efb456e17266f3ae017a` |
+
+No new proprietary file is compiled. The existing process-local matching
+**615.71.09** runtime is verified against its recorded library/ICD identities
+before the repair capture on RTX **3080 Ti**, KDE Wayland/Xwayland-XCB. No
+installed driver, desktop, clocks, profiling permission or installed server/
+worker changes occur. I-084–I-099 retain parsing/collection/build failures and
+the replay-derived missing-update discrepancy separately from the successful
+direct C++ source path.
+
+All **51 ordinary CPU checks pass** in **463.18 seconds** (build plus checks:
+**500.48 seconds**), using `cmake --build --preset linux-gcc-debug --target
+ngm_check --parallel 2` with serial CTest execution. The retained receipt in
+`r024-value-public-final-aggregate` verifies all **285** source inputs unchanged
+through the run. The scoped source-contract, timeline, stdio and HTTP checks
+also pass before the native matrix. The current server/fixture hashes match the
+frozen tested binaries above. R-024 remains In Progress pending final
+qualification publication.

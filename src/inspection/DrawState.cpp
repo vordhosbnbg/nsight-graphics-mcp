@@ -3,6 +3,7 @@
 #include "DescriptorState.hpp"
 #include "PushState.hpp"
 #include "ReplayValues.hpp"
+#include "ValueExecutionState.hpp"
 #include "ngm/Inspection.hpp"
 
 #include <algorithm>
@@ -275,7 +276,7 @@ struct DynamicArray {
     std::size_t count = 0;
     std::map<std::size_t, Json> values, evidence;
 };
-Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) {
+Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, bool value_selection = false) {
     const auto& calls = recording.calls;
     require(calls.size() >= 2 && calls.front().name == "VulkanReplay_BeginCommandBuffer" &&
                 calls.back().name == "VulkanReplay_EndCommandBuffer",
@@ -334,6 +335,29 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) 
         }
         if(name == "VulkanReplay_CmdPipelineBarrier") {
             arity(10);
+            continue;
+        }
+        if(value_selection && (name == "VulkanReplay_CmdResetQueryPool" || name == "VulkanReplay_CmdWriteTimestamp")) {
+            arity(4);
+            const auto pool = symbol(a[name == "VulkanReplay_CmdResetQueryPool" ? 1 : 2], "VkQueryPool");
+            (void)pool;
+            require(number(a[3]) <= 65536, "value-selection query index/count exceeds bounds");
+            if(name == "VulkanReplay_CmdResetQueryPool")
+                require(number(a[2]) <= 65536, "value-selection first query exceeds bounds");
+            continue;
+        }
+        if(value_selection && name == "VulkanReplay_CmdCopyImageToBuffer") {
+            arity(6);
+            require(pass.empty(), "image readback inside an active render pass");
+            (void)symbol(a[1], "VkImage");
+            (void)symbol(a[3], "VkBuffer");
+            require(a[2].text == "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL" && number(a[4]) > 0 && number(a[4]) <= 64,
+                    "value-selection image readback layout/count is unqualified");
+            for(const auto& region : array(a[5], recording.values, "VkBufferImageCopy", number(a[4])))
+                require(region.constructor == "VkBufferImageCopy" && region.arguments.size() == 6,
+                        "value-selection image readback requires literal copy regions");
+            // This branch preserves recorded binding banks only. Its target
+            // remains a GPU write that the separate value model must invalidate.
             continue;
         }
         if(name == "VulkanReplay_CmdBeginRenderPass") {
@@ -521,6 +545,12 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording) 
     return draws;
 }
 } // namespace
+
+namespace detail {
+Json value_recording_draws(const CppReplay& replay, const ReplayRecording& recording) {
+    return recording_draws(replay, recording, true);
+}
+} // namespace detail
 
 nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
     Json result{{"executions", Json::array()},

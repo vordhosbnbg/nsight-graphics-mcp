@@ -34,7 +34,7 @@ namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
 constexpr std::uint32_t timing_draw_count = 6, timing_max_queries = 2 + 2 * timing_draw_count;
-constexpr std::array<std::string_view, 30> scenarios{"reference",
+constexpr std::array<std::string_view, 32> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -63,7 +63,9 @@ constexpr std::array<std::string_view, 30> scenarios{"reference",
                                                      "state-descriptors-reuse",
                                                      "timing-direct",
                                                      "timing-indexed",
-                                                     "timing-reuse"};
+                                                     "timing-reuse",
+                                                     "timing-values",
+                                                     "timing-values-error"};
 constexpr std::array<std::string_view, 13> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
@@ -90,6 +92,8 @@ struct Workload {
     bool descriptor_state = false;
     bool reuse_commands = false;
     bool timing = false;
+    bool value_history = false;
+    bool value_error = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
     std::uint32_t instance_count = 1;
@@ -104,6 +108,8 @@ Workload workload(std::string_view scenario) {
     result.state = scenario.starts_with("state-");
     result.dynamic_state = scenario == "state-dynamic" || scenario == "state-count";
     result.timing = scenario.starts_with("timing-");
+    result.value_history = scenario == "timing-values" || scenario == "timing-values-error";
+    result.value_error = scenario == "timing-values-error";
     result.indexed = scenario == "state-indexed" || scenario == "timing-indexed" || scenario == "timing-reuse";
     result.dynamic_count = scenario == "state-count";
     result.constants = scenario.starts_with("state-constants");
@@ -136,7 +142,10 @@ Json workload_metadata(std::string_view scenario) {
         {"partial_push_constants", selected.constants},
         {"descriptor_state_validation", selected.descriptor_state},
         {"timing_validation", selected.timing},
-        {"submissions_per_frame", selected.reuse_commands ? 2 : 1},
+        {"uniform_value_history_validation", selected.value_history},
+        {"submissions_per_frame", selected.value_history    ? 3
+                                  : selected.reuse_commands ? 2
+                                                            : 1},
         {"draws_per_submission", selected.timing             ? 6
                                  : selected.constants        ? 3
                                  : selected.descriptor_state ? 5
@@ -352,6 +361,8 @@ struct Buffer {
     VkDeviceSize allocation_size = 0;
     bool coherent = false;
     void* mapped = nullptr;
+    std::uint32_t memory_type_index = 0;
+    VkMemoryPropertyFlags memory_flags = 0;
 };
 
 class Renderer {
@@ -436,7 +447,8 @@ public:
             check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns), "waiting for frame completion");
             wait_for_present();
             sdk_.before_frame(frame, graphics_queue_);
-            update_palettes(frame);
+            if(!workload_.value_history)
+                update_palettes(frame);
             std::uint32_t image_index = 0;
             const auto acquire =
                 vkAcquireNextImageKHR(device_, swapchain_, gpu_timeout_ns, acquired_, VK_NULL_HANDLE, &image_index);
@@ -449,15 +461,24 @@ public:
             }
             check(vkResetFences(device_, 1, &submit_fence_), "resetting frame fence");
             check(vkResetCommandBuffer(command_, 0), "resetting frame commands");
+            if(workload_.value_history)
+                update_values(frame, 0);
             record(image_index, frame);
             const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             auto submit = vk_struct<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-            const auto repetitions = workload_.reuse_commands ? 2u : 1u;
+            const auto repetitions = workload_.value_history ? 3u : workload_.reuse_commands ? 2u : 1u;
             for(std::uint32_t occurrence = 0; occurrence < repetitions; ++occurrence) {
                 if(occurrence != 0) {
                     check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns),
                           "waiting before command-buffer reuse");
+                    if(workload_.value_history)
+                        check(vkQueueWaitIdle(graphics_queue_), "completing the prior value submission");
                     check(vkResetFences(device_, 1, &submit_fence_), "resetting reused submission fence");
+                    if(workload_.value_history) {
+                        check(vkResetCommandBuffer(command_, 0), "resetting value-history commands");
+                        update_values(frame, occurrence);
+                        record(image_index, frame);
+                    }
                 }
                 submit.waitSemaphoreCount = occurrence == 0 ? 1u : 0u;
                 submit.pWaitSemaphores = &acquired_;
@@ -478,6 +499,8 @@ public:
                 check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
                 if(options_.timing_draw_witness)
                     vkQueueEndDebugUtilsLabelEXT(graphics_queue_);
+                if(workload_.value_history && occurrence + 1 == repetitions)
+                    check(vkQueueWaitIdle(graphics_queue_), "completing the final value submission");
                 if(timing_queries_)
                     collect_timing(frame, occurrence, submitted_at, queue_label);
                 if(!options_.state_witness.empty()) {
@@ -1171,6 +1194,8 @@ private:
         buffer.coherent =
             (memory_properties_.memoryTypes[*selected].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
         buffer.allocation_size = requirements.size;
+        buffer.memory_type_index = *selected;
+        buffer.memory_flags = memory_properties_.memoryTypes[*selected].propertyFlags;
         auto allocate = vk_struct<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
         allocate.allocationSize = requirements.size;
         allocate.memoryTypeIndex = *selected;
@@ -1224,7 +1249,7 @@ private:
             check(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &post_descriptor_layout_),
                   "creating the post-processing layout");
         }
-        std::vector<VkDescriptorPoolSize> sizes{{descriptor_type, 2}};
+        std::vector<VkDescriptorPoolSize> sizes{{descriptor_type, workload_.value_history ? 3u : 2u}};
         if(workload_.multipass) {
             sizes.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1});
         }
@@ -1253,6 +1278,13 @@ private:
             write.pBufferInfo = &buffers[i];
             vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
             name(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptors_[i], "fixture.palette_set." + std::to_string(i));
+        }
+        if(workload_.value_history) {
+            allocation.descriptorSetCount = 1;
+            allocation.pSetLayouts = &descriptor_layout_;
+            check(vkAllocateDescriptorSets(device_, &allocation, &value_descriptor_),
+                  "allocating the value-history destination");
+            name(VK_OBJECT_TYPE_DESCRIPTOR_SET, value_descriptor_, "fixture.values.destination");
         }
         if(workload_.multipass) {
             allocation.descriptorSetCount = 1;
@@ -1655,6 +1687,58 @@ private:
         }
     }
 
+    void update_values(std::uint32_t frame, std::uint32_t occurrence) {
+        if(occurrence > 2)
+            throw std::logic_error("value-history submission exceeds its fixture contract");
+        const auto phase = static_cast<std::uint32_t>((std::uint64_t{frame} * 3 + occurrence) % 11);
+        update_palettes(phase);
+        const auto source = workload_.value_error && occurrence == 2 ? 1u : occurrence == 1 ? 1u : 0u;
+        auto copy = vk_struct<VkCopyDescriptorSet>(VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET);
+        copy.srcSet = descriptors_[source];
+        copy.srcBinding = 0;
+        copy.dstSet = value_descriptor_;
+        copy.dstBinding = 0;
+        copy.descriptorCount = 1;
+        vkUpdateDescriptorSets(device_, 0, nullptr, 1, &copy);
+        if(!options_.timing_witness.empty()) {
+            value_witness_ = {{"evidence_origin", "private_fixture_host_api_and_mapped_bytes"},
+                              {"frame", frame},
+                              {"submission_occurrence", occurrence},
+                              {"phase", phase},
+                              {"preceding_queue_idle", occurrence != 0},
+                              {"bound_set_handle", handle_bits(value_descriptor_)},
+                              {"copy",
+                               {{"src_set", handle_bits(copy.srcSet)},
+                                {"src_binding", copy.srcBinding},
+                                {"src_array_element", copy.srcArrayElement},
+                                {"dst_set", handle_bits(copy.dstSet)},
+                                {"dst_binding", copy.dstBinding},
+                                {"dst_array_element", copy.dstArrayElement},
+                                {"descriptor_count", copy.descriptorCount}}},
+                              {"buffers", Json::array()}};
+            for(std::size_t n = 0; n < palettes_.size(); ++n) {
+                const auto& buffer = palettes_[n];
+                std::array<std::uint32_t, 4> bits{};
+                std::memcpy(bits.data(), buffer.mapped, sizeof(bits));
+                value_witness_["buffers"].push_back({{"source_set", handle_bits(descriptors_[n])},
+                                                     {"buffer_handle", handle_bits(buffer.handle)},
+                                                     {"memory_handle", handle_bits(buffer.memory)},
+                                                     {"buffer_bytes", sizeof(bits)},
+                                                     {"binding_offset", 0},
+                                                     {"allocation_bytes", buffer.allocation_size},
+                                                     {"map_offset", 0},
+                                                     {"map_bytes", buffer.allocation_size},
+                                                     {"upload_offset", 0},
+                                                     {"upload_bytes", sizeof(bits)},
+                                                     {"memory_type_index", buffer.memory_type_index},
+                                                     {"memory_property_flags", buffer.memory_flags},
+                                                     {"descriptor_offset", 0},
+                                                     {"descriptor_range", sizeof(bits)},
+                                                     {"float32_bits", bits}});
+            }
+        }
+    }
+
     void begin_label(const std::string& text) {
         if(!options_.timing_witness.empty())
             timing_path_.push_back(text);
@@ -1776,7 +1860,8 @@ private:
                  {viewport.x, viewport.y, viewport.width, viewport.height, viewport.minDepth, viewport.maxDepth}},
                 {"scissor", {scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height}}};
         }
-        const auto descriptor = descriptors_[options_.scenario == "binding-error" ? 1 : 0];
+        const auto descriptor =
+            workload_.value_history ? value_descriptor_ : descriptors_[options_.scenario == "binding-error" ? 1 : 0];
         if(!workload_.descriptor_state)
             vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1, &descriptor, 0,
                                     nullptr);
@@ -1836,7 +1921,7 @@ private:
         barrier.image = images_[image_index];
         barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         auto source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        if(frame == options_.frame) {
+        if(frame == options_.frame || (workload_.value_history && timing_queries_)) {
             begin_label("application.readback");
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -1982,6 +2067,24 @@ private:
                         {"markers", timing_markers_}};
         if(options_.timing_draw_witness)
             submission["queue_label"] = queue_label;
+        if(workload_.value_history) {
+            submission["value_history"] = value_witness_;
+            submission["value_history"]["queue_idle_after_submit"] = occurrence == 2;
+            if(!readback_.coherent) {
+                auto range = vk_struct<VkMappedMemoryRange>(VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE);
+                range.memory = readback_.memory;
+                range.size = VK_WHOLE_SIZE;
+                check(vkInvalidateMappedMemoryRanges(device_, 1, &range), "invalidating value-history image readback");
+            }
+            const auto image =
+                "value-frame-" + std::to_string(frame) + "-submission-" + std::to_string(occurrence) + ".ppm";
+            write_image(options_.output / image);
+            submission["value_history"]["gpu_readback"] = {{"evidence_origin", "application_gpu_image_readback"},
+                                                           {"path", image},
+                                                           {"sha256", ngm::sha256_file(options_.output / image)},
+                                                           {"width", extent_.width},
+                                                           {"height", extent_.height}};
+        }
         timing_witness_["submissions"].push_back(std::move(submission));
         write_json(options_.timing_witness, timing_witness_);
     }
@@ -2084,8 +2187,8 @@ private:
         observe("constants.restored", compatible_pipeline_, compatible_layout_);
     }
 
-    void write_image() {
-        const auto path = options_.output / "image.ppm";
+    void write_image(const std::filesystem::path& destination = {}) {
+        const auto path = destination.empty() ? options_.output / "image.ppm" : destination;
         std::ofstream output(path, std::ios::binary);
         output.exceptions(std::ios::badbit | std::ios::failbit);
         output << "P6\n" << extent_.width << ' ' << extent_.height << "\n255\n";
@@ -2318,6 +2421,8 @@ private:
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     std::array<VkDescriptorSet, 2> descriptors_{};
+    VkDescriptorSet value_descriptor_ = VK_NULL_HANDLE;
+    Json value_witness_;
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     std::vector<VkShaderModule> shaders_;
     VkPipeline pipeline_ = VK_NULL_HANDLE;

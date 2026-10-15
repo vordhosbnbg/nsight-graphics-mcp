@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**33 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**34 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 The [0.5.0 capability follow-up](docs/CAPABILITY_FOLLOWUP_COMPLETION.md) adds
 controlled launches, retained reader activation, bounded recorded draw state
@@ -45,8 +45,15 @@ Original live performance and physical counter meanings remain unavailable.
 At **0.5.8**, `capture_cpp_descriptor_writes` lists and optionally decodes
 qualified source-local buffer/image writes through the confined optional worker.
 Fresh uniform, storage/image and dynamic-array captures pass independent source
-checks and restart/pin checks. Selected-draw descriptor visibility and typed
-values remain unfinished R-024 work. See [descriptor writes](docs/DESCRIPTOR_WRITES.md).
+checks and restart/pin checks. See [descriptor writes](docs/DESCRIPTOR_WRITES.md).
+
+The **0.5.9 development slice** adds `capture_draw_values`: a bounded model of
+source-visible uniform values at selected C++ submission/draw occurrences. It
+checks descriptor writes/copies, coherent uploads, completion boundaries and
+actual SPIR-V layouts before returning typed bits and provenance. This remains
+source evidence; GPU invocation/register observation and numeric Graphics
+Capture event correspondence are unavailable. R-024 stays In Progress pending
+final qualification and evidence publication.
 
 ## Example workflows
 

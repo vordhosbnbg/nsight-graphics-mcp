@@ -5,6 +5,9 @@
 #include <optional>
 
 namespace ngm::detail {
+// Values-policy allocations with unique source pool/layout definitions. This
+// does not establish update history, live resources or selected shader access.
+nlohmann::json value_descriptor_allocations(const CppReplay&);
 // Recorded binding identity only. Descriptor writes and buffer contents are not
 // decoded, and no GPU shader access or effective buffer address is inferred.
 class DescriptorState {

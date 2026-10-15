@@ -50,9 +50,17 @@ struct CppReplay {
     // Timing-only literal initial command-buffer/callback relationships. Other
     // setup helper effects and descriptor/resource contents are not interpreted.
     std::vector<ReplayCall> initial_recordings;
+    // Values-only source effects. initial_state follows one setup body;
+    // resource_memory collects unique resource definitions without asserting
+    // execution order between resource functions. Neither establishes upload
+    // visibility, descriptor lifetimes or executed shader values.
+    std::vector<ReplayCall> initial_state;
+    std::vector<ReplayCall> resource_memory;
+    // Unique queue/device definitions used by the Values lifetime interpreter.
+    std::vector<ReplayCall> resource_queues;
     nlohmann::json unsupported = nlohmann::json::array();
 };
-enum class ReplayParseScope { RecordedState, Timing };
+enum class ReplayParseScope { RecordedState, Timing, Values };
 CppReplay parse_cpp_replay(const std::vector<CppSource>& sources,
                            ReplayParseScope scope = ReplayParseScope::RecordedState);
 } // namespace ngm::detail

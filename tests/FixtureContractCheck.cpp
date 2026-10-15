@@ -198,7 +198,8 @@ int main(int argc, char** argv) {
 
         require(rejected.at("workload").at("required_api_features").empty(),
                 "basic rendering never requires optional bindless features");
-        for(const auto* scenario : {"timing-direct", "timing-indexed", "timing-reuse"}) {
+        for(const auto* scenario :
+            {"timing-direct", "timing-indexed", "timing-reuse", "timing-values", "timing-values-error"}) {
             for(const bool per_draw : {false, true}) {
                 auto timing = make_case(executable, scratch.path,
                                         std::string("timing input ") + scenario + (per_draw ? " draw" : " scene"));
@@ -210,10 +211,14 @@ int main(int argc, char** argv) {
                     timing.process.arguments.insert(timing.process.arguments.end(), {"--timing-scope", "draw"});
                 require_failure(timing, 3, "DISPLAY is unset");
                 const auto record = Json::parse(ngm::read_regular_file(timing.output / "result.json", 1024 * 1024));
+                const bool values = std::string_view(scenario).starts_with("timing-values");
                 require(record.at("workload").at("timing_validation") == true &&
+                            record.at("workload").at("uniform_value_history_validation") == values &&
                             record.at("workload").at("draws_per_submission") == 6 &&
                             record.at("workload").at("submissions_per_frame") ==
-                                (std::string_view(scenario) == "timing-reuse" ? 2 : 1) &&
+                                (values                                         ? 3
+                                 : std::string_view(scenario) == "timing-reuse" ? 2
+                                                                                : 1) &&
                             record.at("inputs").at("timing_witness_scope") == (per_draw ? "draw" : "scene") &&
                             !fs::exists(witness),
                         "timing scope metadata does not claim GPU timestamps before display initialization");

@@ -121,6 +121,29 @@ deleted overlay without changing the installed driver, permissions or clocks.
 The installed 0.4.1 server and exact five-file 0.4.2 worker stay unchanged.
 The following slice records retain their historical scope and build identities.
 
+The **0.5.9 R-024 development slice** adds `capture_draw_values`, bringing the
+shared surface to **34 tools**. The source-visible uniform model checks complete
+descriptor/update/copy, memory/upload, queue/command-buffer/fence lifetimes and
+actual bounded SPIR-V layouts/effects before decoding typed bits. Unknown effects
+discard all provisional values. It remains source evidence with
+`captured_gpu_execution_correspondence: false`, without invocation/register or
+numeric Graphics Capture ID claims. Three direct C++ captures pass **54** public
+draw checks / **216** independent bit checks, **835** schema-valid results, nine
+refusals and **18** repeat reads across two restarts. An actual source edit,
+normal CMake rebuild and fresh capture repair **10,754** differing pixels to
+**zero** in all three submission images; **18** repaired draw checks and six
+restart reads pass **322** further schemas. The deliberate fault source is
+restored byte-for-byte after freezing the repaired build. All **51 CPU checks**
+pass in **463.18 seconds**, with all 285 checked source inputs unchanged (build
+plus checks: 500.48 seconds). Qualification publication remains pending;
+**R-024 stays In Progress**, R-026
+Pending. Do not turn this source model into general observed GPU-state claims.
+The requested central artifact budget increase from 2 GiB to 4 GiB has no owner
+answer yet: do not change global configuration, raise the limit, unpin/prune
+protected evidence or use another root to evade it. New experiment pins are
+retained in their isolated working stores pending complete qualification
+publication. See docs/DESCRIPTOR_WRITES.md and docs/BUILD_VALIDATION.md.
+
 The **0.5.8 R-024 source-query slice** adds `capture_cpp_descriptor_writes`,
 bringing the shared surface to **33 tools**. Its bounded parser and supervised
 parent validate capture/source/database/helper/worker identities, map typed

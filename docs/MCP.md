@@ -1,5 +1,14 @@
 # Local MCP server
 
+The **0.5.9 development slice** adds `capture_draw_values`, bringing the shared
+surface to **34 tools**. It models source-visible uniform values at selected
+draw occurrences in matching direct C++ captures, with descriptor/upload/
+completion/SPIR-V proofs and retained attempts. Its
+`captured_gpu_execution_correspondence` remains false. The
+[source-value contract](DESCRIPTOR_WRITES.md#source-visible-draw-uniform-values-059-development)
+defines coverage and prerequisites; R-024 remains In Progress pending final
+qualification and evidence publication. The notes below retain milestone scope.
+
 At **0.5.8**, `capture_cpp_descriptor_writes` brings the shared surface to
 **33 tools**. It lists bounded literal source-update references, optionally
 decodes a listed call through the approved confined worker and returns typed
@@ -174,6 +183,7 @@ The surface remains 28 tools; see [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md).
 | `capture_cpp_resources` | Required `capture_id`; optional `section` (`resources` or `unsupported`), `offset`, `limit` (default 50, maximum 100). Lists literal source references and qualified byte declarations with hashes/spans; no worker required. |
 | `capture_cpp_resource` | Required `capture_id` and listed `resource_ref`; optional `offset`, `length` (1–65536, default 65536), `pin` (default false). Uses the configured qualified worker and returns hex bytes/hashes plus a retained attempt artifact. Each call retains database snapshots up to 272 MiB. No GPU event-state reconstruction. |
 | `capture_cpp_descriptor_writes` | Required native `capture_id`; optional listing `section` (`updates`, default, or `unsupported`), `offset` (0–100000), `limit` (default 50, maximum 100). Supply a listed `update_ref` to decode paginated source writes using `--descriptor-worker-2026-3`; optional `pin` requires that read and protects its separate attempt. Exact capture/source/input/helper/reader identities are checked. No selected-draw visibility, effective dynamic address or typed shader value is inferred. See [DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md). |
+| `capture_draw_values` | Required native C++ `capture_id`; optional listing `section` (`executions`, default, or `unsupported`), `offset` (0–100000), `limit` (default 50, maximum 100). Listing requires no worker. Supply this capture's listed `execution_ref` to model source-visible uniform values through both configured workers; selected results use section `values`. Optional `pin` requires a selected read and protects its query/child artifacts. Limits: 256 KiB/page, 20-second shared deadline, 32 parent reads / 1 MiB returned payloads, 64 KiB per shader or uniform-prefix read, 16 MiB retained proof. Each page creates a separate attempt. Unknown shader, memory, lifetime or type effects refuse values. Source evidence does not establish GPU invocation/register observation or a numeric Graphics Capture event join. See [DESCRIPTOR_WRITES.md](DESCRIPTOR_WRITES.md#source-visible-draw-uniform-values-059-development). |
 
 Strings reject NUL bytes; input byte limits are enforced in addition to the
 advertised schemas. Absolute application/import paths are limited to 4096 bytes;

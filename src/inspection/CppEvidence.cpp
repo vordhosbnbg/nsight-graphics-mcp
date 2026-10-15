@@ -44,8 +44,11 @@ struct Token {
 struct Document {
     const CppSource& source;
     bool timing = false;
+    bool values = false;
+    std::string content_sha256;
     std::vector<Token> tokens;
-    explicit Document(const CppSource& input, bool timing_scope = false) : source(input), timing(timing_scope) {
+    explicit Document(const CppSource& input, bool timing_scope = false, bool values_scope = false) :
+        source(input), timing(timing_scope), values(values_scope) {
         check(!input.path.empty() && input.path.size() <= 4096 && input.path.find('\0') == std::string::npos,
               "source path exceeds bounds or contains NUL");
         (void)Json(input.path).dump();
@@ -54,6 +57,8 @@ struct Document {
         check(input.text.find("\\\n") == std::string::npos && input.text.find("\\\r\n") == std::string::npos,
               "C++ line splicing is unsupported");
         (void)Json(input.text).dump(); // Reject damaged UTF-8 rather than repairing evidence.
+        if(values)
+            content_sha256 = sha256(std::as_bytes(std::span(input.text.data(), input.text.size())));
         const std::string_view text(input.text);
         std::vector<std::size_t> stack;
         std::size_t line = 1, brace = none, conditional = 0;
@@ -152,7 +157,13 @@ struct Document {
         check(stack.empty() && conditional == 0, "unclosed source delimiter or preprocessor condition");
     }
     Json span(std::size_t first, std::size_t last) const {
-        return {{"path", source.path}, {"start_line", tokens.at(first).line}, {"end_line", tokens.at(last).line}};
+        Json result{{"path", source.path}, {"start_line", tokens.at(first).line}, {"end_line", tokens.at(last).line}};
+        if(values) {
+            result["sha256"] = content_sha256;
+            result["byte_offset"] = tokens.at(first).begin;
+            result["byte_count"] = tokens.at(last).end - tokens.at(first).begin;
+        }
+        return result;
     }
     std::string expression(std::size_t first, std::size_t last) const {
         std::string result;
@@ -307,10 +318,64 @@ bool value_type(const Document& d, std::string_view name) {
     static const std::set<std::string_view> timing_types{
         "VkCommandPoolResetFlags",  "VkQueryResultFlags", "VkBufferImageCopy", "VkExtent3D", "VkImageBlit",
         "VkImageSubresourceLayers", "VkOffset3D"};
-    return value_types.contains(name) || (d.timing && timing_types.contains(name));
+    static const std::set<std::string_view> values_types{"VkDebugUtilsObjectNameInfoEXT",
+                                                         "VkPhysicalDeviceVulkan13Features",
+                                                         "VkDevicePrivateDataCreateInfo",
+                                                         "VkPhysicalDeviceBufferDeviceAddressFeatures",
+                                                         "VkMemoryAllocateFlags",
+                                                         "VkMemoryAllocateFlagsInfo",
+                                                         "VkMemoryOpaqueCaptureAddressAllocateInfo",
+                                                         "VkPhysicalDeviceMemoryProperties",
+                                                         "VkMemoryType",
+                                                         "VkMemoryHeap",
+                                                         "VkMemoryPropertyFlags",
+                                                         "VkMemoryHeapFlags",
+                                                         "VkQueueFamilyProperties",
+                                                         "VkQueueFlags",
+                                                         "VkImageLayout",
+                                                         "VkImageSubresource",
+                                                         "VkImageAspectFlags",
+                                                         "VulkanHelper_PopulateImageFlags",
+                                                         "VkBufferCreateInfo",
+                                                         "VkBufferCreateFlags",
+                                                         "VkBufferUsageFlags",
+                                                         "VkMemoryRequirements",
+                                                         "VkDeviceAddress",
+                                                         "VkBindBufferMemoryInfo",
+                                                         "VkBindImageMemoryInfo",
+                                                         "VkMemoryAllocateInfo",
+                                                         "VulkanHelper_InitializeDeviceMemoryInfo",
+                                                         "VkQueryPoolCreateInfo",
+                                                         "VkQueryPoolCreateFlags",
+                                                         "VkQueryPipelineStatisticFlags",
+                                                         "VkDescriptorPoolCreateInfo",
+                                                         "VkDescriptorPoolCreateFlags",
+                                                         "VkDescriptorPoolSize",
+                                                         "VkDescriptorPoolResetFlags",
+                                                         "VkCommandPoolCreateInfo",
+                                                         "VkCommandPoolCreateFlags",
+                                                         "VkFenceCreateInfo",
+                                                         "VkFenceCreateFlags",
+                                                         "VkCopyDescriptorSet"};
+    return value_types.contains(name) || (d.timing && timing_types.contains(name)) ||
+           (d.values && values_types.contains(name));
+}
+bool value_lifetime_creation(const Document& d, std::string_view name) {
+    return d.values && (name == "VulkanReplay_CreateDescriptorPool" || name == "VulkanReplay_CreateCommandPool" ||
+                        name == "VulkanReplay_CreateFence");
 }
 void value_expression(const Document& d, Range r) {
     const auto& t = d.tokens;
+    if(d.values && (r.second == r.first + 7 || r.second == r.first + 8) && t[r.first].value == "Serialization" &&
+       t[r.first + 1].value == ":" && t[r.first + 2].value == ":" && t[r.first + 3].value == "DATABASE_HANDLE" &&
+       t[r.first + 4].value == "(" && t[r.first + 4].pair == r.second - 1) {
+        for(auto n = r.first; n < r.second; ++n)
+            check(!t[n].conditional, "conditional database handle is unqualified");
+        const bool sentinel = r.second == r.first + 8 && t[r.first + 5].value == "-" && t[r.first + 6].value == "1";
+        check(sentinel || (r.second == r.first + 7 && integer(t[r.first + 5].value) <= INT32_MAX),
+              "descriptor database handle exceeds worker bounds");
+        return;
+    }
     for(auto i = r.first; i < r.second; ++i) {
         const auto v = t[i].value;
         check(!t[i].conditional && !v.starts_with('#'), "conditional expression unsupported");
@@ -342,6 +407,8 @@ struct Declaration {
 };
 Declaration declaration(const Document& d, std::size_t at, std::size_t& next) {
     const auto& t = d.tokens;
+    if(d.values && !value_type(d, t.at(at + 1).value))
+        throw Unsupported("unqualified value declaration type: " + std::string(t.at(at + 1).value));
     check(t.at(at).value == "static" && value_type(d, t.at(at + 1).value), "unsupported declaration type");
     Declaration result{std::string(t.at(at + 1).value), std::string(t.at(at + 2).value), {}, {at, at}, {}, 0};
     check(result.name.starts_with(result.type + "_") && result.name.find("_uid_") == std::string::npos,
@@ -504,6 +571,9 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                                              "VulkanReplay_CreateXcbSurfaceKHR",
                                              "VulkanReplay_GetDeviceQueue",
                                              "VulkanReplay_GetSwapchainImagesKHR"};
+    const auto helper = [&](std::string_view name) {
+        return helpers.contains(name) || (d.values && name == "VulkanReplay_CreateQueryPool");
+    };
     const std::set<std::string_view> aggregate_types{"VkApplicationInfo",
                                                      "VkAttachmentDescription",
                                                      "VkAttachmentReference",
@@ -589,10 +659,12 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
         const auto first = t[i].value;
         if(first == "static") {
             const auto type = t.at(i + 1).value;
-            check(value_types.contains(type) || aggregate_types.contains(type) || type == "float" ||
-                      type == "VkDescriptorSetLayout" || type == "VkImageView" ||
-                      (type == "const" && t.at(i + 2).value == "char" && t.at(i + 3).value == "*"),
-                  "unrecognized resource declaration type");
+            const auto known = value_type(d, type) || aggregate_types.contains(type) || type == "float" ||
+                               type == "VkDescriptorSetLayout" || type == "VkImageView" ||
+                               (type == "const" && t.at(i + 2).value == "char" && t.at(i + 3).value == "*");
+            if(d.values && !known)
+                throw Unsupported("unqualified value resource declaration type: " + std::string(type));
+            check(known, "unrecognized resource declaration type");
             std::size_t assignments = 0;
             for(auto j = i; j < finish; ++j)
                 assignments += t[j].value == "=";
@@ -610,7 +682,7 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                       numbered(t[i + 7].value, "std_vector_of_VkImage_temp_") && t[i + 8].value == "(",
                   "unrecognized local image vector declaration");
         } else {
-            check(helpers.contains(first) && i + 1 < finish && t[i + 1].value == "(",
+            check(helper(first) && i + 1 < finish && t[i + 1].value == "(",
                   "unrecognized executable resource setup statement");
             for(auto j = i; j < finish; ++j)
                 check(t[j].value != "=", "side effect in resource setup call");
@@ -622,12 +694,12 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
         check(v != "+" && v != "new" && v != "delete" && v != "throw", "unsupported resource expression");
         if(i + 1 < end && t[i + 1].value == "{" &&
            (std::isalpha(static_cast<unsigned char>(v.front())) || v.front() == '_'))
-            check(aggregate_types.contains(v) || value_types.contains(v), "unrecognized aggregate in resource sibling");
+            check(aggregate_types.contains(v) || value_type(d, v), "unrecognized aggregate in resource sibling");
         creation |= v == "VulkanReplay_CreateGraphicsPipelines" || v == "VulkanReplay_CreateShaderModule";
         if(state)
             creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers" ||
                         v == "VulkanReplay_CreatePipelineLayout" || v == "VulkanReplay_CreateDescriptorSetLayout" ||
-                        v == "VulkanReplay_AllocateDescriptorSets";
+                        v == "VulkanReplay_AllocateDescriptorSets" || value_lifetime_creation(d, v);
         relevant_handle |= v.starts_with("VkPipeline_uid_") || v.starts_with("VkShaderModule_uid_");
         if(state)
             relevant_handle |= v.starts_with("VkCommandBuffer_uid_") || v.starts_with("VkPipelineLayout_uid_") ||
@@ -645,7 +717,7 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
         if(i + 1 < end && t[i + 1].value == "(") {
             const bool vector_data = v == "data" && i >= 2 && t[i - 1].value == "." &&
                                      numbered(t[i - 2].value, "std_vector_of_VkImage_temp_");
-            if(!helpers.contains(v) && !value_types.contains(v) && !vector_data && !numbered(v, "uint32_t_temp_") &&
+            if(!helper(v) && !value_type(d, v) && !vector_data && !numbered(v, "uint32_t_temp_") &&
                !numbered(v, "std_vector_of_VkImage_temp_"))
                 throw Unsupported("unrecognized helper in resource sibling: " + std::string(v.substr(0, 128)));
         }
@@ -678,7 +750,8 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                             t[i + 2].value == "VulkanReplay_AllocateCommandBuffers" ||
                             t[i + 2].value == "VulkanReplay_CreatePipelineLayout" ||
                             t[i + 2].value == "VulkanReplay_CreateDescriptorSetLayout" ||
-                            t[i + 2].value == "VulkanReplay_AllocateDescriptorSets"))))
+                            t[i + 2].value == "VulkanReplay_AllocateDescriptorSets" ||
+                            value_lifetime_creation(d, t[i + 2].value)))))
                 continue;
             std::string symbol;
             std::vector<std::string> outputs;
@@ -718,7 +791,10 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                                     : invocation.name == "VulkanReplay_CreatePipelineLayout" ? "VkPipelineLayout_uid_"
                                     : invocation.name == "VulkanReplay_CreateDescriptorSetLayout"
                                         ? "VkDescriptorSetLayout_uid_"
-                                        : "VkShaderModule_uid_");
+                                    : invocation.name == "VulkanReplay_CreateDescriptorPool" ? "VkDescriptorPool_uid_"
+                                    : invocation.name == "VulkanReplay_CreateCommandPool"    ? "VkCommandPool_uid_"
+                                    : invocation.name == "VulkanReplay_CreateFence"          ? "VkFence_uid_"
+                                                                                             : "VkShaderModule_uid_");
                     outputs.push_back(symbol);
                 }
                 const auto block = t[i].brace;
@@ -765,7 +841,8 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                     check(registration.args.size() == 3 &&
                               expr(d, registration.args[0]) == "VK_OBJECT_TYPE_DESCRIPTOR_SET" &&
                               expr(d, registration.args[1]) == "uint64_t ( " + symbol + " )" &&
-                              integer(expr(d, registration.args[2])) == integer(symbol.substr(20)),
+                              (d.values ? integer(expr(d, registration.args[2])) != 0
+                                        : integer(expr(d, registration.args[2])) == integer(symbol.substr(20))),
                           "descriptor registration does not match its allocation");
                 }
                 check(!t[i].conditional, "conditional creation unsupported");
@@ -1025,6 +1102,11 @@ ReplayValue replay_value(const Document& d, Range r, SyntaxBudget& budget) {
     value.source = d.span(r.first, r.second - 1);
     value.position = r.first;
     budget.take(value.text.size() + d.source.path.size() + 128);
+    if(d.values && d.tokens[r.first].value == "Serialization") {
+        value.constructor = "Serialization::DATABASE_HANDLE";
+        value.arguments.push_back(replay_value(d, {r.first + 5, r.second - 1}, budget));
+        return value;
+    }
     if(r.first + 1 < r.second && (d.tokens[r.first + 1].value == "(" || d.tokens[r.first + 1].value == "{") &&
        d.tokens[r.first + 1].pair + 1 == r.second) {
         value.constructor = d.tokens[r.first].value;
@@ -1104,15 +1186,29 @@ ReplayCall frame_call(const Document& d, const Call& call, const ReplayDeclarati
           "timing host query requires bounded packed 64-bit output; no output values are interpreted");
     return result;
 }
+std::size_t value_log_end(const Document& d, std::size_t at) {
+    const auto& t = d.tokens;
+    check(t.at(at + 1).value == "(" && t.at(t[at + 1].pair + 1).value == ";",
+          "value initialization log statement is unqualified");
+    const auto args = arguments(d, at + 1);
+    check((args.size() == 1 || args.size() == 3) && args[0].second == args[0].first + 1 &&
+              t[args[0].first].value.starts_with('"'),
+          "value initialization log arguments are unqualified");
+    if(args.size() == 3)
+        check(expr(d, args[0]) == "\"Initializing resources...(%d/%d)\"" && integer(expr(d, args[1])) == 1 &&
+                  expr(d, args[2]) == "g_ResourceInitFunctionCount",
+              "value initialization progress log is unqualified");
+    return t[at + 1].pair + 2;
+}
 void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visible, std::vector<ReplayCall>& calls,
-                SyntaxBudget& budget) {
+                SyntaxBudget& budget, bool initial = false) {
     const auto& t = d.tokens;
     std::optional<std::uint64_t> thread;
     for(auto i = opening + 1; i < t[opening].pair;) {
         check(!t[i].conditional && !t[i].value.starts_with('#'), "conditional frame unsupported");
         if(t[i].value == "{") {
             check(!thread, "nested scopes inside a timing thread annotation are unqualified");
-            frame_body(d, i, visible, calls, budget);
+            frame_body(d, i, visible, calls, budget, initial);
             i = t[i].pair + 1;
         } else if(t[i].value == "BEGIN_DATA_SCOPE_FUNCTION" || t[i].value == "BEGIN_DATA_SCOPE") {
             check(t.at(i + 1).value == "(" && t.at(i + 2).value == ")" && t.at(i + 3).value == ";",
@@ -1155,12 +1251,18 @@ void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visib
             auto values = replay_values(d, b, budget);
             check(!visible.contains(parsed.name), "shadowed frame declaration");
             visible.insert(values.begin(), values.end());
+        } else if(d.values && initial && t[i].value == "NV_MESSAGE_VERBOSE") {
+            i = value_log_end(d, i);
         } else {
             Call invocation;
             if(t[i].value == "NV_VK_REPLAY")
                 invocation = call(d, i);
             else {
-                check(t[i].value == "VulkanHelper_RecordCommandBuffer" && t.at(i + 1).value == "(",
+                check((t[i].value == "VulkanHelper_RecordCommandBuffer" ||
+                       (d.values && initial &&
+                        (t[i].value == "VulkanHelper_InitializeSwapchain" ||
+                         t[i].value == "VulkanHelper_InitializeQueryPool" || t[i].value == "FreeCachedMemory"))) &&
+                          t.at(i + 1).value == "(",
                       "unknown executable frame statement");
                 const auto end = t[i + 1].pair;
                 check(t.at(end + 1).value == ";", "unsupported frame helper statement");
@@ -1296,6 +1398,122 @@ void timing_initializations(const Document& d, std::vector<ReplayCall>& output, 
     }
     check(!instance.empty() && ended, "timing setup requires one matching initialization bracket");
 }
+void values_initializations(const Document& d, CppReplay& output, SyntaxBudget& budget) {
+    timing_initializations(d, output.initial_recordings, budget);
+    const auto& t = d.tokens;
+    for(std::size_t at = 0; at + 5 < t.size(); ++at)
+        if(t[at].value == "void" && t[at + 1].value == "SetInitialFrameState00" && t[at + 2].value == "(") {
+            frame_body(d, at + 4, {}, output.initial_state, budget, true);
+            return;
+        }
+    throw Unsupported("value setup root is absent");
+}
+ReplayCall values_device_metadata(const Document& d, const Call& operation, SyntaxBudget& budget) {
+    check(!d.tokens[operation.at].conditional, "conditional physical/device identity is unqualified");
+    if(operation.name == "VulkanReplay_CreateDevice")
+        return replay_call(d, operation, budget);
+    check(operation.name == "VulkanHelper_GetCompatiblePhysicalDevice" && operation.args.size() == 7,
+          "physical memory-property interface is unqualified");
+    ReplayCall result;
+    result.name = operation.name;
+    result.position = operation.at;
+    result.source = d.span(operation.at, operation.end);
+    budget.take(result.name.size() + d.source.path.size() + 128);
+    for(std::size_t n = 0; n < operation.args.size(); ++n) {
+        const auto range = operation.args[n];
+        if(n != 2) {
+            result.arguments.push_back(replay_value(d, range, budget));
+            continue;
+        }
+        // These limits can have over 64 fields. They are neither interpreted
+        // nor used to infer memory visibility; the separately normalized memory
+        // properties and original complete source span remain authoritative.
+        const auto& t = d.tokens;
+        check(t[range.first].value == "VkPhysicalDeviceProperties" && t[range.first + 1].value == "{" &&
+                  t[range.first + 1].pair + 1 == range.second,
+              "physical properties are not one literal captured aggregate");
+        ReplayValue opaque;
+        opaque.constructor = "captured_physical_properties";
+        opaque.text = "opaque captured physical-device properties";
+        opaque.position = range.first;
+        opaque.source = d.span(range.first, range.second - 1);
+        budget.take(opaque.text.size() + d.source.path.size() + 128);
+        result.arguments.push_back(std::move(opaque));
+    }
+    check(result.arguments[5].constructor == "VkPhysicalDeviceMemoryProperties" &&
+              result.arguments[5].arguments.size() == 4,
+          "captured physical memory properties lack the literal four-field interface");
+    return result;
+}
+void values_memory(const Document& d, std::vector<ReplayCall>& output, std::vector<ReplayCall>& queues,
+                   std::set<std::string>& functions, SyntaxBudget& budget) {
+    const auto& t = d.tokens;
+    for(std::size_t at = 0; at + 5 < t.size(); ++at) {
+        if(t[at].value != "void" || !t[at + 1].value.starts_with("CreateResources") || t[at + 2].value != "(")
+            continue;
+        check(!t[at].conditional && t[at + 2].pair == at + 3 && t[at + 4].value == "{" && t[at + 4].brace == none &&
+                  functions.insert(std::string(t[at + 1].value)).second,
+              "value resource root is conditional, ambiguous or has parameters");
+        const auto opening = at + 4;
+        for(auto token = opening + 1; token < t[opening].pair;) {
+            check(!t[token].conditional, "conditional resource effects are unqualified for values");
+            if(t[token].value == "{") {
+                const auto end = t[token].pair;
+                check(qualified_resource_sibling(d, token, true),
+                      "resource side effects prevent value memory identity");
+                bool memory = false, device = false, queue = false;
+                for(auto n = token + 1; n < end; ++n) {
+                    memory |= t[n].value == "VulkanHelper_CreateBuffer3" ||
+                              t[n].value == "VulkanHelper_AllocateAndInitializeMemory3";
+                    device |= t[n].value == "VulkanHelper_GetCompatiblePhysicalDevice" ||
+                              t[n].value == "VulkanReplay_CreateDevice";
+                    queue |= t[n].value == "VulkanReplay_GetDeviceQueue";
+                }
+                check(unsigned(memory) + unsigned(device) + unsigned(queue) <= 1,
+                      "mixed device/memory/queue creation block needs separate qualification");
+                if(queue) {
+                    const auto before = queues.size();
+                    frame_body(d, token, {}, queues, budget);
+                    check(queues.size() == before + 1 && queues.back().name == "VulkanReplay_GetDeviceQueue" &&
+                              queues.size() <= 64,
+                          "queue identity block has another executable effect or exceeds bounds");
+                }
+                if(device)
+                    for(auto n = token + 1; n < end; ++n)
+                        if(t[n].value == "NV_VK_REPLAY") {
+                            const auto invocation = call(d, n);
+                            check(invocation.name == "VulkanHelper_GetCompatiblePhysicalDevice" ||
+                                      invocation.name == "VulkanReplay_CreateDevice",
+                                  "device identity block has another unmodeled effect");
+                            check(output.size() < 10000, "device/memory definitions exceed bounds");
+                            output.push_back(values_device_metadata(d, invocation, budget));
+                            n = invocation.end;
+                        }
+                if(memory) {
+                    for(auto n = token + 1; n < end; ++n)
+                        check(!t[n].conditional, "conditional resource memory effects are unqualified");
+                    const auto before = output.size();
+                    frame_body(d, token, {}, output, budget);
+                    check(output.size() > before, "resource memory block has no literal effect");
+                    for(auto n = before; n < output.size(); ++n)
+                        check(output[n].name == "VulkanHelper_CreateBuffer3" ||
+                                  output[n].name == "VulkanHelper_AllocateAndInitializeMemory3" ||
+                                  output[n].name == "VulkanHelper_RegisterObject",
+                              "memory block has another unmodeled executable effect");
+                }
+                token = end + 1;
+            } else if(t[token].value == "BEGIN_DATA_SCOPE_FUNCTION" && t.at(token + 1).value == "(" &&
+                      t.at(token + 1).pair == token + 2 && t.at(token + 3).value == ";")
+                token += 4;
+            else if(t[token].value == "NV_MESSAGE_VERBOSE" && t.at(token + 1).value == "(" &&
+                    t.at(token + 1).pair == token + 3 && t.at(token + 2).value.starts_with('"') &&
+                    t.at(token + 4).value == ";")
+                token += 5;
+            else
+                throw Unsupported("unmodeled direct resource effect prevents value memory identity");
+        }
+    }
+}
 // Timing needs allocation metadata, not pipeline/descriptor reconstruction.
 // Qualify the exact allocation block without interpreting unrelated resource
 // payloads; the recorded-state parser keeps its stricter whole-parent contract.
@@ -1355,7 +1573,7 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseSco
             check(paths.insert(source.path).second, "duplicate replay source path");
             total += source.text.size();
             check(total <= 16U * 1024U * 1024U, "aggregate replay source exceeds 16 MiB");
-            docs.emplace_back(source, scope == ReplayParseScope::Timing);
+            docs.emplace_back(source, scope != ReplayParseScope::RecordedState, scope == ReplayParseScope::Values);
         }
         SyntaxBudget syntax;
         ResultBudget budget;
@@ -1377,12 +1595,16 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseSco
             result.objects.emplace(symbol, std::move(object));
         }
         std::set<std::string> all_functions;
+        std::set<std::string> resource_functions;
         bool frame_seen = false;
+        bool setup_seen = false;
         for(const auto& d : docs) {
             const auto filename = std::filesystem::path(d.source.path).filename().string();
             const auto& t = d.tokens;
-            if(d.timing && filename.starts_with("Resources"))
+            if(scope == ReplayParseScope::Timing && filename.starts_with("Resources"))
                 timing_allocations(d, result.objects, syntax);
+            if(d.values && filename.starts_with("Resources"))
+                values_memory(d, result.resource_memory, result.resource_queues, resource_functions, syntax);
             if(filename.starts_with("CommandList")) {
                 struct Function {
                     std::size_t at, opening;
@@ -1428,7 +1650,12 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseSco
                 }
             } else if(d.timing && filename.starts_with("FrameSetup")) {
                 check(filename == "FrameSetup00.cpp", "only FrameSetup00 initial recording metadata is qualified");
-                timing_initializations(d, result.initial_recordings, syntax);
+                if(d.values) {
+                    check(!setup_seen, "duplicate value initialization source");
+                    setup_seen = true;
+                    values_initializations(d, result, syntax);
+                } else
+                    timing_initializations(d, result.initial_recordings, syntax);
             } else if(filename.starts_with("Frame") && filename.find("Part") != std::string::npos) {
                 check(filename == "Frame0Part00.cpp" && !frame_seen, "only one Frame0Part00 execution is qualified");
                 frame_seen = true;
@@ -1446,6 +1673,7 @@ CppReplay parse_cpp_replay(const std::vector<CppSource>& sources, ReplayParseSco
             }
         }
         check(frame_seen, "submitted execution evidence requires Frame0Part00.cpp");
+        check(scope != ReplayParseScope::Values || setup_seen, "value evidence requires FrameSetup00.cpp");
     } catch(const Unsupported& error) {
         throw InspectionError(InspectionErrorCode::InvalidExport, error.what());
     } catch(const std::out_of_range&) {

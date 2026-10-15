@@ -618,6 +618,96 @@ Schema recorded_state_schema(bool selected) {
     }
     return result;
 }
+Schema draw_values_schema() {
+    const auto selection = object_schema({{"frame", integer_schema(0, 0)},
+                                          {"submission_index", integer_schema(0, 10000)},
+                                          {"submit_info_index", integer_schema(0, 15)},
+                                          {"command_buffer_index", integer_schema(0, 63)},
+                                          {"command_buffer", string_schema(128, 1)},
+                                          {"recording", string_schema(128, 1)},
+                                          {"event_index", integer_schema()},
+                                          {"queue", string_schema(128, 1)}},
+                                         {"frame", "submission_index", "submit_info_index", "command_buffer_index",
+                                          "command_buffer", "recording", "event_index", "queue"});
+    const Json statuses = {"not_read", "qualified_source_values", "not_applicable", "unavailable"};
+    const auto candidate = object_schema({{"execution_ref", string_schema(64, 64)},
+                                          {"selection", selection},
+                                          {"draw_source", resource_span_schema()},
+                                          {"submission_source", resource_span_schema()},
+                                          {"labels", array_schema(string_schema(256), 16)},
+                                          {"function", string_schema(128, 1)},
+                                          {"arguments", array_schema(string_schema(128, 1), 6)},
+                                          {"value_status", {{"type", "string"}, {"enum", statuses}}}},
+                                         {"execution_ref", "selection", "draw_source", "submission_source", "labels",
+                                          "function", "arguments", "value_status"});
+    const auto component =
+        object_schema({{"bits", integer_schema(0, UINT32_MAX)},
+                       {"value", {{"type", {"number", "null"}}}},
+                       {"classification", {{"type", "string"}, {"enum", {"integer", "finite", "nan", "infinity"}}}}},
+                      {"bits", "value", "classification"});
+    const auto evidence = object_schema({{"artifact_id", string_schema(39, 39)},
+                                         {"report_path", string_schema(512, 1)},
+                                         {"value_index", integer_schema(0, 127)}},
+                                        {"artifact_id", "report_path", "value_index"});
+    auto value = object_schema(
+        {{"stage", {{"type", "string"}, {"enum", {"VK_SHADER_STAGE_VERTEX_BIT", "VK_SHADER_STAGE_FRAGMENT_BIT"}}}},
+         {"module", string_schema(128, 1)},
+         {"module_sha256", string_schema(64, 64)},
+         {"entry_point", string_schema(128, 1)},
+         {"descriptor_set", integer_schema(0, 7)},
+         {"binding", integer_schema(0, UINT32_MAX)},
+         {"array_element", integer_schema(0, 0)},
+         {"buffer", string_schema(128, 1)},
+         {"effective_offset", integer_schema()},
+         {"effective_range", integer_schema(1)},
+         {"member_offset", integer_schema(0, 65536)},
+         {"variable_name", nullable(string_schema(256))},
+         {"block_name", nullable(string_schema(256))},
+         {"member_name", nullable(string_schema(256))},
+         {"load_word_offset", integer_schema(0, 262144)},
+         {"scalar", {{"type", "string"}, {"enum", {"float32", "int32", "uint32"}}}},
+         {"components", array_schema(component, 4)},
+         {"evidence", evidence}});
+    for(const auto& [name, unused] : value["properties"].items()) {
+        (void)unused;
+        value["required"].push_back(name);
+    }
+    auto result = cpp_inspection_schema();
+    auto& p = result["properties"];
+    p["evidence_origin"] = {{"type", "string"}, {"enum", {"nsight_generated_cpp_draw_values"}}};
+    p["selection_domain"] = {{"type", "string"}, {"enum", {"generated_cpp_captured_submission"}}};
+    p["captured_gpu_execution_correspondence"] = boolean_schema();
+    auto input = cpp_file_schema();
+    input["properties"]["bytes"] = integer_schema(0, 268435456);
+    p["input_files"] = array_schema(input, 260);
+    p["inputs_sha256"] = string_schema(64, 64);
+    p["association_scope"] = string_schema(512, 1);
+    p["section"] = {{"type", "string"}, {"enum", {"executions", "unsupported", "values"}}};
+    p["executions"] = array_schema(candidate, 100);
+    p["execution"] = nullable(candidate);
+    p["unsupported"] = array_schema(object_schema({{"source", resource_span_schema()},
+                                                   {"recording", string_schema(65536)},
+                                                   {"symbol", string_schema(65536)},
+                                                   {"scope", string_schema(64)},
+                                                   {"reason", string_schema(65792, 1)}},
+                                                  {"reason"}),
+                                    100);
+    p["values"] = array_schema(value, 100);
+    p["values_status"] = {{"type", "string"}, {"enum", statuses}};
+    p["reason"] = nullable(string_schema(4096, 1));
+    p["artifact_id"] = nullable(string_schema(39, 39));
+    p["report_path"] = nullable(string_schema(512, 1));
+    p["read_artifacts"] = array_schema(string_schema(39, 39), 32);
+    for(const auto* name : {"executions_total", "unsupported_total", "values_total", "offset", "total"})
+        p[name] = integer_schema(0, 100000);
+    p["next_offset"] = nullable(integer_schema(0, 100000));
+    for(const auto& [name, unused] : p.items()) {
+        (void)unused;
+        if(std::find(result["required"].begin(), result["required"].end(), name) == result["required"].end())
+            result["required"].push_back(name);
+    }
+    return result;
+}
 Schema resource_reference_schema() {
     auto span = resource_span_schema();
     for(const auto* key : {"sha256", "byte_offset", "byte_count"})
@@ -976,6 +1066,7 @@ Json implemented_tool_names() {
                         "capture_cpp_draws",
                         "capture_draw_executions",
                         "capture_draw_state",
+                        "capture_draw_values",
                         "capture_cpp_resources",
                         "capture_cpp_descriptor_writes",
                         "capture_cpp_resource",
@@ -1983,6 +2074,34 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .cpp_resource(artifact_id(arguments, "capture_id"), arguments.at("resource_ref").get<std::string>(),
                               arguments.value("offset", std::size_t{0}), arguments.value("length", std::size_t{65536}),
                               arguments.value("pin", false));
+        });
+    add_tool(
+        tools, "capture_draw_values",
+        object_schema(
+            {{"capture_id", string_schema(39, 39)},
+             {"execution_ref", string_schema(64, 64)},
+             {"section", {{"type", "string"}, {"maxLength", 32}, {"enum", {"executions", "unsupported", "values"}}}},
+             {"offset", integer_schema(0, 100000)},
+             {"limit", integer_schema(1, 100)},
+             {"pin", boolean_schema()}},
+            {"capture_id"}),
+        draw_values_schema(),
+        "List source-scoped draw-value candidates from fingerprinted matching 2026.3 C++ captures without invoking "
+        "workers. Supply a listed execution_ref to model descriptor write/copy lifetimes, coherent uploads, all "
+        "submitted shader effects and completion boundaries, then read and decode bounded scalar/vector uniform "
+        "bytes. Requires both matching configured resource and descriptor workers. Unknown effects, aliases, "
+        "shader/layout/lifetime evidence refuse all values. This source model does not observe live shader "
+        "invocations/registers or join numeric graphics-inventory IDs. Defaults offset0/limit50; max100/256KiB/page. "
+        "Selected reads share twenty seconds, at most 32 parent reads/1MiB returned payloads; source shader and "
+        "uniform prefix reads are <=64KiB. Raw provenance and failures are retained under artifact quota. Pin "
+        "retains query/read artifacts and does not pin the source. Without execution_ref section is executions or "
+        "unsupported; selected results page values.",
+        false, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts(), options_.resource_workers)
+                .draw_values(artifact_id(arguments, "capture_id"), arguments.value("execution_ref", std::string{}),
+                             arguments.value("section", std::string("executions")),
+                             arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}),
+                             arguments.value("pin", false));
         });
     add_tool(
         tools, "capture_cpp_descriptor_writes",

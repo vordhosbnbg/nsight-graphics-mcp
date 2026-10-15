@@ -1,5 +1,10 @@
 # Source descriptor writes
 
+The **0.5.9 development slice** additionally implements the
+[source-visible draw uniform model](#source-visible-draw-uniform-values-059-development)
+below. Its final qualification/publication remains In Progress. The following
+source-write qualification retains its 0.5.8 identity and scope.
+
 At **0.5.8**, `capture_cpp_descriptor_writes` brings the shared stdio/HTTP surface
 to **33 tools**. It lists literal descriptor-update calls in retained matching
 **Nsight 2026.3.1.0/build 38722833** C++ captures, then optionally decodes one
@@ -138,3 +143,85 @@ verifier reconstructs every file and passes **313** total schema-valid results
 (**231** from the final qualified runs), source/input/reader checks, private
 oracles and the preserved failures. The installed 0.4.1 importer identity stays
 separate from the tested 0.5.8 server/worker.
+
+## Source-visible draw uniform values (0.5.9 development)
+
+`capture_draw_values` lists bounded draw occurrences from a matching direct C++
+capture, then optionally composes source descriptor updates, buffer uploads and
+shader layouts for one listed occurrence. The shared surface has **34 tools**.
+The result remains generated-source evidence:
+`captured_gpu_execution_correspondence: false`. No shader invocation/register
+value or numeric Graphics Capture event-ID relationship is inferred. The source
+domain's `frame: 0` identifies the exported captured frame; debug-label text
+does not replace an original capture frame identity.
+
+List candidates without a worker:
+
+```json
+{"capture_id":"<native-cpp-bundle-id>","section":"executions","limit":50}
+```
+
+Read a selected candidate using **both** trusted operator options
+`--resource-worker-2026-3` and `--descriptor-worker-2026-3`:
+
+```json
+{"capture_id":"<native-cpp-bundle-id>","execution_ref":"<listed-64-character-reference>","pin":true}
+```
+
+References bind the capture, complete capture-time source/database fingerprints
+and literal submission/recording/draw selection. Listing also supports
+`section: "unsupported"`. Selected results page `values`; offsets/defaults match
+the source-write query. `pin` protects the query and its child reads, and must
+be requested separately for the source capture. Every selected call, including
+pagination, creates a new retained attempt.
+
+The model requires a complete supported source history. It validates queue,
+device, command-pool, command-buffer and fence relationships; descriptor pool,
+set, write/copy and recorded-use lifetimes; exclusive, nonaliased buffer-memory
+bindings; coherent host uploads and explicit completion before later updates.
+All submitted vertex/fragment modules must pass the bounded no-external-buffer-
+write proof. Unknown effects anywhere in the captured frame discard all
+provisional plans, including effects after the requested draw. Unsupported
+GPU writes, aliases, ownership transfers, shader control/layout forms and
+incomplete byte coverage refuse values.
+
+Supported typed reads are direct constant-member loads from plain uniform
+blocks in the qualified single-entry, single-function, straight-line vertex/
+fragment SPIR-V subset. Values are 32-bit float, signed/unsigned integer scalars
+or vectors of two to four components. Each component retains its raw bits;
+nonfinite floats have null numeric values with explicit classification. Shader
+names are source/debug names rather than material semantics. Buffer range,
+effective offset, member offset, module hash, load position and the full
+descriptor/upload/shader proof accompany the value. The selected input buffer
+must have the qualified GPU-read-only usage profile; opaque initial bytes alone
+never establish a later value.
+
+Checked exported helper semantics stay read-only text. Five implementation/
+interface files require exact hashes; `ReplayProcedures.cpp` additionally
+permits only reordering its complete set of 15 known literal function
+prototypes before the first body. All executable bytes remain fingerprinted.
+Raw and canonical hashes are retained. No generated replay/application code is
+compiled or executed, and the proprietary worker closure remains the approved
+seven files.
+
+Selected calls share one **20-second** deadline, at most **32 parent reads**
+and **1 MiB** of returned byte/structure payloads. Each shader or uniform-prefix
+read is at most **64 KiB**. Pages are bounded to **256 KiB**, and full retained
+proofs to **16 MiB**. Large proofs use `artifact_read`'s existing local-file
+reference contract. Successful and failed attempts retain
+`raw/draw-values.json`; protected evidence is never removed to satisfy quota.
+
+Three fresh direct C++ captures contain **54** submitted draw occurrences with
+two different seeds/resolutions and descriptor copies/host updates between
+three submissions. The public 0.5.9 query passes **835** schema-valid results,
+all **216** typed component-bit comparisons against separate private API and
+independent numeric oracles, nine missing-worker/foreign-reference refusals
+and **18** repeat value reads over two server restarts. Native source payloads
+remain byte-identical and source/query/child pins persist. Original application
+GPU readback is checked separately against independent renderer images; it is
+not product evidence of a shader invocation value.
+
+The actual descriptor-source repair and final CPU/publication receipts are
+recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md). R-024 stays In Progress
+until its final acceptance and retained qualification are complete; the source
+model is not a broader GPU-state or register-debugging capability.

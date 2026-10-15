@@ -65,6 +65,12 @@ public:
     nlohmann::json cpp_descriptor_writes(const std::string& capture_id, const std::string& update_ref = {},
                                          const std::string& section = "updates", std::size_t offset = 0,
                                          std::size_t limit = 50, bool pin = false) const;
+    // Worker-free candidate listing, or an explicit selected source-value read.
+    // The selected path authenticates all helpers, source/database identities,
+    // submission lifetimes and shader effects before returning typed values.
+    nlohmann::json draw_values(const std::string& capture_id, const std::string& execution_ref = {},
+                               const std::string& section = "executions", std::size_t offset = 0,
+                               std::size_t limit = 50, bool pin = false) const;
 
 private:
     ArtifactStore& artifacts_;

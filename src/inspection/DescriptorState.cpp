@@ -139,6 +139,74 @@ std::pair<SetLayout, Json> allocated_layout(const CppReplay& replay, const std::
     return {set_layout(replay, symbol(layouts[*index], "VkDescriptorSetLayout")), object.source};
 }
 } // namespace
+Json value_descriptor_allocations(const CppReplay& replay) {
+    struct Pool {
+        std::string device;
+        std::uint64_t maximum, used = 0;
+        std::map<std::string, std::uint64_t> capacity, consumed;
+        Json source;
+        bool freeable;
+    };
+    std::map<std::string, Pool> pools;
+    for(const auto& [name, object] : replay.objects) {
+        const auto& call = object.creation;
+        if(call.name != "VulkanReplay_CreateDescriptorPool")
+            continue;
+        require(call.arguments.size() == 4 && call.arguments[2].text == "nullptr" &&
+                    call.arguments[3].text == "& " + name,
+                "descriptor pool creation interface is unqualified");
+        const auto f = fields(call.arguments[1], object.values, "VkDescriptorPoolCreateInfo", 6);
+        structure(f, "VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO");
+        const auto flags = unwrap(f[2], "VkDescriptorPoolCreateFlags").text;
+        require(flags == "0" || flags == "VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT" || flags == "1u",
+                "descriptor pool flags require separate lifetime qualification");
+        const auto maximum = number(f[3]), count = number(f[4]);
+        require(maximum > 0 && maximum <= 4096 && count > 0 && count <= 64,
+                "descriptor pool sizes exceed qualified bounds");
+        Pool pool{symbol(call.arguments[0], "VkDevice"), maximum, 0, {}, {}, object.source, flags != "0"};
+        for(const auto& size : array(f[5], object.values, "VkDescriptorPoolSize", count)) {
+            require(size.constructor == "VkDescriptorPoolSize" && size.arguments.size() == 2,
+                    "descriptor pool size is not one literal type/count pair");
+            const auto amount = number(size.arguments[1]);
+            require(amount > 0 && amount <= UINT32_MAX, "descriptor pool capacity exceeds uint32");
+            auto& capacity = pool.capacity[size.arguments[0].text];
+            require(capacity <= UINT32_MAX - amount, "descriptor pool capacity overflows");
+            capacity += amount;
+        }
+        require(pools.emplace(name, std::move(pool)).second, "descriptor pool identity is ambiguous");
+    }
+    Json sets = Json::object();
+    for(const auto& [name, object] : replay.objects) {
+        const auto& call = object.creation;
+        if(call.name != "VulkanReplay_AllocateDescriptorSets")
+            continue;
+        require(call.arguments.size() == 3, "descriptor allocation arity is unqualified");
+        const auto allocation = fields(call.arguments[1], object.values, "VkDescriptorSetAllocateInfo", 5);
+        const auto pool_name = symbol(allocation[2], "VkDescriptorPool");
+        require(pools.contains(pool_name), "descriptor allocation lacks a unique captured pool creation");
+        auto& pool = pools.at(pool_name);
+        require(pool.device == symbol(call.arguments[0], "VkDevice") && ++pool.used <= pool.maximum,
+                "descriptor allocation device or pool set capacity differs");
+        const auto [layout, source] = allocated_layout(replay, name);
+        for(const auto& binding : layout.bindings) {
+            const auto type = binding.at("descriptor_type").get<std::string>();
+            const auto count = binding.at("descriptor_count").get<std::uint64_t>();
+            require(pool.capacity.contains(type) && pool.consumed[type] <= pool.capacity.at(type) &&
+                        count <= pool.capacity.at(type) - pool.consumed[type],
+                    "descriptor allocation exceeds its declared pool capacity");
+            pool.consumed[type] += count;
+        }
+        sets[name] = {{"device", pool.device},
+                      {"pool_allows_free", pool.freeable},
+                      {"pool", pool_name},
+                      {"layout", layout.name},
+                      {"layout_signature", layout.signature},
+                      {"bindings", layout.bindings},
+                      {"evidence", Json::array({source, layout.source, pool.source})}};
+        require(sets.size() <= 4096, "descriptor allocations exceed qualified bounds");
+    }
+    return {{"status", "qualified_source_descriptor_allocations"}, {"sets", sets}};
+}
 bool DescriptorState::compatible(const Layout& a, const Layout& b, std::size_t set) {
     return a.push_signature == b.push_signature && a.sets.size() > set && b.sets.size() > set &&
            std::equal(a.sets.begin(), a.sets.begin() + set + 1, b.sets.begin());
