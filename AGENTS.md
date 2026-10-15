@@ -76,7 +76,7 @@ restore fresh Graphics Capture reliability; expose proven descriptor contents/
 execution-time values; associate timings with draw occurrences; qualify counter
 meaning/application attribution; qualify standalone GPU replay. Implementation
 of all five is authorized. **R-023 completes at 0.5.1** and **R-027 at 0.5.2**;
-**R-025 completes at 0.5.6; R-024 is In Progress and R-026 remains Pending**. Follow docs/ROADMAP.md for evidence dependencies
+**R-025 completes at 0.5.6; R-024 and R-026 are Blocked**. Follow docs/ROADMAP.md for evidence dependencies
 and acceptance. R-024–R-026 require documented evidence before any
 new execution-time or physical attribution capability can be claimed.
 
@@ -136,8 +136,14 @@ restart reads pass **322** further schemas. The deliberate fault source is
 restored byte-for-byte after freezing the repaired build. All **51 CPU checks**
 pass in **463.18 seconds**, with all 285 checked source inputs unchanged (build
 plus checks: 500.48 seconds). Qualification publication remains pending;
-**R-024 stays In Progress**, R-026
-Pending. Do not turn this source model into general observed GPU-state claims.
+**R-024 is Blocked on the pending evidence-storage decision**. Its complete
+106,961,591-byte package passes independent lossless reconstruction. R-026 is
+Blocked on exact definition/application-boundary prerequisites (I-100/I-102).
+The native multi-pass probe succeeds and adds 87 unique metric names, but does
+not qualify physical semantics or application attribution. On 2026-10-16 the owner
+declined the optional Perf SDK proposal and reaffirmed **Nsight Graphics only**;
+do not evaluate or integrate that separate backend. See docs/TECH_STACK.md.
+Do not turn this source model into general observed GPU-state claims.
 The requested central artifact budget increase from 2 GiB to 4 GiB has no owner
 answer yet: do not change global configuration, raise the limit, unpin/prune
 protected evidence or use another root to evade it. New experiment pins are

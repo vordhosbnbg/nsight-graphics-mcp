@@ -557,3 +557,37 @@ releases. R-013 owns the build/toolchain choices, R-005 the fixture/windowing se
 R-011 process control, R-012 storage, and R-015 the exact compatibility matrix.
 Revisit the library only if validation reveals a material gap; do not reopen
 settled preferences without new evidence or a change in user priorities.
+
+## R-026 backend decision: Nsight Graphics only
+
+The current Nsight Graphics backend preserves sampled counter cells but has no
+verified exported metric-definition or application-only counter boundary for
+R-026. Matching 2026.3 CLI help exposes metric-set selection and auto-export;
+the reviewed frame/regime tables carry names and values without the missing
+physical definitions/context evidence. This is a scoped observation, not a
+claim that no additional public interface can exist.
+
+The [GPU Trace UI guide](https://docs.nvidia.com/nsight-graphics/UserGuide/gpu-trace-ui.html)
+describes possible collection of other processes' work. A
+[first-hand namespace explanation](https://forums.developer.nvidia.com/t/what-does-triagescg-mean-in-the-metric-of-triagescg-sm-throughput/315122/2)
+describes `TriageSCG`/`TriageAC` as collection configurations and monitor hints;
+those names do not supply a current application-isolation guarantee. Generic
+Nsight Compute realtime-accumulator documentation cannot establish the exact
+Graphics counters' precision. The official
+[Nsight Perf SDK entry point](https://developer.nvidia.com/nsight-perf-sdk/get-started)
+requires NVIDIA sign-in, confirmed by a read-only browser visit; no SDK is
+available in the inspected local toolchains. The prerequisite observations are
+retained in pinned `bundle-8837d11efb3fa1f8487ff80da02d061b` (I-100).
+
+On 2026-10-16 the owner declined the proposed separate Nsight Perf SDK counter
+backend and explicitly chose **“Keep Nsight Graphics only.”** No evaluation or
+integration of that SDK is authorized. The existing seven-file descriptor
+worker and default source build are unchanged.
+
+R-026 therefore remains dependent on a suitable documented Graphics interface.
+The documented `--multi-pass-metrics` probe succeeds on the matching
+2026.3.1.0/GA102 setup and exports 87 additional unique names, with 34 duplicated
+metric names (I-102). It still supplies no definition/context table and does not
+qualify application-only attribution. The current product profile path remains
+single-pass. R-026 is blocked on a usable documented Graphics definition/scope
+interface; this inconclusive result does not satisfy its acceptance.

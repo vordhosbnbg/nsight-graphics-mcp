@@ -2849,5 +2849,60 @@ ngm_check --parallel 2` with serial CTest execution. The retained receipt in
 `r024-value-public-final-aggregate` verifies all **285** source inputs unchanged
 through the run. The scoped source-contract, timeline, stdio and HTTP checks
 also pass before the native matrix. The current server/fixture hashes match the
-frozen tested binaries above. R-024 remains In Progress pending final
-qualification publication.
+frozen tested binaries above. R-024 is Blocked on the pending storage-budget
+decision before final qualification publication.
+
+The prepared, independently reconstructed qualification package is
+`r024-value-qualification-prep` (**106,961,591 bytes / seven payloads**). Its
+lossless XZ archive retains **16,396 paths / 4,793 unique content blobs**,
+including every native payload, preserved failed attempt and the exact source
+snapshot at **581cd31d3d5fd3edda85164403523dfa5b86d0d5**. The portable verifier
+passes file reconstruction, all 51 CPU receipts/source hashes, all 1,157 final
+MCP schemas, nine intended errors, 72 independent typed draw checks, 24 restart
+reads, child/native pins and the three exact repaired images. This package is
+prepared and verified, **not centrally published or marked complete**.
+
+Archive SHA-256:
+`360740cfb506e43a22f5a6a9a27eb60edc7047052c047176040ac2a773af4dfd`.
+Path-inventory SHA-256:
+`1ffddc2026383fe8160e6b4e886010607a045ba0f73c0bbc2f9d0804bf6939ae`.
+Payload-inventory SHA-256:
+`9a7102df3c025fcf158260d962c6971df916357a552ca97c3cefdfdef03a84bf`.
+The current 2 GiB store cannot accommodate it while preserving existing pins;
+the proposed owner budget decision remains pending. Documentation/publication
+bookkeeping follows the frozen source without changing the tested code.
+
+### R-026 native multi-pass feasibility after the Graphics-only decision
+
+On **2026-10-16** the owner declines the separate Perf SDK proposal and retains
+Nsight Graphics only. I-100's read-only discovery record is complete/pinned as
+`bundle-8837d11efb3fa1f8487ff80da02d061b`. The subsequent documented native CLI
+probe uses **2026.3.1.0/build 38722833**, **GA102/RTX 3080 Ti**, matching child-only
+**615.71.09** runtime and explicit unaltered clocks. Fresh ordinary/multi-pass
+collection on seed **1723**, **256×192**, `timing-direct`, five warmup presents
+and one collected frame completes with exit 0/confirmed cleanup in
+**5.84/17.19 seconds**. The earlier missing-output-directory precondition
+refusals remain preserved (I-101).
+
+The ordinary frame table contains **146 unique metrics**; multi-pass contains
+**267 rows / 233 unique names**, including **87 additional names** and
+**34 duplicated names**. The same private six-draw application oracle contrasts
+with raw FE frame cells **7 versus 13/13**; no cause or application boundary is
+inferred. Both runs export the same five table kinds without a definition/context
+table. First-pass labels do not establish all-pass marker correspondence. This
+is a successful collection probe with **unqualified semantics**, not a new
+product option or R-026 completion (I-102).
+
+`r026-native-evidence-prep` holds **seven payloads / 4,581,533 bytes**, including
+a lossless **495-path / 426-blob** snapshot, both complete attempt trees,
+original traces/exports/witnesses, frozen fixture/supervisor, source identities
+and a portable verifier. Reconstruction, two successful receipts, two preserved
+precondition refusals, private six-call inputs and exact raw cells pass.
+Archive SHA-256:
+`a4ab20a67d14db27c28e38d3ce83d4e8b838a5eafac2a3843661db1c19d9680e`.
+The **4,473,424-byte** archive alone exceeds the current **3,410,198-byte** free
+central budget; no import, limit change, unpin or pruning is attempted. The
+package is prepared/verified and **not centrally published or pinned**. R-026
+is Blocked on a usable documented Graphics definition/scope interface; its
+evidence publication also awaits the existing storage decision. No first-party
+code changes or repeated CPU builds/tests accompany this documentation update.

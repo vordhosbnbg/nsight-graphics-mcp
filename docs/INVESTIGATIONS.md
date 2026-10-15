@@ -2857,3 +2857,93 @@ no value claim is based on the replay snapshots.
   server, transcript, tool schemas and failed audit. Repeat in a fresh directory
   with reference-aware collection. The product query and inline bound require
   no change; this is not evidence of a failed shader/value extraction.
+
+### I-100 — Counter-definition documentation and attribution prerequisites remain unmet
+
+- **Context/reproduce:** Recheck matching 2026.3.1.0/build 38722833 CLI help,
+  the installed NGFX SDK/header inventory, readable local SDK paths, official
+  GPU Trace/architecture documentation and the indexed Nsight Perf SDK manual
+  while beginning R-026's exact counter-definition assessment.
+- **Observed:** CLI help returns its known discovery exit 1 with valid text;
+  no metric-definition export option is found. No separate Perf SDK or public
+  metric enumerator is found in the inspected readable paths. Two unrelated
+  `/opt` directories are inaccessible; no permission change is attempted. The
+  indexed official PDF's signed URL fails/redirects to 403, and an anonymous
+  read of its exact document path also fails. The official SDK entry point
+  redirects both a web read and an actual hidden browser visit to NVIDIA login.
+  The browser visibly requires sign-in; no account data is entered, SDK
+  downloaded or license accepted, and the temporary tab is closed.
+- **Interpretation/revisit:** Primary general sampling/namespace explanations
+  do not verify the matching Graphics counters' exact units, precision or
+  application-only scope, and do not explain I-045 by themselves. Keep raw
+  metrics available with unresolved attribution. Revisit with an accessible
+  primary definition/Graphics interface. On 2026-10-16 the owner declined the
+  separate Perf SDK proposal and chose Nsight Graphics only (TECH_STACK.md).
+  The subsequent documented native multi-pass probe succeeds (I-102), without
+  qualifying counter semantics or attribution. This is inconclusive about all
+  possible public interfaces and does not complete R-026.
+- **Evidence/retention:** Complete/pinned
+  `bundle-8837d11efb3fa1f8487ff80da02d061b` retains all eight discovery/receipt/
+  browser/documentation-observation payloads. Its importer reports 0.4.1,
+  separately from the inspected 2026.3 tool and 0.5.9 project. The small record
+  fits the existing quota; no limit, older pin, installed backend or machine
+  setting is changed.
+
+### I-101 — Private counter probe omitted the CLI output-directory prerequisite
+
+- **Context/reproduce:** `r026-native-multi-pass/harness.py` invokes matching
+  2026.3.1.0/build 38722833 `ngfx` for ordinary/multi-pass GPU Trace, with a
+  nonexistent `--output-dir`. Unlike the product backend, the private harness
+  omitted creation of that directory.
+- **Observed/correction:** Both calls return exit 1 with “No such output
+  directory” and “Invalid general options”, before launching the application.
+  Owned-process cleanup is confirmed; no trace or counter result exists.
+  Preserve the original requests, receipts and harness. The corrected fresh
+  `r026-native-multi-pass-prepared-output` creates each output directory first.
+- **Evidence/revisit:** The native-probe snapshot described in I-102 retains
+  both attempts. This is a harness setup error; it establishes no limitation
+  of multi-pass collection and requires no product change.
+
+### I-102 — Native multi-pass exports more counters without qualifying application attribution
+
+- **Context/reproduce:** After the owner explicitly chooses **Nsight Graphics
+  only**, run matching 2026.3.1.0/build 38722833 native GPU Trace on a fresh
+  `timing-direct` input: seed 1723, 256×192, frame limit 300, start after five
+  presents, collect one frame/1000 ms, Throughput Metrics, per-action timing,
+  HES disabled. Compare ordinary collection with the documented
+  `--multi-pass-metrics` option. Both use an owned-process 90-second deadline,
+  fresh isolated configuration and the existing child-only 615.71.09 runtime.
+  GPU clocks explicitly remain unaltered; no machine/background setting changes.
+- **Observed:** Both calls exit 0 with confirmed cleanup, in 5.84/17.19 seconds.
+  Reproduction exports confirm matching GA102/tool/driver, Unaltered clocks and
+  Multi-Pass Metrics Disabled/Enabled. Both export the same five table kinds.
+  Ordinary frame metrics have 146 rows/unique names; multi-pass has 267 rows,
+  233 unique names, 87 additional names and 34 duplicated names. Preserve all
+  positions, raw precision and zeros; do not collapse duplicated identifiers.
+  All retained private application submissions contain six `vkCmdDraw` calls.
+  The raw `FE_A.TriageSCG.fe__draw_count.sum` frame cells are 7 versus 13/13;
+  the six ordinary leaf cells are 4/0/0/0/0/0, while both multi-pass columns
+  contain six zeros. Exported first-pass marker paths do not prove correspondence
+  for all collected passes. No counter-definition or application-context table
+  is exported by these runs.
+- **Interpretation/revisit:** Collection and additional raw cells work on this
+  measured path. They do not establish physical definitions, scaling, an API
+  count or an application-only boundary, and do not explain I-045's differences.
+  The [GPU Trace UI guide](https://docs.nvidia.com/nsight-graphics/UserGuide/gpu-trace-ui.html)
+  describes heuristic matching across frames and possible other-process work;
+  its interfering-process detector is documented for DirectX 12 on Windows.
+  That does not diagnose these Linux cells or establish an equivalent Linux
+  isolation interface. R-026 needs a documented Graphics definition/scope path
+  before further qualification. The separate Perf SDK proposal was declined.
+  Product profiling remains single-pass; no flag/schema/parser changes or new
+  physical counter claims are made.
+- **Evidence/retention:** `r026-native-multi-pass-prepared-output/summary.json`
+  independently checks both receipts/settings, exact frozen fixture identity,
+  private six-call inputs and all raw frame/regime positions. Both original
+  attempt trees, traces, exports, witnesses, harnesses, frozen executable and
+  supervisor are retained in the independently reconstructed
+  `r026-native-evidence-prep` snapshot: 495 paths/426 blobs, seven payloads /
+  4,581,533 bytes. It is prepared/verified, not centrally published or pinned;
+  its 4,473,424-byte archive exceeds the remaining central budget. See
+  BUILD_VALIDATION.md for hashes and the pending storage decision. This is an
+  inconclusive capability probe, not R-026 acceptance evidence.

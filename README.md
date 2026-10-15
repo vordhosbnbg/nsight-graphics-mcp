@@ -52,8 +52,9 @@ source-visible uniform values at selected C++ submission/draw occurrences. It
 checks descriptor writes/copies, coherent uploads, completion boundaries and
 actual SPIR-V layouts before returning typed bits and provenance. This remains
 source evidence; GPU invocation/register observation and numeric Graphics
-Capture event correspondence are unavailable. R-024 stays In Progress pending
-final qualification and evidence publication.
+Capture event correspondence are unavailable. R-024's validated evidence package
+awaits the owner storage-budget decision before publication; the roadmap records
+this remaining blocker.
 
 ## Example workflows
 

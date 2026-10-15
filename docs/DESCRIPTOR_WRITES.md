@@ -2,8 +2,9 @@
 
 The **0.5.9 development slice** additionally implements the
 [source-visible draw uniform model](#source-visible-draw-uniform-values-059-development)
-below. Its final qualification/publication remains In Progress. The following
-source-write qualification retains its 0.5.8 identity and scope.
+below. Its verified qualification package awaits the owner storage-budget
+decision before publication. The following source-write qualification retains
+its 0.5.8 identity and scope.
 
 At **0.5.8**, `capture_cpp_descriptor_writes` brings the shared stdio/HTTP surface
 to **33 tools**. It lists literal descriptor-update calls in retained matching
@@ -222,6 +223,6 @@ GPU readback is checked separately against independent renderer images; it is
 not product evidence of a shader invocation value.
 
 The actual descriptor-source repair and final CPU/publication receipts are
-recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md). R-024 stays In Progress
-until its final acceptance and retained qualification are complete; the source
-model is not a broader GPU-state or register-debugging capability.
+recorded in [BUILD_VALIDATION.md](BUILD_VALIDATION.md). R-024 is Blocked on the
+pending storage-budget decision before final qualification publication; the
+source model is not a broader GPU-state or register-debugging capability.
