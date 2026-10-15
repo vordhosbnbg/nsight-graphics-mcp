@@ -2,8 +2,9 @@
 
 The **0.4.11** runner adds an opt-in `--repeat-overhead` mode to
 `ngm_profile_correlation_integration`. This is a validation workload, with no
-new product tool or performance correction. R-022 remains In Progress until
-the recorded run and final scope assessment are complete.
+new product tool or performance correction. The recorded run below retains its
+0.4.11 identity; the [final scope assessment](PROFILE_SCOPE_FEASIBILITY.md)
+completes R-022's conditional outcome in the 0.5.0 group.
 
 ## Declared measurement plan
 
@@ -105,5 +106,5 @@ Qualification is complete/pinned as **bundle-8d667f47f660fc46a582f440ee786c5e**,
 eight native sources independently pinned. [BUILD_VALIDATION.md](BUILD_VALIDATION.md)
 records exact source paths, hashes and the CPU receipt. No installed-server,
 permission, clock, driver, display or helper-closure update is performed. New
-2026.2 support remains unqualified. R-022 stays In Progress for its final
-scope/conditional-outcome audit.
+2026.2 support remains unqualified. The subsequent 0.5.0
+[completion audit](CAPABILITY_FOLLOWUP_COMPLETION.md) preserves these limits.

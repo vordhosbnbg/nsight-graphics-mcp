@@ -9,6 +9,15 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The R-018–R-022 group completes at **0.5.0** using the existing C++20/fastmcpp,
+pure interpreters, inspection adapters and optional confined five-file reader.
+No dependency or broader helper/backend is added. Final CPU, retained API/byte
+oracles, actual stdio/HTTP contracts and pin/hash audits pass. The conditional
+reports retain execution-time values/GPU correspondence, isolated draw counters,
+physical normalization and causal overhead correction as unavailable. See
+CAPABILITY_FOLLOWUP_COMPLETION.md and PROFILE_SCOPE_FEASIBILITY.md. Versioned
+evaluations below preserve earlier qualification and planning state.
+
 The 0.4.11 repeated-control assessment reuses the explicit C++ correlation
 runner with a separate opt-in mode and a predeclared alternate-order plan.
 Eight fresh source-built collections retain private timestamp/API inputs,

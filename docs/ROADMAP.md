@@ -5,7 +5,7 @@ enough to scan at the start of a coding session and specific enough that the nex
 useful task is obvious. Items describe accepted work toward an MCP server for
 Vulkan graphics and compute on Linux.
 
-Planning state: **The owner authorized implementation of the capability follow-up plan on 2026-10-15. R-018 completes reader requalification/activation at 0.4.2; R-019 completes launch-environment implementation at 0.4.3 with graphics-capture timeouts explicitly unqualified; R-020 completes profile-table compatibility at 0.4.4. R-021 adds recorded state at 0.4.5, opaque push-constant reconstruction at 0.4.6 and descriptor binding/offset interpretation at 0.4.7; R-021 is Done with its conditional feasibility report explicitly retaining unavailable contents/values and GPU correspondence. R-022 timing/counters is In Progress; its 0.4.8 controls, 0.4.9 timing workloads and 0.4.10 unique exported marker query pass their CPU/native/retained-profile qualification. The 0.4.11 repeated-control assessment passes eight fresh profiles and retains inconclusive causal overhead/counter attribution. Final scope/conditional-outcome audit stays active. Earlier release groups remain Done through 0.4.1. The shared stdio/HTTP surface has 29 tools; coverage remains evidence-specific.**
+Planning state: **The owner-authorized R-018–R-022 capability follow-up group completes at 0.5.0. Reader activation, launch controls, header-only compatibility, bounded recorded state/push bytes/descriptor bindings and unique marker queries are qualified within their evidence scopes. Conditional reports retain unavailable execution-time values/GPU correspondence, isolated draw counters, physical normalization and causal overhead correction. All 36 CPU checks and 691 actual final-server tool results pass; source pins, payloads and restart behavior verify. All accepted items are Done. The shared stdio/HTTP surface has 29 tools.**
 Last updated: **2026-10-15**.
 
 The technology evaluation lives separately in [TECH_STACK.md](TECH_STACK.md).
@@ -176,25 +176,24 @@ Item conventions:
 
 ## In Progress
 
-### R-022
-
-```text
-Status: In Progress
-Area: profile/capture/mcp/test
-Title: Qualify correlated draw timing and counter scopes
-Goal: Expose supported action/marker durations and counter scopes using actual same-profile exported evidence.
-Scope: Add typed retained per-action/HES settings; probe labelled repeated/reused fixture workloads, audit exported associations/units and implement bounded queries for demonstrated scopes.
-Acceptance: Actual exported rows support unambiguous correlation and independently checked timing/units/overhead; each counter has verified scope; unavailable documented evidence receives a retained limitation outcome; two-release claims require both releases.
-Notes: Authorized by the owner on 2026-10-15. Step E; no private trace decoder, implicit permission changes or fabricated draw counters. Application witnesses remain a separate evidence source. The first slice at 0.4.8 adds nullable per-action/HES controls and producer-qualified unavailable regime cells. All 35 serial CPU checks and two fresh matching 2026.3 profiles pass; 202 MCP results validate against actual schemas and restart checks pass. Qualification is pinned as bundle-193d06c97b109c55fb8a30e35f12b8f9, with source profiles independently pinned. At 0.4.9, six baselines and fifteen fresh 2026.3 profiles pass, with 400 independent API/timestamp submission checks, 1,615 schema-validated MCP results, restart pins and all 35 serial CPU checks. The single-frame marker candidate has scene-unit/timing sanity; I-043 retains wider identity/counter limits. The 0.4.9 qualification is pinned as bundle-40d1c8f983a49246a26d5294f20636bb, with all fifteen source profiles independently pinned. At 0.4.10, profile_marker qualifies unique single-frame exported marker ranges, with explicit original-identity/draw/scaling limits. All 36 serial CPU checks, 391 retained-profile stdio results and eight HTTP results pass; values/refusals and source pins remain stable after restart. Qualification is pinned as bundle-b8d3515b5cd6079e2ba2c8cb5637067e; source profiles retain 0.4.9 collection identities. At 0.4.11, two baselines and eight alternate-order off/on profiles pass after 30 warmup presents, with 326 private submission checks, 32–96 ns scene agreement, all 1,168 raw frame cells and 913 schema-valid MCP results. All eight sources remain independently pinned; qualification is pinned as bundle-8d667f47f660fc46a582f440ee786c5e. I-044/I-045 retain inconclusive causal overhead and unresolved counter attribution. Final scope/conditional-outcome audit remains unfinished. See docs/PROFILE_OVERHEAD.md and docs/PROFILE_MARKERS.md and docs/PROFILE_CORRELATION.md. See docs/PROFILE_CONTROLS.md, docs/BUILD_VALIDATION.md and docs/CAPABILITY_FOLLOWUP_PLAN.md.
-```
-
-
 ## Pending
 
 
 ## Blocked
 
 ## Done
+
+### R-022
+
+```text
+Status: Done
+Area: profile/capture/mcp/test
+Title: Qualify correlated draw timing and counter scopes
+Goal: Expose supported action/marker durations and counter scopes using actual same-profile exported evidence.
+Scope: Add typed retained per-action/HES settings; probe labelled repeated/reused fixture workloads, audit exported associations/units and implement bounded queries for demonstrated scopes.
+Acceptance: Actual exported rows support unambiguous correlation and independently checked timing/units/overhead; each counter has verified scope; unavailable documented evidence receives a retained limitation outcome; two-release claims require both releases.
+Notes: Authorized by the owner on 2026-10-15. Step E; no private trace decoder, implicit permission changes or fabricated draw counters. Application witnesses remain a separate evidence source. The first slice at 0.4.8 adds nullable per-action/HES controls and producer-qualified unavailable regime cells. All 35 serial CPU checks and two fresh matching 2026.3 profiles pass; 202 MCP results validate against actual schemas and restart checks pass. Qualification is pinned as bundle-193d06c97b109c55fb8a30e35f12b8f9, with source profiles independently pinned. At 0.4.9, six baselines and fifteen fresh 2026.3 profiles pass, with 400 independent API/timestamp submission checks, 1,615 schema-validated MCP results, restart pins and all 35 serial CPU checks. The single-frame marker candidate has scene-unit/timing sanity; I-043 retains wider identity/counter limits. The 0.4.9 qualification is pinned as bundle-40d1c8f983a49246a26d5294f20636bb, with all fifteen source profiles independently pinned. At 0.4.10, profile_marker qualifies unique single-frame exported marker ranges, with explicit original-identity/draw/scaling limits. All 36 serial CPU checks, 391 retained-profile stdio results and eight HTTP results pass; values/refusals and source pins remain stable after restart. Qualification is pinned as bundle-b8d3515b5cd6079e2ba2c8cb5637067e; source profiles retain 0.4.9 collection identities. At 0.4.11, two baselines and eight alternate-order off/on profiles pass after 30 warmup presents, with 326 private submission checks, 32–96 ns scene agreement, all 1,168 raw frame cells and 913 schema-valid MCP results. All eight sources remain independently pinned; qualification is pinned as bundle-8d667f47f660fc46a582f440ee786c5e. I-044/I-045 retain inconclusive causal overhead and unresolved counter attribution. At 0.5.0 the conditional scope report and full A–E completion audit pass, with 36 CPU checks, 691 schema-valid final-server results, 28 recorded draws, 31 new pinned reads and verified retained evidence. R-018–R-022 complete as one minor-version group; unavailable physical/execution/overhead fields remain explicit. Final qualification is pinned as bundle-bc107b133c527aa81f11c17fa93c9743. See docs/PROFILE_SCOPE_FEASIBILITY.md and docs/CAPABILITY_FOLLOWUP_COMPLETION.md. See docs/PROFILE_OVERHEAD.md and docs/PROFILE_MARKERS.md and docs/PROFILE_CORRELATION.md. See docs/PROFILE_CONTROLS.md, docs/BUILD_VALIDATION.md and docs/CAPABILITY_FOLLOWUP_PLAN.md.
+```
 
 ### R-021
 

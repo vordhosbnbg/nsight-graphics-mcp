@@ -10,6 +10,12 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+The **0.5.0** follow-up group completes R-022 with the implemented qualified
+export subset and [conditional scope report](PROFILE_SCOPE_FEASIBILITY.md).
+Original execution IDs, isolated draw/fragment counters, physical normalization
+and causal overhead correction remain unavailable. The final reader is checked
+offline; the versioned collection results below keep their original identities.
+
 At **0.4.11**, the [repeated control assessment](PROFILE_OVERHEAD.md) adds four
 fresh off/on pairs, explicit warmup, independent scene timestamps and complete
 raw frame-cell comparisons. Timing sanity passes; causal overhead and application

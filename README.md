@@ -10,6 +10,11 @@ development tools.
 
 **29 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
+The [0.5.0 capability follow-up](docs/CAPABILITY_FOLLOWUP_COMPLETION.md) adds
+controlled launches, retained reader activation, bounded recorded draw state
+and exported marker ranges. Execution-time values and isolated draw counters
+remain unavailable under the documented evidence limits.
+
 ## Example workflows
 
 **Diagnose a rendering defect**

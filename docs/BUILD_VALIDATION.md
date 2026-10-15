@@ -2091,3 +2091,102 @@ not a full native-profile backup or typed import. The generic importer remains
 installed **0.4.1**; payload identities bind **0.4.11** collection/reader binaries.
 The installed/live server is unchanged. New 2026.2 support remains unqualified.
 R-022 stays In Progress for its final scope/conditional-outcome audit.
+
+## 0.5.0 capability follow-up completion, 2026-10-15
+
+The **R-018–R-022 group** completes at **0.5.0**, with **29 tools**. The minor
+increment subsumes a patch increment and resets PATCH. First-party runtime logic
+is unchanged from 0.4.11; the source delta is the authoritative CMake version and
+the conditional scope/completion documents. Source is based on **99119b1**, with
+the tested 0.5.0 change explicitly dirty. GCC **16.2.1**, CMake **4.4.4**, Ninja
+**1.13.2** and Linux **7.2.7-zen1-1-zen** remain the recorded build host.
+All seven exact dependency pins and the five-file helper policy are unchanged.
+
+[CAPABILITY_FOLLOWUP_COMPLETION.md](CAPABILITY_FOLLOWUP_COMPLETION.md) audits
+every A–E requirement against code, executed checks and retained sources.
+[DRAW_STATE_FEASIBILITY.md](DRAW_STATE_FEASIBILITY.md) and
+[PROFILE_SCOPE_FEASIBILITY.md](PROFILE_SCOPE_FEASIBILITY.md) retain the specified
+conditional unavailable outcomes. Completing the plan does not claim observed
+full GPU state, execution-time descriptor/material values, isolated draw/fragment
+counters, physical counter normalization or a causal instrumentation correction.
+
+The final serial aggregate passes **36/36 CPU checks, zero skipped, in 355.49 s**
+(355.47 s summed CPU-test time). This includes actual worker confinement, parser/
+state/refusal matrices, process/queue/cleanup cases, stdio/HTTP contracts, binary
+linkage and staged installation. No GPU collection runs concurrently or at this
+release increment. All earlier hardware results retain their actual versions.
+
+The final C++ retained checks use complete byte-identical copies of the original
+service stores in isolated directories. No manifests are reconstructed and no raw
+imports are promoted to typed inputs. Existing verifier modes execute no Nsight
+or GPU process. Verified commands include:
+
+```sh
+cmake --build --preset linux-gcc-debug --target nsight-graphics-mcp ngm-capture \
+  ngm_retained_resource_integration ngm_profile_marker_integration
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+cmake --build --preset linux-gcc-debug --target ngm_draw_state_integration
+/absolute/build/tests/ngm_draw_state_integration --verify-mcp \
+  /absolute/build/nsight-graphics-mcp /absolute/verified-worker /absolute/raster-copy
+/absolute/build/tests/ngm_draw_state_integration --verify-push \
+  /absolute/build/nsight-graphics-mcp /absolute/verified-worker /absolute/push-copy
+/absolute/build/tests/ngm_draw_state_integration --verify-descriptors \
+  /absolute/build/nsight-graphics-mcp /absolute/descriptor-copy
+/absolute/build/tests/ngm_retained_resource_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/reader-copy/store \
+  /absolute/cases.json /absolute/reader-copy /absolute/verified-worker -
+/absolute/build/tests/ngm_profile_marker_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/marker-source-copy /absolute/final-root
+```
+
+All five retained verifier groups pass. Four raster captures, nine push draws
+and fifteen descriptor draws supply **28 distinct recorded occurrences**, checked
+against their original private API witnesses in two fresh processes per group.
+Eight exact shader reads, explicit partial-byte reconstruction, the independent
+2,700-byte whole/split/end oracle, foreign references and restart pins pass.
+The stable configured worker remains the qualified **0.4.2** binary; the test
+server/inspection version is **0.5.0**. Native sources retain 0.2.12/0.4.5/0.4.6/
+0.4.7 identities and their exact producer tuples.
+
+The final marker reader repeats all **360** selections from the fifteen actual
+0.4.9 profiles, preserving **32 available**, **48 ambiguous/unavailable** and
+**280 unsupported** results across restart. An authenticated ephemeral loopback
+HTTP process discovers the same 29 tools and exactly matches the available,
+ambiguous and unsupported selections. Session deletion, clean exit/empty stdout,
+source inventory/pin stability and private-token removal pass.
+
+All **691 successful tool results** pass their actual JSON Schema 2020-12
+contracts and text/structured parity: raster **48**, push **117**, descriptor
+**110**, reader **17**, marker **391**, HTTP **8**. The ten expected tool-error
+refusals (eight stale draw references/two unknown resource references) are
+separately checked by the C++ verifiers. All **31** new read artifacts are
+complete/pinned. Original input payloads in the copies remain unchanged.
+
+The read-only retention audit verifies **14** earlier qualification/failure
+snapshots, all **1,281** payloads against their frozen import sources, and
+**87** independently pinned native bundles with **3,099** payloads. The native
+inventory contains 84 complete bundles and the three explicitly failed I-038
+captures. Existing configuration still names the separately installed qualified
+0.4.2 worker; its hash matches the original qualification. No system setting,
+operator launch configuration or installed server is changed.
+
+Final evidence is under
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/followup-final-38iee9ng`.
+Its native copies/new read results retain independent pins. The consolidated
+completion snapshot is complete/pinned as **bundle-bc107b133c527aa81f11c17fa93c9743**,
+reported as **43,443,811 bytes / 617 files**, including **259** first-party
+source/fixture files and selected complete evidence from all **31** new read
+bundles. It retains the requirement audit, exact current source/diff and binary identities,
+all final transcripts/schemas/reports, CPU receipt, original pin/hash inventories,
+verifier commands and selected new-read evidence. This is selected qualification
+evidence, not a full native-store backup or typed import. Every imported payload
+and current source/binary hash verifies; usage is released. Scoped document-link
+and whitespace checks pass. No first-party code changes follow the aggregate.
+The installed generic importer/live server remains **0.4.1**; payloads bind the
+source-built **0.5.0** reader and their original GPU collection/build identities.
+
+R-018–R-022 are Done within the accepted conditional scope. I-038/I-039 and
+I-043–I-045 remain explicit limitations with revisit conditions, not new pending
+priorities. No fresh game run, new two-release state/timing qualification,
+hydration extension, installation, publication or machine-setting change is
+implied by group completion.

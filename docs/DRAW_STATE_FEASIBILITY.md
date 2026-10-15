@@ -85,4 +85,5 @@ no new product build or CPU suite is required for this documentation-only change
 The accepted conditional outcome is therefore implemented recorded state plus
 retained, explicit unavailability for the remaining fields. R-021 is Done on
 that basis; full effective-state coverage remains unavailable. R-022 owns the
-separate timing/counter assessment.
+separate timing/counter assessment, subsequently completed with the
+[0.5.0 conditional scope outcome](PROFILE_SCOPE_FEASIBILITY.md).

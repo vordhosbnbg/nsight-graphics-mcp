@@ -1,5 +1,10 @@
 # GPU Trace collection controls
 
+The **0.5.0** group completes the follow-up assessment with 29 shared tools;
+[PROFILE_SCOPE_FEASIBILITY.md](PROFILE_SCOPE_FEASIBILITY.md) records supported
+export scopes and unavailable physical attribution/overhead. The qualification
+below retains its 0.4.8 collection and response-contract identities.
+
 At **0.4.8**, the existing `profile` tool accepts two additional nullable booleans
 inside `settings`: `time_every_action` and `hes_enabled`. Omission or `null`
 preserves the tool default. The shared surface remains 28 tools; profile

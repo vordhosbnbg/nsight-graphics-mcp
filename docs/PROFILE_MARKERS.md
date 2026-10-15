@@ -108,5 +108,7 @@ undefined/duplicate/missing metrics, older-producer refusal and stdio restart.
 Stand-ins establish no hardware compatibility. Source captures remain separately
 pinned; [BUILD_VALIDATION.md](BUILD_VALIDATION.md) records the current reader's
 qualification, pinned as `bundle-b8d3515b5cd6079e2ba2c8cb5637067e`. All **36** serial CPU checks
-pass with zero skips. New 2026.2 marker support remains unqualified. R-022's
-remaining scope/overhead assessment stays In Progress in [ROADMAP.md](ROADMAP.md).
+pass with zero skips. New 2026.2 marker support remains unqualified. The final
+**0.5.0** reader repeats retained stdio/HTTP checks; its
+[scope report](PROFILE_SCOPE_FEASIBILITY.md) completes R-022's conditional
+assessment without adding isolated draw, physical counter or overhead claims.

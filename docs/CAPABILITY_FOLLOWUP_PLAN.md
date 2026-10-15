@@ -9,6 +9,17 @@ applicable version increment after each completed capability. R-018–R-022 in
 evidence and proposals; implementation/qualification updates are recorded there
 and in the capability-specific documents.
 
+**Completed at 0.5.0:** the R-018–R-022 group implements steps A–E within the
+plan's evidence bounds and specified conditional outcomes. The
+[completion audit](CAPABILITY_FOLLOWUP_COMPLETION.md) checks each requirement,
+current code, 36 CPU checks, 691 actual final-server tool results and retained
+pins/hashes. [State feasibility](DRAW_STATE_FEASIBILITY.md) and
+[timing/counter scope](PROFILE_SCOPE_FEASIBILITY.md) keep unavailable execution
+state/values, isolated draw counters and causal overhead correction explicit.
+Final qualification is pinned as `bundle-bc107b133c527aa81f11c17fa93c9743`; the installed
+server remains 0.4.1. The versioned updates and original 0.4.1 assessment below
+retain their historical facts, proposals and status at those points.
+
 Implementation update: A–C complete at **0.4.2–0.4.4**. At **0.4.5**, step D
 adds its first qualified recorded-state subset through two separate tools;
 [DRAW_STATE.md](DRAW_STATE.md) defines the four-case 2026.3 qualification and
@@ -97,7 +108,7 @@ clocks or other applications, and leaves eternity-forge untouched. Historical
 qualification remains scoped to its recorded product/tool versions. Proposed tool
 names and result fields below are design examples, not implemented interfaces.
 
-## Current implementation and feasibility
+## Implementation and feasibility at the original 0.4.1 assessment
 
 | Owner priority | Existing behavior | Missing behavior / next action |
 | --- | --- | --- |

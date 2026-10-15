@@ -7,13 +7,20 @@ The server supplies capture/evidence tools; Codex uses ordinary file and build
 tools for the edit. Applications without source access can still be captured,
 but this repair exercise requires the fixture's source.
 
+The **0.5.0 capability follow-up** uses these source-build conventions; its
+[completion audit](CAPABILITY_FOLLOWUP_COMPLETION.md) records the current 36-check
+GCC Debug qualification, optional reader configuration and supported scopes.
+The repair walkthrough below retains its historical collection identities.
+Current graphics-capture timeout limits and narrower new 2026.3 state/profiling
+qualification are explicit in BUILD_VALIDATION.md and the capability documents.
+
 ## Prerequisites and tested scope
 
 - Linux x86-64, a C++20 compiler and matching standard library, CMake 3.25+,
   Ninja, Python 3, Git, GNU binutils, normal C development headers/linker,
   pkg-config, and XCB development headers/library (1.13+).
 - Recorded builds use GCC 15.3.0/16.2.1 and Clang 22.1.8 with libstdc++.
-  The current 0.2.12 full suite is qualified with GCC 16.2.1; older foundation
+  The 0.2.12 walkthrough suite was qualified with GCC 16.2.1; older foundation
   and focused portability runs have narrower scope. See
   [BUILD_VALIDATION.md](BUILD_VALIDATION.md). Other versions are unqualified.
 - For rendering/capture: an existing X11/Xwayland desktop with `DISPLAY`, a

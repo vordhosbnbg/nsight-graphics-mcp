@@ -1,5 +1,9 @@
 # Graphics timing and counter qualification (R-022)
 
+The **0.5.0** group completes R-022 with the qualified marker query and
+[conditional scope outcome](PROFILE_SCOPE_FEASIBILITY.md). The versioned
+collection/assessment notes below retain their earlier identities and status.
+
 The **0.4.9** slice adds reproducible graphics timing workloads and a separate
 private validation witness. It adds no MCP query or new draw/counter claim.
 `profile_metrics` still reports exact export positions with their existing

@@ -1,5 +1,11 @@
 # Local MCP server
 
+The **0.5.0** R-018–R-022 group completes with **29 tools**, final CPU and
+retained stdio/HTTP qualification. [CAPABILITY_FOLLOWUP_COMPLETION.md](CAPABILITY_FOLLOWUP_COMPLETION.md)
+records implemented capabilities and conditional unavailable outcomes. Recorded
+state remains distinct from observed GPU state; marker ranges/raw counters
+retain their documented scope. The versioned notes below keep earlier identities.
+
 At **0.4.10**, `profile_marker` brings the shared surface to **29 tools**. It
 returns a qualified single-frame exported marker-range duration and up to eight
 requested raw regime metrics, with exact path/position/hash provenance and

@@ -71,6 +71,23 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+The **R-018–R-022 capability follow-up group completes at 0.5.0** with **29
+tools**. Reader activation, launch controls, empty-table compatibility, bounded
+recorded state/push bytes/descriptor bindings and unique exported marker queries
+are implemented. The accepted conditional reports retain unavailable descriptor
+contents, execution-time values, general GPU correspondence, isolated draw/
+fragment counters, physical normalization and causal overhead correction.
+See docs/CAPABILITY_FOLLOWUP_COMPLETION.md, docs/DRAW_STATE_FEASIBILITY.md and
+docs/PROFILE_SCOPE_FEASIBILITY.md. All **36 CPU checks** and **691** actual
+schema-validated final-server tool results pass, including 28 recorded draws,
+exact byte oracles, stdio/HTTP and restart checks. **31** new read artifacts are
+complete/pinned; 14 earlier qualification/failure snapshots and 87 native bundles
+retain their verified payloads/pins. Final qualification is pinned as
+`bundle-bc107b133c527aa81f11c17fa93c9743`. No new GPU collection occurs at 0.5.0; each earlier
+run keeps its exact tool/build identity. Installed server **0.4.1** and configured
+optional worker **0.4.2** remain unchanged. All accepted items are Done; do not
+invent further priorities. The notes below are versioned qualification history.
+
 R-022's repeated control assessment completes at **0.4.11**, retaining **29
 tools**. The opt-in C++ runner mode collects four alternate-order off/on pairs
 after 30 warmup presents. Two baselines/eight fresh matching 2026.3 profiles pass,
