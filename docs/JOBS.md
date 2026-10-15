@@ -8,6 +8,12 @@ MCP status/cancellation, and a real Nsight capture through this lifecycle.
 
 ## Dispatch and ownership
 
+The 0.5.4 same-input timing collector runs its C++ and GPU Trace phases under
+one job, deadline, source lease and GPU reservation. Cancellation between phases
+prevents the second launch; later failure preserves available first-phase
+evidence. Publication still waits for owned-process cleanup. See
+[REPLAY_TIMING.md](REPLAY_TIMING.md).
+
 The 0.4.3 capture service freezes validated per-job
 [launch environments](LAUNCH_ENVIRONMENT.md) at submission. It rechecks selected
 ICD/library identities before any process launch, then applies the overlay to

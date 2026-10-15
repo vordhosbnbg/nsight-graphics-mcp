@@ -171,7 +171,8 @@ int main(int argc, char** argv) {
                                       "--limit-to-frames",
                                       "--limit-to-submits",
                                       "--time-every-action",
-                                      "--hes-enabled"}) {
+                                      "--hes-enabled",
+                                      "--start-with-ngfx-sdk"}) {
                 if(environment("NGM_OMIT_CPP_OPTION") != option && environment("NGM_OMIT_PROFILE_OPTION") != option) {
                     std::cout << ' ' << option;
                 }
@@ -238,7 +239,8 @@ int main(int argc, char** argv) {
         std::ofstream(output / "synthetic.ngfx-gputrace") << "CPU synthetic trace, not Nsight binary evidence";
         if(mode == "duplicate-trace")
             std::ofstream(output / "second.ngfx-gputrace") << "duplicate";
-        const bool frames = !value(arguments, "--start-after-frames").empty();
+        const bool sdk_start = has(arguments, "--start-with-ngfx-sdk");
+        const bool frames = sdk_start || !value(arguments, "--start-after-frames").empty();
         const std::string unit = frames ? "frames" : "submits", suffix = frames ? " Frames" : " Submits";
         std::vector<std::string> target_options;
         std::istringstream tokens(value(arguments, "--args"));
@@ -255,13 +257,21 @@ int main(int argc, char** argv) {
             << "\nDriver Version\tsynthetic" << value(target_options, "--profile-driver") << "\nAPI\tVulkan\n"
             << "GPU Clocks\t" << (mode == "settings" ? "Base" : "Unaltered") << "\nMetric Set\t"
             << value(arguments, "--metric-set-name") << "\nMulti-Pass Metrics\tDisabled\nStart After\t"
-            << value(arguments, "--start-after-" + unit) << suffix << "\nLimited To\t"
-            << value(arguments, "--limit-to-" + unit) << suffix << "\nMax Duration \t"
+            << (sdk_start ? (mode == "wrong-replay-trigger" ? "0 Frames" : "Replay Pass Start")
+                          : value(arguments, "--start-after-" + unit) + suffix)
+            << "\nLimited To\t" << value(arguments, "--limit-to-" + unit) << suffix << "\nMax Duration \t"
             << value(arguments, "--max-duration-ms") << " ms\n";
         if(mode != "missing-action-control") {
             std::ofstream(tables / "REPRO_INFO.xls", std::ios::app)
                 << "Time Every Action\t"
                 << ((has(arguments, "--time-every-action") != (mode == "wrong-action-control")) ? "Yes" : "No") << '\n';
+        }
+        if(fs::path(value(arguments, "--exe")).filename() == "ngfx-replay.bin") {
+            const auto input = target_options.empty() ? std::string() : target_options.back();
+            std::ofstream(tables / "REPRO_INFO.xls", std::ios::app)
+                << "Graphics Capture File\t" << (mode == "wrong-replay-input" ? input + ".wrong" : input)
+                << "\nProcess File Name\t"
+                << (mode == "wrong-replay-target" ? "/wrong/replayer" : value(arguments, "--exe")) << '\n';
         }
         std::ofstream(tables / "FRAME.xls") << "GPU frame time\t0.5\n";
         std::ofstream(tables / "GPUTRACE_FRAME.xls") << "synthetic.metric\t1\nsecond.metric\t2\n";
@@ -436,6 +446,8 @@ int main(int argc, char** argv) {
             std::ofstream stream(output);
             if(mode != "empty") {
                 stream << "CPU stand-in capture, not an Nsight capture\n";
+                stream << "capture_frame=" << value(arguments, "--capture-frame") << '\n'
+                       << "frame_count=" << value(arguments, "--frame-count") << '\n';
             }
         }
         return 0;
@@ -488,11 +500,26 @@ int main(int argc, char** argv) {
     } else if(has(arguments, "--metadata-logs")) {
         // Empty is a legitimate log export for a capture with no log entries.
     } else if(has(arguments, "--metadata")) {
+        std::uint64_t frame = 0, count = 0;
+        if(!arguments.empty()) {
+            std::ifstream capture_file(arguments.back());
+            for(std::string line; std::getline(capture_file, line);) {
+                if(line.starts_with("capture_frame="))
+                    frame = std::stoull(line.substr(14));
+                if(line.starts_with("frame_count="))
+                    count = std::stoull(line.substr(12));
+            }
+        }
         std::cout
             << R"({"metadata_version":1,"nsight_version":"2026.3.1","nsight_version_build_id":"38722833",)"
                R"("primary_api":"Vulkan","process_name":"synthetic-cpu-target",)"
                R"("process_command_line":"synthetic-private-argv","process_environment":["synthetic-private-env"],)"
-               R"("_metadata_collection_":{"warnings":["Synthetic stand-in; no GPU or Nsight validation"]}})";
+               R"("_metadata_collection_":{"warnings":["Synthetic stand-in; no GPU or Nsight validation"]})";
+        if(frame && count == 1)
+            std::cout << ",\"captured_frame\":\"" << frame << '"';
+        else if(frame && count > 1)
+            std::cout << ",\"captured_frames\":\"" << frame << " - " << frame + count - 1 << '"';
+        std::cout << '}';
     } else {
         return 82;
     }

@@ -142,6 +142,10 @@ ProfileReproduction parse_profile_reproduction(std::string_view text) {
     // caller's requested CLI arguments. Missing settings cannot qualify a run.
     for(const auto key : {"Start After", "Limited To", "GPU Clocks", "Metric Set", "Multi-Pass Metrics"})
         (void)required(key);
+    if(const auto found = values.find("Graphics Capture File"); found != values.end() && !found->second.empty())
+        result.replay_capture = std::string(found->second);
+    if(const auto found = values.find("Process File Name"); found != values.end() && !found->second.empty())
+        result.process_executable = std::string(found->second);
     return result;
 }
 } // namespace ngm

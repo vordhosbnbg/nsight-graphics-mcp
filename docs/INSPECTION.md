@@ -1,5 +1,11 @@
 # Capture inspection evidence
 
+At **0.5.4**, combined replay timing evidence has a distinct
+`nsight_replay_timing` origin. Inspect its master/child indexes and raw sources
+with the artifact tools; ordinary capture/C++/profile inspection does not
+promote it into an ordinary capture or a proved draw/time join.
+[REPLAY_TIMING.md](REPLAY_TIMING.md) defines this collection slice.
+
 At **0.5.3**, the typed metadata result also preserves optional raw
 `captured_frames` text separately from `captured_frame`. The observed multi-interval
 value is `"7 - 9"`; missing fields stay null. This does not infer application-frame

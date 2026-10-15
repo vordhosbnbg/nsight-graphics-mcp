@@ -8,7 +8,7 @@ GPU performance before and after a change. Graphics capture requires no
 application instrumentation; source edits and builds use standard
 development tools.
 
-**30 tools · C++20 · Local stdio or authenticated loopback HTTP**
+**31 tools · C++20 · Local stdio or authenticated loopback HTTP**
 
 The [0.5.0 capability follow-up](docs/CAPABILITY_FOLLOWUP_COMPLETION.md) adds
 controlled launches, retained reader activation, bounded recorded draw state
@@ -29,6 +29,11 @@ unqualified.
 The **0.5.3** [capture interval option](docs/MULTI_INTERVAL_CAPTURE.md) retains
 several consecutive intervals in one file on the qualified matching 2026.3 path.
 Raw range metadata is available; draw timing correlation remains in development.
+
+At **0.5.4**, [same-input timing evidence collection](docs/REPLAY_TIMING.md)
+collects generated C++ and a selected-interval GPU Trace from a retained capture.
+The collection has its own source/trigger checks; draw timing correlation still
+requires independent validation.
 
 ## Example workflows
 

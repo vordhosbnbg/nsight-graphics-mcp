@@ -76,6 +76,13 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
         {"launch_environment", launch_environment_policy()},
         {"operations",
          {{"capture", capture},
+          {"timing_collection",
+           {{"available", capture_ready},
+            {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
+            {"reason", "Same-input replay C++/GPU Trace collection requires a retained present-delimited service "
+                       "capture, matching 2026.3 tools, desktop/GPU/driver and profiling access. Each job validates "
+                       "source settings, hashes, triggers and cleanup. Clocks/permissions remain unchanged. "
+                       "Collection is separate from proved draw association and original live performance."}}},
           {"replay",
            {{"available", capture_ready},
             {"status", capture_ready ? "prerequisites_observed" : "missing_prerequisites"},
@@ -255,8 +262,8 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation :
-        {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers", "replay"}) {
+    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers",
+                                 "replay", "timing_collection"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }

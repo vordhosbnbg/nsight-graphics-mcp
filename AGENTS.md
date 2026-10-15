@@ -115,6 +115,23 @@ exists yet. R-025 stays In Progress; R-024 and R-026 remain Pending. The surface
 stays 30 tools; installed configuration, helper closure and machine policies are
 unchanged. I-053–I-061 preserve failures and corrected serial qualification.
 
+The **0.5.4 R-025 collector slice** brings the shared surface to **31 tools**.
+`capture_analyze_timing` leases/snapshots one native input and collects generated
+C++ plus a selected-interval GPU Trace, with separate trigger/settings/hash
+checks, a shared deadline and owned cleanup. Qualified source counts are one
+and three on the matching 2026.3 producer. Four final-build actual MCP jobs pass
+with **353** schema-valid results and two restarts per source. Collection does
+not complete draw association or independent per-draw timestamp acceptance;
+R-025 stays In Progress and R-024/R-026 stay Pending. All **38 CPU checks** pass
+in **382.75 seconds**. Complete/pinned
+**bundle-d95a9298e94a1dfc4b1e598bc2445d3f** retains **2,302** verified payloads
+and **15** native pins; the imported verifier passes. I-062–I-066 preserve the
+syntax, termination, private-harness and C++ entry failures. The final phase
+counts are 20 for C++ and 60 for profiling; their internal failure causes remain
+unproven. See docs/REPLAY_TIMING.md and docs/BUILD_VALIDATION.md for qualification
+and retained evidence. No installed configuration, helper closure or machine
+policy changes.
+
 The **R-018–R-022 capability follow-up group completes at 0.5.0** with **29
 tools**. Reader activation, launch controls, empty-table compatibility, bounded
 recorded state/push bytes/descriptor bindings and unique exported marker queries

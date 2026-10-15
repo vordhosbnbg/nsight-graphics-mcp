@@ -45,8 +45,9 @@ public fixture mode. No installed server, helper closure or machine settings cha
 [BUILD_VALIDATION.md](BUILD_VALIDATION.md) records exact source/build identities,
 CPU checks and pinned qualification. I-053–I-060 preserve the separate timing
 export, trigger, startup, orchestration and typed range findings. A future
-source-validated replay-profile/correlation operation still needs its own
-implementation, independent draw timestamps and acceptance evidence.
+source-validated replay-profile collection is implemented separately at 0.5.4;
+see [REPLAY_TIMING.md](REPLAY_TIMING.md). Draw correlation still needs its own
+query, independent draw timestamps and acceptance evidence.
 
 The final serial CPU aggregate passes **37/37** checks in **368.46 seconds**.
 Serial collection and final metadata/replay verification validate **154** actual

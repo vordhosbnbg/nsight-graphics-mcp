@@ -173,6 +173,27 @@ struct NsightProfileResult {
 NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
                                        std::stop_token stop = {});
 
+// The qualified installed launcher explicitly invokes its sibling ELF. Using
+// that same unmodified target allows documented capture/profile injection;
+// ordinary standalone replay continues to use the public launcher.
+std::filesystem::path nsight_replay_target(const NsightInstallation& installation);
+struct NsightReplayProfileOptions {
+    static constexpr std::uint64_t loop_count = 60;
+    NsightRunContext context;
+    std::filesystem::path capture_file;
+    std::string capture_tool_version;
+    std::string capture_tool_build;
+    std::filesystem::path output_directory;
+    std::uint64_t interval_index = 0;
+    std::string architecture;
+    std::uint64_t duration_ms = 1000;
+};
+// One selected retained interval: SDK-triggered Replay Pass Start for zero,
+// otherwise a one-frame collection after the explicit replay-frame ordinal.
+// The source lease/snapshot, count qualification and scheduling belong to core.
+NsightProfileResult run_nsight_replay_profile(const NsightInstallation& installation,
+                                              const NsightReplayProfileOptions& options, std::stop_token stop = {});
+
 // No shell is used. Because the documented --args string does not define its
 // escaping rules, this adapter accepts only nonempty ASCII tokens composed of
 // letters, digits, '_', '-', '.', '/', ':', '=', ',', '+', '@', and '%'. Other

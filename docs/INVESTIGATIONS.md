@@ -1986,3 +1986,116 @@ Source/imported hashes and lengths match; the imported verifier passes. The
 snapshot qualifies the 0.5.3 interval-capture/range foundation and preserves
 private feasibility evidence; R-025 remains In Progress. Importer 0.4.1 and each
 actual tested build remain distinct.
+
+### I-062 — Existing recorded-state grammar refuses replay-generated timing input
+
+- **Context:** A private syntax probe calls `detail::parse_cpp_replay` on the
+  CommandList, Resources and Frame sources from the actual 0.5.4 combined
+  collector's first-interval bundle, `bundle-41a1f9abb69675072b38af35b7e951c0`.
+  Producer: 2026.3.1.0/build 38722833; RTX 3080 Ti / driver 615.71.09.
+- **Expected/observed:** The collector has preserved literal queue/draw labels
+  in the C++ and trace exports. The existing recorded-state grammar nevertheless
+  refuses with `unrecognized expression helper` before returning any parsed
+  occurrence. This does not establish which construct caused the refusal or
+  invalidate the raw source labels.
+- **Isolation:** A first-party diagnostic copy adds only filename/token detail
+  to that error and identifies `VkCommandPoolResetFlags` in Frame0Part00.cpp.
+  A separate private type-extension probe then reaches and refuses
+  `NV_THREAD_BEGIN`. The actual source also has host query-result vector
+  outputs. These diagnostic controls do not change the product grammar or
+  establish a callable timing association.
+- **Reproduce/evidence:** Build/run `CppTimingParseProbe.cpp` with the retained
+  compile/link arrays against that bundle's `project_directory`. The probe
+  source, command receipt and stderr are retained with the 0.5.4 collection
+  qualification. Its parser is the existing implementation, with no permissive
+  fallback or generated-code execution.
+- **Revisit:** Isolate the relevant grammar construct and qualify a bounded
+  timing-specific interpretation with negative tests. Do not claim source-call
+  association from label text alone or widen the old recorded-state contract
+  merely to make this input parse.
+
+### I-063 — Single-interval replay profiling exports tables but misses cleanup deadline
+
+- **Context/reproduce:** After the three-interval 0.5.4 core and MCP collections
+  pass, run `capture_analyze_timing` for interval zero of the retained native
+  single-interval source `bundle-420c3ddae43aed8e42acc1f98a010f72`, using the same
+  matching 2026.3 tools, explicit driver overlay, 20 replay loops, SDK trigger
+  and 120-second total deadline. No other qualification GPU job overlaps.
+- **Observed:** Generate C++ completes and preserves the original literal frame-7
+  queue labels. GPU Trace exports its tables and prints `Terminating process...`
+  followed by a connection-error message, but does not finish before the job
+  deadline. The coordinator reports `timed_out`, confirms owned cleanup and
+  releases the GPU reservation. Export files do not turn this into success.
+- **Evidence:** Failed/pinned native `bundle-48b3d8b3975111db92545b2b01a48664`,
+  the `r025-analysis-single-mcp` transcript/audit and separate subprocess logs
+  retain the request, exact source/build identities, partial C++/trace evidence
+  and terminal state. The source remains pinned and unchanged. The script's
+  success assertion fails as intended for this unexpected outcome.
+- **Revisit:** Change one documented replay control at a time in separately
+  supervised serial probes. No internal cause, target-lifetime race or generic
+  single-interval incompatibility has been established.
+- **Control/correction:** The corrected I-064 control changes the replay loop
+  count from 20 to 60 while preserving source bytes, SDK trigger and all profile
+  settings. It exits zero with confirmed cleanup and exports the original
+  frame-7 queue labels. Both controls print the final connection-error text, so
+  that text alone does not classify success. The collector now uses a shared
+  fixed 60-loop profile constant. The separately qualified 20-loop C++ phase is
+  retained, with per-phase counts explicit in settings. Product MCP reruns and
+  CPU checks must qualify that final build separately.
+
+### I-064 — Private replay-loop probe omits the required output directory
+
+- **Reproduce/observed:** The initial `r025-single-loop60` control copies the
+  I-063 single-interval input and changes the fixed replay loop count to 60,
+  but its script fails to create the requested profile output directory.
+  `ngfx` exits 1 with `No such output directory` / `Invalid general options`.
+  Cleanup is confirmed; no trace exists and no GPU compatibility conclusion
+  follows from this attempt.
+- **Correction/evidence:** Retain that exact request, source hash, script,
+  stdout/stderr and supervised receipt. Create the output directory explicitly
+  in a fresh `r025-single-loop60-valid` run before invoking the same documented
+  controls. The product collector already creates its profile directory.
+- **Revisit:** Require the private experiment's filesystem prerequisites before
+  interpreting its tool result. Preserve the failed control separately.
+
+### I-065 — A 60-loop C++ collection fails while entering frame-debugger mode
+
+- **Context/reproduce:** The intermediate 0.5.4 build sets both C++ and profile
+  replay loops to 60. Its first three-interval input selection (index zero)
+  succeeds, but index one, `--wait-frames=4`, fails during Generate C++ Capture.
+- **Observed:** The target connects and presents; the tool reports initial-state
+  and function-stream capture progress, then `Preparing to enter frame debugger
+  mode... Failed` and exits 1. Owned cleanup is confirmed. No trace phase is
+  launched for that failed attempt, and no internal cause is established.
+- **Evidence:** Failed/pinned native `bundle-a057196505c5857c688d38bc68d26b59`
+  and the separate `r025-analysis-final-mcp` transcript preserve exact input,
+  arguments, process result and partial output. The earlier selection's success
+  is native `bundle-d818360c2b787329f2ea300bac16618f`.
+- **Next control:** Preserve the previously demonstrated 20-loop C++ invocation
+  while independently qualifying the 60-loop profile control. Store both phase
+  counts explicitly. This choice does not prove the failed C++ capture's cause;
+  fresh serial product checks remain required.
+
+### I-066 — Evidence copy omits files declared by native manifests
+
+- **Observed/reproduce:** The first 0.5.4 evidence-copy script excludes every
+  directory named `config`, including server-managed native `raw/config`
+  payloads. The portable verifier refuses a missing inventoried NVIDIA cache
+  file before accepting the snapshot. Native sources/manifests remain intact;
+  this is a qualification-copy error, not a capture failure.
+- **Correction:** Preserve the original script, verifier and failure log under
+  `verifiers/`. Restrict cache omission to private experiment folders, restore
+  all **104** missing native payloads (**6,282,950 bytes**) from their pinned
+  native sources, and retain each restored path/size/SHA-256 in `repair.json`.
+  Do not edit manifests to hide missing files. Rerun complete semantic/hash and
+  import verification before pinning the final qualification.
+- **Revisit:** Native manifests define the retained payload set; a generic
+  experiment-folder exclusion cannot be applied to a managed bundle snapshot.
+
+**Shared retention for I-062–I-066:** Complete/pinned
+**bundle-d95a9298e94a1dfc4b1e598bc2445d3f** retains **2,302** verified payloads,
+15 native pins, raw source/trace data, exact requests/transcripts, successful and
+failed controls, separate build identities, CPU logs and the portable verifier.
+The repaired source/imported payload sizes and SHA-256 all match; the imported
+verifier passes. It qualifies the 0.5.4 collector only. Draw correlation and
+independent per-draw timestamp acceptance remain unfinished.

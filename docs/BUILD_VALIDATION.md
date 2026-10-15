@@ -2437,3 +2437,75 @@ schemas, images/ranges/input hashes, binary identities and native pin checks.
 remains **0.4.1** and its identity is kept separate from tested **0.5.3** builds.
 No installed server/worker, helper closure, permission, driver, clock, desktop
 or other machine setting changes.
+
+## 0.5.4 same-input timing evidence collector, R-025 slice, 2026-10-15
+
+`capture_analyze_timing` adds the **31st** shared stdio/HTTP tool. It collects
+Generate C++ and single-interval GPU Trace evidence from one protected native
+Graphics Capture, with one coordinated job/deadline and a fixed replay target.
+**R-025 remains In Progress**: a public source-call/time query, independent
+per-draw timestamp acceptance and the full correlation workflow remain unfinished.
+[REPLAY_TIMING.md](REPLAY_TIMING.md) defines inputs, phase settings and scope.
+
+The final GCC Debug build passes **38/38 CPU checks** in **382.75 seconds** via
+`cmake --build --preset linux-gcc-debug --target nsight-graphics-mcp ngm_check_all -j4`.
+The new `ngm_replay_timing_check` passes in **12.04 seconds**, covering all three
+intervals, exact source/target/trigger/settings refusals, queued source leases,
+shared scheduling, cancellation, escaped-child reaping, deadlines, shutdown and
+restart pins. Count-two capture remains independent; timing selection refuses
+that unqualified mapping before launch. MCP and HTTP checks exercise the new
+collector through their real protocol adapters and executable stand-ins. No
+stand-in result establishes GPU support. Earlier 20/20-loop and 60/60-loop
+builds have their own aggregate logs and are separate development controls.
+The initially mistyped aggregate target `ngm_checks` fails before building;
+`ngm_check_all` is the existing verified aggregate target.
+
+Actual serial final-build collection uses matching **2026.3.1.0/build 38722833**,
+**RTX 3080 Ti**, kernel driver **615.71.09**, KDE Wayland/Xwayland and the
+explicit process-local matching-driver library/ICD overlay. No machine policy
+or installed server/worker changes. C++ uses 20 replay loops; profiling uses 60.
+Source counts one/three and the measured raw metadata shape are qualified;
+other counts refuse. The original application is not relaunched.
+
+| Native source | Selected interval | Final analysis | Result |
+| --- | --- | --- | --- |
+| `bundle-59a280028a05a9eedfd7d29e876dd0ba` | 0 | `bundle-cb9f1be49f63e6e3ee1781720b550c53` | Both phases pass; SDK trigger exports `Replay Pass Start`; literal queue labels retain frame 7. |
+| Same three-interval source | 1 | `bundle-9846183bc91dcb1f7c1f4a3fb5629d29` | Both phases pass; after-one-frame trigger and literal frame-8 labels. |
+| Same three-interval source | 2 | `bundle-060f96fae811b1e3f979fccf80688ed6` | Both phases pass; after-two-frame trigger and literal frame-9 labels. |
+| `bundle-420c3ddae43aed8e42acc1f98a010f72` | 0 | `bundle-e5b93c406a5a35591d3e09b8244756be` | Both phases pass; SDK trigger and literal frame-7 labels. |
+
+The final three-interval run validates **261** successful results against its
+advertised schemas; the single-interval run validates **92**, totaling **353**.
+Both run two additional server restarts and preserve report/index text, source
+hashes and pins. Each complete analysis retains the same input hash, replayer
+hashes, child-index hashes, original labels and explicit settings. These are
+collection/label facts, not a draw-time association or original frame-ID rule.
+The final frozen server SHA-256 is
+`28b3218659cd17e835702663706ca9b170fa4d66558df209cda39f5cde22c9d7`.
+
+Earlier direct-core and MCP 20/20-loop three-interval collections pass but keep
+their exact earlier binary identities. I-063's single-interval 20-loop profile
+exports tables then reaches its deadline with confirmed cleanup. A private
+60-loop control exits zero; both print final connection-error text, which alone
+cannot classify success or establish a cause. I-064 retains a separate missing
+output-directory harness error. The intermediate 60/60 product build passes
+index zero, then fails C++ frame-debugger entry at index one (I-065). The final
+20/60 combination passes all four cases above. No causal diagnosis is inferred
+from these controls.
+
+I-062 retains the existing recorded-state parser's actual refusal and narrow
+private diagnostic controls. The product grammar is unchanged. No generated
+replay code or wider proprietary helper closure is compiled. Draw correlation,
+independent per-draw timestamps, physical counter attribution and unannotated
+source-call correspondence remain unfinished.
+
+Complete/pinned **bundle-d95a9298e94a1dfc4b1e598bc2445d3f** retains all **2,302**
+payloads (**197,849,965** bytes), the **15** independently pinned native bundles,
+successful/failed controls, raw exports, requests/transcripts, exact final
+source and separately identified compressed binaries. Every source/imported
+payload length and SHA-256 agrees. The imported portable verifier passes the
+353 final schemas, all retained transcript schemas, input/child/source hashes,
+native pins and compressed executable identities. I-066 preserves and corrects
+an initial copy omission before final verification. `artifact_info` confirms
+complete/pinned/not in use. The installed **0.4.1** importer remains distinct
+from the tested **0.5.4** product.

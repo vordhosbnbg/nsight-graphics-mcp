@@ -112,10 +112,10 @@ Json manifest_provenance(const Json& report) {
     // Full argv, caller provenance, and operation observations are retained in
     // raw/report.json. Their growth must not exhaust the compact manifest API.
     Json result{{"report_path", "raw/report.json"}};
-    for(const auto* key :
-        {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings", "sdk",
-         "readable_capture", "generated_cpp_project", "application_identity_observed", "cleanup_confirmed",
-         "worker_outcome", "profiled", "replayed", "replay_settings", "source"}) {
+    for(const auto* key : {"schema_version", "project_version", "evidence_origin", "backend", "job", "capture_settings",
+                           "sdk", "readable_capture", "generated_cpp_project", "application_identity_observed",
+                           "cleanup_confirmed", "worker_outcome", "profiled", "replayed", "replay_settings", "source",
+                           "timing_settings", "timing_collected", "analysis_index"}) {
         if(report.contains(key)) {
             result[key] = report.at(key);
         }
@@ -208,6 +208,74 @@ void retain_safe_cpp_failure_output(const fs::path& root, Json& report, const st
                        "Regular output within bounds and original process logs are retained. Symlink targets were not "
                        "followed."}};
     }
+}
+
+Json profile_index(const NsightProfileResult& collected, const fs::path& root, const JobContext& context,
+                   const Json& requested, const char* origin) {
+    const auto reference = [&](const fs::path& path) {
+        return Json{{"path", relative_evidence(path, root)},
+                    {"sha256", sha256_regular_file(path, context.deadline, context.stop)}};
+    };
+    Json tables = Json::object();
+    for(const auto& [name, path] : collected.tables)
+        tables[name] = reference(path);
+    const auto& reproduction = collected.reproduction;
+    Json index{{"schema_version", 1},
+               {"evidence_origin", origin},
+               {"job", context.identity},
+               {"trace", reference(collected.trace_file)},
+               {"reproduction", reference(collected.reproduction_file)},
+               {"tables", std::move(tables)},
+               {"producer", reproduction.product_version},
+               {"gpu", reproduction.gpu},
+               {"driver", reproduction.driver},
+               {"settings", reproduction.settings},
+               {"requested", requested},
+               {"scope", "Live target auto-export. Positional values are not independent runs or min/mean/max. "
+                         "No arbitrary physical unit scaling, GPU replay or application correctness inferred."}};
+    if(std::string_view(origin) == "nsight_replay_gpu_trace") {
+        index["replay_capture"] =
+            collected.reproduction.replay_capture ? Json(*collected.reproduction.replay_capture) : Json(nullptr);
+        index["process_executable"] = collected.reproduction.process_executable
+                                          ? Json(*collected.reproduction.process_executable)
+                                          : Json(nullptr);
+    }
+    return index;
+}
+
+Json cpp_index(const NsightCppCaptureResult& captured, const fs::path& root, const JobContext& context) {
+    Json sources = Json::array();
+    Json state_inputs = Json::array();
+    const auto retain_identity = [&](const fs::path& path) {
+        state_inputs.push_back({{"path", relative_evidence(path, root)},
+                                {"bytes", fs::file_size(path)},
+                                {"sha256", sha256_regular_file(path, context.deadline, context.stop)}});
+    };
+    for(const auto& source : captured.source_files) {
+        sources.push_back(relative_evidence(captured.project_directory / source, root));
+        retain_identity(captured.project_directory / source);
+    }
+    for(const auto* name : {"metadata.json", "Resources.h", "data.bin", "data.bin.rec"})
+        retain_identity(captured.project_directory / name);
+    Json index{{"schema_version", 1},
+               {"evidence_origin", "nsight_generated_cpp"},
+               {"job", context.identity},
+               {"project_directory", relative_evidence(captured.project_directory, root)},
+               {"metadata_path", relative_evidence(captured.project_directory / "metadata.json", root)},
+               {"screenshot_path", relative_evidence(captured.project_directory / "screenshot.bmp", root)},
+               {"database_path", relative_evidence(captured.project_directory / "data.bin", root)},
+               {"source_files", std::move(sources)},
+               {"recorded_state_inputs", {{"schema_version", 1}, {"files", std::move(state_inputs)}}},
+               {"nsight_version", captured.metadata.nsight_version},
+               {"nsight_version_build_id", captured.metadata.build_id},
+               {"primary_api", captured.metadata.primary_api},
+               {"primary_gpu", captured.metadata.primary_gpu},
+               {"has_unsupported_operation", captured.metadata.has_unsupported_operation},
+               {"inspection_scope", "Generated source and referenced data from this capture only. "
+                                    "No automatic event-state reconstruction or database extraction. "
+                                    "Setup resources are not arbitrary after-draw snapshots."},
+               {"validation_scope", captured.operation.message}};
+    return index;
 }
 
 struct Attempt {
@@ -358,28 +426,8 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
                     retain_safe_cpp_failure_output(root, report, "profile");
                 throw std::runtime_error("Profiling failed: " + collected.operation.message);
             }
-            const auto reference = [&](const fs::path& path) {
-                return Json{{"path", relative_evidence(path, root)},
-                            {"sha256", sha256_regular_file(path, context.deadline, context.stop)}};
-            };
-            Json tables = Json::object();
-            for(const auto& [name, path] : collected.tables)
-                tables[name] = reference(path);
-            const auto& reproduction = collected.reproduction;
-            Json index{{"schema_version", 1},
-                       {"evidence_origin", "nsight_gpu_trace"},
-                       {"job", context.identity},
-                       {"trace", reference(collected.trace_file)},
-                       {"reproduction", reference(collected.reproduction_file)},
-                       {"tables", std::move(tables)},
-                       {"producer", reproduction.product_version},
-                       {"gpu", reproduction.gpu},
-                       {"driver", reproduction.driver},
-                       {"settings", reproduction.settings},
-                       {"requested", report.at("capture_settings")},
-                       {"scope",
-                        "Live target auto-export. Positional values are not independent runs or min/mean/max. "
-                        "No arbitrary physical unit scaling, GPU replay or application correctness inferred."}};
+            const auto index =
+                profile_index(collected, root, context, report.at("capture_settings"), "nsight_gpu_trace");
             save(root / "derived/profile.json", index);
             report["profile_index"] = "derived/profile.json";
             profiled = true;
@@ -401,37 +449,7 @@ JobCompletion execute_capture(const CaptureServiceOptions& options, ArtifactStor
                 }
                 throw std::runtime_error("C++ capture failed: " + captured.operation.message);
             }
-            Json sources = Json::array();
-            Json state_inputs = Json::array();
-            const auto retain_identity = [&](const fs::path& path) {
-                state_inputs.push_back({{"path", relative_evidence(path, root)},
-                                        {"bytes", fs::file_size(path)},
-                                        {"sha256", sha256_regular_file(path, context.deadline, context.stop)}});
-            };
-            for(const auto& source : captured.source_files) {
-                sources.push_back(relative_evidence(captured.project_directory / source, root));
-                retain_identity(captured.project_directory / source);
-            }
-            for(const auto* name : {"metadata.json", "Resources.h", "data.bin", "data.bin.rec"})
-                retain_identity(captured.project_directory / name);
-            Json index{{"schema_version", 1},
-                       {"evidence_origin", "nsight_generated_cpp"},
-                       {"job", context.identity},
-                       {"project_directory", relative_evidence(captured.project_directory, root)},
-                       {"metadata_path", relative_evidence(captured.project_directory / "metadata.json", root)},
-                       {"screenshot_path", relative_evidence(captured.project_directory / "screenshot.bmp", root)},
-                       {"database_path", relative_evidence(captured.project_directory / "data.bin", root)},
-                       {"source_files", std::move(sources)},
-                       {"recorded_state_inputs", {{"schema_version", 1}, {"files", std::move(state_inputs)}}},
-                       {"nsight_version", captured.metadata.nsight_version},
-                       {"nsight_version_build_id", captured.metadata.build_id},
-                       {"primary_api", captured.metadata.primary_api},
-                       {"primary_gpu", captured.metadata.primary_gpu},
-                       {"has_unsupported_operation", captured.metadata.has_unsupported_operation},
-                       {"inspection_scope", "Generated source and referenced data from this capture only. "
-                                            "No automatic event-state reconstruction or database extraction. "
-                                            "Setup resources are not arbitrary after-draw snapshots."},
-                       {"validation_scope", captured.operation.message}};
+            const auto index = cpp_index(captured, root, context);
             save(root / "derived/cpp-project.json", index);
             report["cpp_project_index"] = "derived/cpp-project.json";
             generated_cpp_project = true;
@@ -546,7 +564,7 @@ Json replay_metadata_identity(const std::string& raw) {
 
 JobCompletion execute_replay(const CaptureServiceOptions& options, ArtifactStore& artifacts,
                              const std::shared_ptr<Attempt>& attempt, const ReplayRequest& request,
-                             const JobContext& context) {
+                             const std::optional<ReplayTimingRequest>& timing, const JobContext& context) {
     attempt->started = true;
     JobCompletion completion;
     completion.identity = context.identity;
@@ -621,29 +639,210 @@ JobCompletion execute_replay(const CaptureServiceOptions& options, ArtifactStore
             throw std::runtime_error("Fresh replay input metadata differs from the retained capture identity");
         if(stopped(context))
             throw std::runtime_error("Replay stopped before GPU launch");
-        fs::create_directories(root / "raw/logs/replay");
-        NsightReplayOptions replay;
-        replay.context = {root / "raw/logs/replay", environment, remaining(context)};
-        replay.capture_file = input;
-        replay.capture_tool_version = producer.at("version");
-        replay.capture_tool_build = producer.at("build");
-        replay.loop_count = request.loop_count;
-        completion.cleanup_confirmed = false;
-        const auto replayed = run_nsight_replay(installation, replay, context.stop);
-        completion.cleanup_confirmed = !replayed.launched || replayed.process.cleanup_confirmed;
-        report["replay"] = operation_json(replayed, root);
-        if(replayed.outcome != NsightOutcome::Success || !completion.cleanup_confirmed)
-            throw std::runtime_error("GPU replay failed: " + replayed.message);
+        if(timing) {
+            const auto target = nsight_replay_target(installation);
+            const auto target_hash = sha256_regular_file(target, context.deadline, context.stop);
+            report["replay_target"] = {
+                {"path", target.string()},
+                {"sha256_before", target_hash},
+                {"identity_scope", "Path contents around both launches; running image identity unverified"}};
+            fs::create_directories(root / "raw/logs/cpp");
+            NsightCppCaptureOptions cpp;
+            cpp.context = {root / "raw/logs/cpp", environment, remaining(context)};
+            cpp.executable = target;
+            cpp.arguments = {"--loop-count=20", "--present-app", "--verbose", input.string()};
+            cpp.working_directory = input.parent_path();
+            cpp.output_directory = root / "raw/cpp";
+            const auto count = report.at("timing_settings").at("source_interval_count").get<std::uint64_t>();
+            cpp.wait_frames = std::max(std::uint64_t{2}, count) + timing->interval_index;
+            report["timing_settings"]["cpp_wait_frames"] = cpp.wait_frames;
+            completion.cleanup_confirmed = false;
+            const auto captured = run_nsight_cpp_capture(installation, cpp, context.stop);
+            completion.cleanup_confirmed = !captured.operation.launched || captured.operation.process.cleanup_confirmed;
+            report["cpp_capture"] = operation_json(captured.operation, root);
+            if(captured.operation.outcome != NsightOutcome::Success || !completion.cleanup_confirmed) {
+                if(completion.cleanup_confirmed)
+                    retain_safe_cpp_failure_output(root, report);
+                throw std::runtime_error("Timing C++ capture failed: " + captured.operation.message);
+            }
+            save(root / "derived/cpp-project.json", cpp_index(captured, root, context));
+            report["generated_cpp_project"] = true;
+            if(sha256_regular_file(input, context.deadline, context.stop) !=
+                   report.at("source").at("observed_capture_sha256").get<std::string>() ||
+               sha256_regular_file(target, context.deadline, context.stop) != target_hash)
+                throw std::runtime_error("Timing input snapshot or replayer changed after C++ capture");
+            if(stopped(context))
+                throw std::runtime_error("Timing analysis stopped before profile collection");
+            fs::create_directories(root / "raw/logs/profile");
+            NsightReplayProfileOptions profile;
+            profile.context = {root / "raw/logs/profile", environment, remaining(context)};
+            profile.capture_file = input;
+            profile.capture_tool_version = producer.at("version");
+            profile.capture_tool_build = producer.at("build");
+            profile.output_directory = root / "raw/profile";
+            profile.interval_index = timing->interval_index;
+            profile.architecture = timing->architecture;
+            profile.duration_ms = timing->duration_ms;
+            completion.cleanup_confirmed = false;
+            const auto collected = run_nsight_replay_profile(installation, profile, context.stop);
+            completion.cleanup_confirmed =
+                !collected.operation.launched || collected.operation.process.cleanup_confirmed;
+            report["profile"] = operation_json(collected.operation, root);
+            if(collected.operation.outcome != NsightOutcome::Success || !completion.cleanup_confirmed) {
+                if(completion.cleanup_confirmed)
+                    retain_safe_cpp_failure_output(root, report, "profile");
+                throw std::runtime_error("Timing replay profile failed: " + collected.operation.message);
+            }
+            report["replay_target"]["sha256_after"] = sha256_regular_file(target, context.deadline, context.stop);
+            if(report.at("replay_target").at("sha256_after") != target_hash)
+                throw std::runtime_error("Timing replayer changed during profiling");
+            auto profile_data =
+                profile_index(collected, root, context, report.at("timing_settings"), "nsight_replay_gpu_trace");
+            profile_data["scope"] =
+                "GPU Trace of this exact saved input. Reported times include replay/instrumentation; original live "
+                "performance and draw association require separate evidence.";
+            save(root / "derived/replay-profile.json", profile_data);
+            const auto reference = [&](const fs::path& path) {
+                return Json{{"path", relative_evidence(path, root)},
+                            {"sha256", sha256_regular_file(path, context.deadline, context.stop)}};
+            };
+            Json index{{"schema_version", 1},
+                       {"evidence_origin", "nsight_replay_timing"},
+                       {"job", context.identity},
+                       {"source", report.at("source")},
+                       {"requested", report.at("timing_settings")},
+                       {"replay_target", report.at("replay_target")},
+                       {"cpp_index", reference(root / "derived/cpp-project.json")},
+                       {"profile_index", reference(root / "derived/replay-profile.json")},
+                       {"scope", "Same-input collection, not by itself a proved source-call/time association."}};
+            save(root / "derived/timing-analysis.json", index);
+            report["analysis_index"] = "derived/timing-analysis.json";
+            report["profiled"] = true;
+            report["timing_collected"] = true;
+        } else {
+            fs::create_directories(root / "raw/logs/replay");
+            NsightReplayOptions replay;
+            replay.context = {root / "raw/logs/replay", environment, remaining(context)};
+            replay.capture_file = input;
+            replay.capture_tool_version = producer.at("version");
+            replay.capture_tool_build = producer.at("build");
+            replay.loop_count = request.loop_count;
+            completion.cleanup_confirmed = false;
+            const auto replayed = run_nsight_replay(installation, replay, context.stop);
+            completion.cleanup_confirmed = !replayed.launched || replayed.process.cleanup_confirmed;
+            report["replay"] = operation_json(replayed, root);
+            if(replayed.outcome != NsightOutcome::Success || !completion.cleanup_confirmed)
+                throw std::runtime_error("GPU replay failed: " + replayed.message);
+            report["replayed"] = true;
+        }
         if(sha256_regular_file(input, context.deadline, context.stop) !=
            report.at("source").at("observed_capture_sha256").get<std::string>())
             throw std::runtime_error("Replay input snapshot changed during execution");
-        report["replayed"] = true;
         completion.outcome = JobOutcome::succeeded;
     } catch(const std::exception& error) {
         completion.error = error.what();
         completion.outcome = JobOutcome::failed;
     }
     return finish_attempt(artifacts, attempt, context, std::move(completion));
+}
+std::pair<std::shared_ptr<Attempt>, JobClock::time_point>
+make_replay_attempt(const CaptureServiceOptions& options, ArtifactStore& artifacts, const ReplayRequest& request,
+                    const std::optional<ReplayTimingRequest>& timing) {
+    if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.loop_count < 1 ||
+       request.loop_count > 600)
+        throw std::invalid_argument("Replay requires timeout 1..600000 ms and loop_count 1..600");
+    const auto deadline = JobClock::now() + request.timeout;
+    const auto selection = validate_launch_environment(request.launch_environment, options.environment, deadline);
+    auto source_lease = artifacts.lease(request.capture_id);
+    // Reuse retained-capture validation, including complete status, native origin,
+    // manifest/report/job agreement, matching producer and metadata export schema.
+    const auto metadata = InspectionService(artifacts).metadata(request.capture_id);
+    const auto raw_report = artifacts.read(request.capture_id, "raw/report.json", NsightEvidenceLimits::maximum_bytes);
+    const auto source_report = Json::parse(raw_report);
+    const auto raw_metadata =
+        artifacts.read(request.capture_id, "raw/exports/metadata.raw", NsightEvidenceLimits::maximum_bytes);
+    (void)replay_metadata_identity(raw_metadata);
+    const auto original_hash = source_report.at("capture").value("sha256", Json(nullptr));
+    if(!original_hash.is_null() &&
+       (!original_hash.is_string() || original_hash.get_ref<const std::string&>().size() != 64))
+        throw std::invalid_argument("Retained capture SHA-256 is invalid");
+    auto attempt = std::make_shared<Attempt>();
+    attempt->artifacts = &artifacts;
+    attempt->source_lease = std::move(source_lease);
+    attempt->provenance = {
+        {"schema_version", 1},
+        {"project_version", project_version()},
+        {"evidence_origin", "nsight_gpu_replay"},
+        {"backend", "documented_nsight_cli"},
+        {"replay_settings", {{"loop_count", request.loop_count}, {"timeout_ms", request.timeout.count()}}},
+        {"source",
+         {{"capture_id", request.capture_id},
+          {"job", source_report.at("job")},
+          {"capture_tool", metadata.at("producer").at("capture_tool")},
+          {"report_sha256", text_hash(raw_report)},
+          {"metadata_sha256", text_hash(raw_metadata)},
+          {"original_capture_sha256", original_hash},
+          {"observed_capture_sha256", nullptr},
+          {"identity_scope", original_hash.is_null()
+                                 ? "Legacy source has no capture-time payload hash. Retained header/report and an "
+                                   "observed snapshot hash are checked; original-byte authenticity is unverified."
+                                 : "Snapshot must match the retained capture-time payload hash and fresh metadata. "
+                                   "Recorded provenance is not producer authentication."}}},
+        {"launch_environment", {{"requested", request.launch_environment}, {"selection", selection}}},
+        {"scope", "Fresh matching Nsight GPU replay of a retained input. Original application is not launched. "
+                  "Tool completion does not prove pixels, GPU event state, frame correspondence or timing accuracy."}};
+    std::vector<std::string> required{"raw/input/capture.ngfx-capture", "raw/input/metadata.raw",
+                                      "raw/input/report.json", "raw/exports/metadata.raw", "raw/report.json"};
+    if(timing) {
+        ProfileSettings controls;
+        controls.architecture = timing->architecture;
+        controls.duration_ms = timing->duration_ms;
+        validate_profile_settings(controls);
+        const auto& settings = source_report.at("capture_settings");
+        if(settings != artifacts.inspect(request.capture_id).provenance.at("capture_settings") ||
+           settings.value("delimiter", Json()) != "present" || !settings.at("frame_count").is_number_integer() ||
+           settings.at("frame_count") < 1 || settings.at("frame_count") > 600 ||
+           !settings.at("capture_frame").is_number_integer() || settings.at("capture_frame") < 2)
+            throw std::invalid_argument("Timing analysis requires verified present-delimited source interval settings");
+        const auto count = settings.at("frame_count").get<std::uint64_t>();
+        if(count != 1 && count != 3)
+            throw std::invalid_argument("Timing interval selection is qualified only for source counts 1 and 3; "
+                                        "retain a matching capture with one of these counts");
+        const auto first = settings.at("capture_frame").get<std::uint64_t>();
+        if(timing->interval_index >= count || first > UINT64_MAX - (count - 1))
+            throw std::invalid_argument("Timing interval is outside the retained source bounds");
+        const auto header = parse_nsight_metadata(raw_metadata);
+        if((count == 1 && (header.captured_frame != std::to_string(first) || header.captured_frames)) ||
+           (count > 1 && (header.captured_frame ||
+                          header.captured_frames != std::to_string(first) + " - " + std::to_string(first + count - 1))))
+            throw std::invalid_argument("Timing source header does not match the qualified retained interval shape");
+        attempt->provenance["evidence_origin"] = "nsight_replay_timing";
+        attempt->provenance.erase("replay_settings");
+        attempt->provenance["timing_settings"] = {
+            {"interval_index", timing->interval_index},
+            {"source_interval_count", count},
+            {"architecture", timing->architecture},
+            {"duration_ms", timing->duration_ms},
+            {"timeout_ms", request.timeout.count()},
+            {"cpp_loop_count", 20},
+            {"profile_loop_count", NsightReplayProfileOptions::loop_count},
+            {"time_every_action", true},
+            {"hes_enabled", false},
+            {"gpu_clocks", "unaltered"},
+            {"metric_set", "Throughput Metrics"},
+            {"trigger", timing->interval_index == 0 ? "replay_pass_start" : "replay_frame_ordinal"}};
+        attempt->provenance["timing_collected"] = false;
+        attempt->provenance["scope"] =
+            "Fresh same-input replay profile and generated C++ collection. Original application not launched; "
+            "call/timing association requires qualified retained analysis.";
+        required.insert(required.end(),
+                        {"derived/timing-analysis.json", "derived/cpp-project.json", "derived/replay-profile.json"});
+    } else {
+        required.push_back("raw/logs/replay/replay.stdout.txt");
+    }
+    artifacts.prune();
+    attempt->writer = artifacts.begin(manifest_provenance(attempt->provenance), std::move(required), request.pin);
+    return {attempt, deadline};
 }
 } // namespace
 
@@ -802,61 +1001,31 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
 }
 
 CaptureSubmission CaptureService::replay(ReplayRequest request) {
-    if(request.timeout.count() < 1 || request.timeout > std::chrono::minutes(10) || request.loop_count < 1 ||
-       request.loop_count > 600)
-        throw std::invalid_argument("Replay requires timeout 1..600000 ms and loop_count 1..600");
-    const auto deadline = JobClock::now() + request.timeout;
-    const auto selection = validate_launch_environment(request.launch_environment, options_.environment, deadline);
-    auto source_lease = artifacts_.lease(request.capture_id);
-    // Reuse retained-capture validation, including complete status, native origin,
-    // manifest/report/job agreement, matching producer and metadata export schema.
-    const auto metadata = InspectionService(artifacts_).metadata(request.capture_id);
-    const auto raw_report = artifacts_.read(request.capture_id, "raw/report.json", NsightEvidenceLimits::maximum_bytes);
-    const auto source_report = Json::parse(raw_report);
-    const auto raw_metadata =
-        artifacts_.read(request.capture_id, "raw/exports/metadata.raw", NsightEvidenceLimits::maximum_bytes);
-    (void)replay_metadata_identity(raw_metadata);
-    const auto original_hash = source_report.at("capture").value("sha256", Json(nullptr));
-    if(!original_hash.is_null() &&
-       (!original_hash.is_string() || original_hash.get_ref<const std::string&>().size() != 64))
-        throw std::invalid_argument("Retained capture SHA-256 is invalid");
-    artifacts_.prune();
-    auto attempt = std::make_shared<Attempt>();
-    attempt->artifacts = &artifacts_;
-    attempt->source_lease = std::move(source_lease);
-    attempt->provenance = {
-        {"schema_version", 1},
-        {"project_version", project_version()},
-        {"evidence_origin", "nsight_gpu_replay"},
-        {"backend", "documented_nsight_cli"},
-        {"replay_settings", {{"loop_count", request.loop_count}, {"timeout_ms", request.timeout.count()}}},
-        {"source",
-         {{"capture_id", request.capture_id},
-          {"job", source_report.at("job")},
-          {"capture_tool", metadata.at("producer").at("capture_tool")},
-          {"report_sha256", text_hash(raw_report)},
-          {"metadata_sha256", text_hash(raw_metadata)},
-          {"original_capture_sha256", original_hash},
-          {"observed_capture_sha256", nullptr},
-          {"identity_scope", original_hash.is_null()
-                                 ? "Legacy source has no capture-time payload hash. Retained header/report and an "
-                                   "observed snapshot hash are checked; original-byte authenticity is unverified."
-                                 : "Snapshot must match the retained capture-time payload hash and fresh metadata. "
-                                   "Recorded provenance is not producer authentication."}}},
-        {"launch_environment", {{"requested", request.launch_environment}, {"selection", selection}}},
-        {"scope", "Fresh matching Nsight GPU replay of a retained input. Original application is not launched. "
-                  "Tool completion does not prove pixels, GPU event state, frame correspondence or timing accuracy."}};
-    attempt->writer =
-        artifacts_.begin(manifest_provenance(attempt->provenance),
-                         {"raw/input/capture.ngfx-capture", "raw/input/metadata.raw", "raw/input/report.json",
-                          "raw/exports/metadata.raw", "raw/logs/replay/replay.stdout.txt", "raw/report.json"},
-                         request.pin);
+    auto [attempt, deadline] = make_replay_attempt(options_, artifacts_, request, std::nullopt);
     const auto artifact_id = attempt->writer.id();
     JobRequest job;
     job.capture_id = artifact_id;
     job.deadline = deadline;
     job.worker = [this, attempt, request = std::move(request)](const JobContext& context) {
-        return execute_replay(options_, artifacts_, attempt, request, context);
+        return execute_replay(options_, artifacts_, attempt, request, std::nullopt, context);
+    };
+    return {jobs_.submit(std::move(job)), artifact_id};
+}
+
+CaptureSubmission CaptureService::analyze_timing(ReplayTimingRequest request) {
+    ReplayRequest base;
+    base.capture_id = request.capture_id;
+    base.loop_count = 20;
+    base.timeout = request.timeout;
+    base.pin = request.pin;
+    base.launch_environment = request.launch_environment;
+    auto [attempt, deadline] = make_replay_attempt(options_, artifacts_, base, request);
+    const auto artifact_id = attempt->writer.id();
+    JobRequest job;
+    job.capture_id = artifact_id;
+    job.deadline = deadline;
+    job.worker = [this, attempt, base = std::move(base), request = std::move(request)](const JobContext& context) {
+        return execute_replay(options_, artifacts_, attempt, base, request, context);
     };
     return {jobs_.submit(std::move(job)), artifact_id};
 }

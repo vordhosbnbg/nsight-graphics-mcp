@@ -803,8 +803,8 @@ std::vector<std::string> profile_control_arguments(const ProfileSettings& settin
     return result;
 }
 
-NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
-                                       std::stop_token stop) {
+static NsightProfileResult profile_impl(const NsightInstallation& installation, const NsightProfileOptions& options,
+                                        const NsightReplayProfileOptions* replay, std::stop_token stop) {
     namespace fs = std::filesystem;
     NsightProfileResult result;
     auto& operation = result.operation;
@@ -833,6 +833,11 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
     fs::path output;
     try {
         validate_profile_settings(options.settings);
+        if(replay && replay->interval_index == 0 && !cli.documented_options.contains("--start-with-ngfx-sdk")) {
+            operation.outcome = NsightOutcome::Unavailable;
+            operation.message = "ngfx help does not advertise the required replay SDK trigger";
+            return result;
+        }
         for(const auto& [requested, flag] : std::vector<std::pair<bool, std::string>>{
                 {options.settings.time_every_action.has_value(), "--time-every-action"},
                 {options.settings.hes_enabled.has_value(), "--hes-enabled"}})
@@ -853,8 +858,10 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
                              "--exe=" + target.string(),
                              "--dir=" + directory.string(),
                              "--output-dir=" + output.string(),
-                             "--start-after-" + options.settings.delimiter + "=" +
-                                 std::to_string(options.settings.start_after),
+                             replay && replay->interval_index == 0
+                                 ? "--start-with-ngfx-sdk"
+                                 : "--start-after-" + options.settings.delimiter + "=" +
+                                       std::to_string(options.settings.start_after),
                              "--limit-to-" + options.settings.delimiter + "=" + std::to_string(options.settings.limit),
                              "--max-duration-ms=" + std::to_string(options.settings.duration_ms),
                              "--architecture=" + options.settings.architecture,
@@ -917,11 +924,16 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
         if(repro.settings.at("GPU Clocks") != "Unaltered" ||
            repro.settings.at("Metric Set") != options.settings.metric_set ||
            repro.settings.at("Multi-Pass Metrics") != "Disabled" ||
-           repro.settings.at("Start After") != std::to_string(options.settings.start_after) + suffix ||
+           repro.settings.at("Start After") != (replay && replay->interval_index == 0
+                                                    ? "Replay Pass Start"
+                                                    : std::to_string(options.settings.start_after) + suffix) ||
            repro.settings.at("Limited To") != std::to_string(options.settings.limit) + suffix ||
            !repro.settings.contains("Max Duration ") ||
            repro.settings.at("Max Duration ") != std::to_string(options.settings.duration_ms) + " ms")
             throw std::runtime_error("GPU Trace exported settings differ from requested collection");
+        if(replay && (repro.replay_capture != replay->capture_file.string() ||
+                      repro.process_executable != options.executable.string()))
+            throw std::runtime_error("Replay GPU Trace source file or target differs from the requested snapshot");
         if(options.settings.time_every_action.has_value() &&
            (!repro.settings.contains("Time Every Action") ||
             repro.settings.at("Time Every Action") != (*options.settings.time_every_action ? "Yes" : "No")))
@@ -949,12 +961,63 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
         operation.output_file = output;
         operation.output_bytes = bytes;
         operation.outcome = NsightOutcome::Success;
-        operation.message = "Live GPU Trace and four bounded text exports validated; numeric positions and physical "
-                            "scaling are not inferred";
+        operation.message =
+            replay ? "Same-input replay GPU Trace and four bounded exports validated; original live "
+                     "performance, action identity and physical scaling are not inferred"
+                   : "Live GPU Trace and four bounded text exports validated; numeric positions and physical "
+                     "scaling are not inferred";
     } catch(const std::exception& error) {
         operation.outcome = NsightOutcome::InvalidOutput;
         operation.message = error.what();
     }
     return result;
+}
+
+NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
+                                       std::stop_token stop) {
+    return profile_impl(installation, options, nullptr, stop);
+}
+
+std::filesystem::path nsight_replay_target(const NsightInstallation& installation) {
+    if(!installation.interface_ready || !installation.replay.path || installation.replay.version != "2026.3.1.0" ||
+       installation.replay.build != "38722833")
+        throw std::invalid_argument("Replay analysis requires qualified matching Nsight 2026.3.1.0/build 38722833");
+    return executable_path(installation.replay.path->parent_path() / "ngfx-replay.bin");
+}
+
+NsightProfileResult run_nsight_replay_profile(const NsightInstallation& installation,
+                                              const NsightReplayProfileOptions& options, std::stop_token stop) {
+    NsightProfileResult invalid;
+    invalid.operation.process.cleanup_confirmed = true;
+    try {
+        if(options.capture_tool_version != installation.replay.version ||
+           options.capture_tool_build != installation.replay.build)
+            throw std::invalid_argument("Replay profile source version/build must match the selected replayer");
+        if(options.interval_index > 599)
+            throw std::invalid_argument("Replay profile interval index must be in [0, 599]");
+        const auto input = absolute_path(options.capture_file, "Replay profile capture");
+        if(input != options.capture_file || input.extension() != ".ngfx-capture")
+            throw std::invalid_argument("Replay profile input must be an absolute .ngfx-capture path");
+        regular_file_size(input, false, 1024ULL * 1024 * 1024);
+        NsightProfileOptions profile;
+        profile.context = options.context;
+        profile.executable = nsight_replay_target(installation);
+        profile.working_directory = input.parent_path();
+        profile.arguments = {"--loop-count=" + std::to_string(NsightReplayProfileOptions::loop_count), "--present-app",
+                             "--verbose", input.string()};
+        profile.output_directory = options.output_directory;
+        profile.settings.delimiter = "frames";
+        profile.settings.start_after = options.interval_index;
+        profile.settings.limit = 1;
+        profile.settings.duration_ms = options.duration_ms;
+        profile.settings.architecture = options.architecture;
+        profile.settings.time_every_action = true;
+        profile.settings.hes_enabled = false;
+        return profile_impl(installation, profile, &options, stop);
+    } catch(const std::exception& error) {
+        invalid.operation.outcome = NsightOutcome::InvalidInput;
+        invalid.operation.message = error.what();
+        return invalid;
+    }
 }
 } // namespace ngm

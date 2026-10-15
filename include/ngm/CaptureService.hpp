@@ -66,6 +66,17 @@ struct ReplayRequest {
     LaunchEnvironment launch_environment;
 };
 
+struct ReplayTimingRequest {
+    std::string capture_id;
+    // Zero-based interval within the retained file, not an application frame ID.
+    std::uint64_t interval_index = 0;
+    std::string architecture;
+    std::uint64_t duration_ms = 1000;
+    std::chrono::milliseconds timeout{120000};
+    bool pin = false;
+    LaunchEnvironment launch_environment;
+};
+
 // Composes the independently tested storage, coordinator, and documented CLI
 // adapter. All jobs use one local-GPU reservation. Construction claims the
 // artifact root; callers should construct lazily for discovery-only sessions.
@@ -78,6 +89,7 @@ public:
 
     CaptureSubmission capture(CaptureRequest request);
     CaptureSubmission replay(ReplayRequest request);
+    CaptureSubmission analyze_timing(ReplayTimingRequest request);
     std::optional<JobSnapshot> status(const std::string& job_id) const;
     std::optional<JobSnapshot> wait(const std::string& job_id, std::chrono::milliseconds timeout) const;
     JobCancelResult cancel(const std::string& job_id);

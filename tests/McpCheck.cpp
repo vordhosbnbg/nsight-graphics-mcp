@@ -89,6 +89,7 @@ Json query_capabilities(Client& client) {
                                                         "capture",
                                                         "capture_cpp",
                                                         "replay",
+                                                        "capture_analyze_timing",
                                                         "job_status",
                                                         "job_cancel",
                                                         "artifact_list",
@@ -137,7 +138,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 30, "discover exactly the implemented tools");
+    require(listing.size() == 31, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");
@@ -565,7 +566,7 @@ void workflow_check(const std::string& server, const std::string& standin, const
                     const Scratch& scratch) {
     const auto installation = scratch.path / "standin-installation";
     std::filesystem::create_directories(installation);
-    for(const auto* name : {"ngfx", "ngfx-capture", "ngfx-replay"}) {
+    for(const auto* name : {"ngfx", "ngfx-capture", "ngfx-replay", "ngfx-replay.bin"}) {
         std::filesystem::copy_file(standin, installation / name);
         std::filesystem::permissions(installation / name, std::filesystem::perms::owner_all);
     }
@@ -667,6 +668,18 @@ void workflow_check(const std::string& server, const std::string& standin, const
     require(!successful_call(client, "artifact_files", {{"artifact_id", first_id}, {"offset", 1}})["files"].empty(),
             "file inventory subsequent page");
 
+    const auto timing = successful_call(client, "capture_analyze_timing",
+                                        {{"capture_id", first_id}, {"architecture", "Ampere GA10x"}, {"pin", true}});
+    require(await_job(client, timing.at("identity").at("job_id")).at("state") == "succeeded",
+            "actual stdio timing collector completes both replay phases");
+    const auto timing_index = Json::parse(
+        successful_call(client, "artifact_read",
+                        {{"artifact_id", timing.at("artifact_id")}, {"path", "derived/timing-analysis.json"}})
+            .at("text")
+            .get<std::string>());
+    require(timing_index.at("source").at("capture_id") == first_id &&
+                timing_index.at("requested").at("trigger") == "replay_pass_start",
+            "actual stdio timing collection retains source and explicit trigger provenance");
     const auto record2 = scratch.path / "target2.pid";
     auto sdk_arguments = capture_arguments(record2);
     sdk_arguments["delimiter"] = "graphics_capture_api";

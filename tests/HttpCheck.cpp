@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
         fs::permissions(scratch.path / "token", fs::perms::owner_read | fs::perms::owner_write);
         const auto installation = scratch.path / "nsight";
         fs::create_directory(installation);
-        for(auto name : {"ngfx", "ngfx-capture", "ngfx-replay"}) {
+        for(auto name : {"ngfx", "ngfx-capture", "ngfx-replay", "ngfx-replay.bin"}) {
             fs::copy_file(argv[2], installation / name);
             fs::permissions(installation / name, fs::perms::owner_all);
         }
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         require(other.tool("capabilities")["server"]["protocol_version"] == "2025-11-25",
                 "independent protocol version B");
         require(!fs::exists(store), "discovery does not open store");
-        require(c.rpc("tools/list")["result"]["tools"].size() == 30, "same implemented tools");
+        require(c.rpc("tools/list")["result"]["tools"].size() == 31, "same implemented tools");
         bad = c.headers();
         bad.erase("Accept");
         bad.emplace("Accept", "application/json;q=1");
@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
             } catch(const fastmcpp::TransportHttpError& e) {
                 throw std::runtime_error(std::string(e.what()) + ": " + e.body());
             }
-            require(sdk.list_tools().size() == 30, "supported client tool discovery");
+            require(sdk.list_tools().size() == 31, "supported client tool discovery");
             // Preserve JSON Schema union types: the pinned client's optional
             // high-level result coercion assumes string-only schema types.
             const auto result = sdk.call("tools/call", {{"name", "capabilities"}, {"arguments", Json::object()}});
@@ -330,6 +330,15 @@ int main(int argc, char** argv) {
                     replay_report.at("source").at("capture_id") == complete.at("artifact_id") &&
                     replay_report.at("environment").at("SDL_VIDEODRIVER") == "x11",
                 "HTTP retains replay source identity and launch overlay");
+        const auto timing =
+            other.tool("capture_analyze_timing",
+                       {{"capture_id", complete.at("artifact_id")}, {"architecture", "Ampere GA10x"}, {"pin", true}});
+        require(await_job(other, timing.at("identity").at("job_id")).at("state") == "succeeded",
+                "HTTP timing collector completes its shared source-protected job");
+        const auto timing_info = other.tool("artifact_info", {{"artifact_id", timing.at("artifact_id")}});
+        require(timing_info.at("provenance").at("timing_collected") == true &&
+                    timing_info.at("provenance").at("source").at("capture_id") == complete.at("artifact_id"),
+                "HTTP retains combined analysis origin and source identity");
         auto waiting = capture(c, scratch.path / "wait.pid", true);
         wait_record(scratch.path / "wait.pid");
         c.remove();

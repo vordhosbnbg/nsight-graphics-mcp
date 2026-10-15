@@ -9,6 +9,8 @@ function(ngm_add_capture)
 endfunction()
 
 function(ngm_add_capture_checks)
+    ngm_add_check(ngm_replay_timing_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayTimingCheck.cpp"
+        LIBRARIES ngm_capture ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
     ngm_add_check(ngm_replay_workflow_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ReplayWorkflowCheck.cpp"
         LIBRARIES ngm_capture
         ARGS "$<TARGET_FILE:ngm_nsight_standin>" "$<TARGET_FILE:nsight-graphics-mcp>"

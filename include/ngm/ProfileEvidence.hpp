@@ -54,6 +54,10 @@ struct ProfileReproduction {
     // Selected exported settings only. Host/process names and command lines are
     // deliberately excluded. Raw evidence belongs in the retained bundle.
     std::map<std::string, std::string> settings;
+    // Separate optional evidence for a source-validated replay analysis. These
+    // are not added to historical ordinary-profile settings or public metadata.
+    std::optional<std::string> replay_capture = std::nullopt;
+    std::optional<std::string> process_executable = std::nullopt;
 };
 // Exact observed Vulkan producer versions only; extra bounded fields are ignored.
 ProfileReproduction parse_profile_reproduction(std::string_view text);

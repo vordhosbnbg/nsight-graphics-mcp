@@ -762,6 +762,7 @@ Json implemented_tool_names() {
                         "capture",
                         "capture_cpp",
                         "replay",
+                        "capture_analyze_timing",
                         "job_status",
                         "job_cancel",
                         "artifact_list",
@@ -1158,6 +1159,38 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .compare({args.at("baseline"), args.at("candidate"), args.at("table"), args.at("label"),
                           args.at("column_index"), args.at("workload_policy"), args.at("warmup_policy")});
         });
+
+    add_tool(tools, "capture_analyze_timing",
+             object_schema({{"capture_id", string_schema(39, 39)},
+                            {"interval_index", integer_schema(0, 2)},
+                            {"architecture", string_schema(64, 1)},
+                            {"duration_ms", integer_schema(1, 10000)},
+                            {"timeout_ms", integer_schema(1, 600000)},
+                            {"pin", boolean_schema()},
+                            {"launch_environment", launch_environment_schema()}},
+                           {"capture_id", "architecture"}),
+             object_schema({{"identity", identity_schema()}, {"artifact_id", string_schema(39, 39)}},
+                           {"identity", "artifact_id"}),
+             "Collect generated C++ and a GPU Trace from the same retained Graphics Capture input and selected "
+             "zero-based interval. Qualified source counts are 1 and 3. Requires verified present-delimited source "
+             "settings, matching qualified "
+             "2026.3 tools, profiling access and an explicit architecture selector. Defaults: interval 0, "
+             "duration 1000 ms, deadline 120000 ms, pin false. Source inputs remain leased and snapshotted. "
+             "The original application is not launched; both fresh replay phases share the GPU queue. "
+             "Poll job_status, then inspect derived/timing-analysis.json and its child indexes. Collection "
+             "completion does not itself prove a draw/time association, original live performance or physical "
+             "counter attribution.",
+             false, false, [this](const Json& arguments) {
+                 ReplayTimingRequest request;
+                 request.capture_id = arguments.at("capture_id");
+                 request.interval_index = arguments.value("interval_index", std::uint64_t{0});
+                 request.architecture = arguments.at("architecture");
+                 request.duration_ms = arguments.value("duration_ms", std::uint64_t{1000});
+                 request.timeout = std::chrono::milliseconds(arguments.value("timeout_ms", std::uint64_t{120000}));
+                 request.pin = arguments.value("pin", false);
+                 request.launch_environment = arguments.value("launch_environment", LaunchEnvironment{});
+                 return Json(service().analyze_timing(std::move(request)));
+             });
 
     add_tool(tools, "replay",
              object_schema({{"capture_id", string_schema(39, 39)},
