@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ngm/Artifacts.hpp"
+#include <optional>
 
 namespace ngm {
 struct ResourceWorkers {
@@ -19,6 +20,8 @@ struct ResourceReadRequest {
     std::size_t offset = 0;
     std::size_t length = 65536;
     bool pin = false;
+    // A composing query can share one bounded deadline across multiple reads.
+    std::optional<std::chrono::steady_clock::time_point> deadline = std::nullopt;
 };
 // Leases source, fingerprints helpers, snapshots data, supervises worker,
 // validates its entire bounded response, and publishes success/failure evidence.

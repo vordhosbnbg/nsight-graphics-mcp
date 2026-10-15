@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <set>
 
 namespace {
 namespace fs = std::filesystem;
@@ -242,6 +243,179 @@ void verify_mcp(const fs::path& server, const fs::path& worker, const fs::path& 
     report["status"] = "pass";
     save(run / "state-query-report.json", report);
 }
+void verify_push_mcp(const fs::path& server, const fs::path& worker, const fs::path& run) {
+    const auto captured = load(run / "report.json");
+    require(captured.at("status") == "pass" && captured.at("cases").size() == 2, "two fresh push captures");
+    Json report{{"status", "running"},
+                {"project_version", ngm::project_version()},
+                {"scope", "Recorded opaque push bytes versus private API witnesses; no GPU-observed event state or "
+                          "typed material values"},
+                {"server_sha256", ngm::sha256_file(server)},
+                {"worker_sha256", ngm::sha256_file(worker)},
+                {"harness_sha256", ngm::sha256_file("/proc/self/exe")},
+                {"passes", Json::array()}};
+    fs::copy_file(__FILE__, run / "PushStateQueryIntegration.cpp", fs::copy_options::overwrite_existing);
+    std::ofstream transcript(run / "push-query-transcript.ndjson");
+    transcript.exceptions(std::ios::failbit | std::ios::badbit);
+    std::vector<std::string> read_artifacts;
+    Json original;
+    for(unsigned pass = 0; pass < 2; ++pass) {
+        ngm::check::mcp::Client client(
+            server, "/usr/bin:/bin",
+            {"--artifact-root", (run / "store").string(), "--resource-worker-2026-3", worker.string()}, false, {},
+            {30s, 30s});
+        int sequence = 1;
+        const auto request = [&](const char* method, const Json& params) {
+            transcript << Json{{"pass", pass},
+                               {"direction", "request"},
+                               {"id", sequence},
+                               {"method", method},
+                               {"params", params}}
+                              .dump()
+                       << '\n';
+            const auto response = client.request(sequence++, method, params);
+            transcript << Json{{"pass", pass}, {"direction", "response"}, {"message", response}}.dump() << '\n';
+            transcript.flush();
+            require(response.contains("result"), "MCP protocol response");
+            return response.at("result");
+        };
+        const auto call = [&](const char* tool, const Json& args) {
+            const auto response = request("tools/call", {{"name", tool}, {"arguments", args}});
+            require(!response.value("isError", false) && response.contains("structuredContent"),
+                    "push MCP call: " + response.dump());
+            require(Json::parse(response.at("content")[0].at("text").get<std::string>()) ==
+                        response.at("structuredContent"),
+                    "push text/structured parity");
+            return response.at("structuredContent");
+        };
+        const auto initialized =
+            request("initialize",
+                    {{"protocolVersion", "2025-06-18"},
+                     {"capabilities", Json::object()},
+                     {"clientInfo", {{"name", "ngm-push-state-integration"}, {"version", ngm::project_version()}}}});
+        require(initialized.at("serverInfo").at("version") == ngm::project_version(), "current push server identity");
+        client.send({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}});
+        if(pass == 0)
+            report["tools"] = request("tools/list", Json::object());
+        Json cases = Json::array();
+        std::set<std::string> execution_refs;
+        for(std::size_t case_at = 0; case_at < captured.at("cases").size(); ++case_at) {
+            const auto& source = captured.at("cases")[case_at];
+            const auto id = source.at("submission").at("artifact_id");
+            Json pages = Json::array(), executions = Json::array();
+            std::size_t offset = 0;
+            for(;;) {
+                const auto page =
+                    call("capture_draw_executions", {{"capture_id", id}, {"offset", offset}, {"limit", 2}});
+                require(page.at("unsupported_total") == 0, "qualified push source grammar");
+                pages.push_back(page);
+                for(const auto& row : page.at("executions"))
+                    executions.push_back(row);
+                if(page.at("next_offset").is_null())
+                    break;
+                offset = page.at("next_offset").get<std::size_t>();
+            }
+            require(executions.size() == (case_at == 0 ? 3 : 6),
+                    "three draws per recorded submission, including reuse");
+            Json item{{"capture_id", id}, {"pages", pages}, {"draws", Json::array()}};
+            for(std::size_t draw_at = 0; draw_at < executions.size(); ++draw_at) {
+                const auto& execution = executions[draw_at];
+                const auto ref = execution.at("execution_ref");
+                require(execution_refs.insert(ref.get<std::string>()).second,
+                        "each capture/submission/draw occurrence has a distinct reference");
+                const auto usage = call("artifact_usage", Json::object());
+                const auto state = call("capture_draw_state", {{"capture_id", id}, {"execution_ref", ref}});
+                require(state.at("execution").at("selection") == execution.at("selection"),
+                        "selected reference preserves its exact recorded occurrence");
+                require(call("artifact_usage", Json::object()).at("completed_bytes") == usage.at("completed_bytes"),
+                        "default query retains no byte snapshots");
+                const auto& push = state.at("execution").at("state").at("push_constants");
+                require(push.at("status") == "unavailable" && push.at("value").is_null() &&
+                            push.at("coverage").at("input_coverage_complete") == true,
+                        "known writes remain explicitly unread by default");
+                const auto& label = execution.at("labels")[0];
+                const auto occurrence = execution.at("selection").at("submission_index");
+                const auto& submissions = source.at("witness").at("submissions");
+                const auto submitted = std::find_if(submissions.begin(), submissions.end(), [&](const auto& entry) {
+                    return entry.at("label") == label && entry.at("submission_occurrence") == occurrence;
+                });
+                require(submitted != submissions.end(),
+                        "selected recorded occurrence matches private successful submission");
+                const auto& expected_draws = submitted->at("constant_draws");
+                const auto expected = std::find_if(expected_draws.begin(), expected_draws.end(), [&](const auto& row) {
+                    return row.at("label") == execution.at("labels").back();
+                });
+                require(expected != expected_draws.end(), "unique nested draw label in private API witness");
+                const auto& pipelines = source.at("witness").at("pipelines");
+                const auto pipeline = std::find_if(pipelines.begin(), pipelines.end(), [&](const auto& row) {
+                    return row.at("pipeline_handle") == expected->at("pipeline_handle");
+                });
+                require(pipeline != pipelines.end() && pipeline->at("layout_handle") == expected->at("layout_handle") &&
+                            pipeline->at("push_size") == 16,
+                        "private pipeline/layout creation and bind association");
+                Json checked{{"execution_ref", ref}, {"default", state}, {"witness", *expected}};
+                if(pass == 0 || draw_at == 0) {
+                    const auto bytes = call(
+                        "capture_draw_state",
+                        {{"capture_id", id}, {"execution_ref", ref}, {"read_push_constants", true}, {"pin", true}});
+                    const auto& resolved = bytes.at("execution").at("state").at("push_constants");
+                    require(resolved.at("status") == "qualified_recorded_state" && resolved.at("value").size() == 1 &&
+                                resolved.at("value")[0].at("stage") == "VK_SHADER_STAGE_FRAGMENT_BIT" &&
+                                resolved.at("value")[0].at("data") == expected->at("data") &&
+                                resolved.at("value")[0].at("offset") == expected->at("offset") &&
+                                resolved.at("value")[0].at("length") == expected->at("length"),
+                            "exact reconstructed per-stage byte bank matches private API writes");
+                    require(bytes.at("captured_gpu_execution_correspondence") == false &&
+                                bytes.at("full_effective_state_coverage") == false,
+                            "push reconstruction does not claim GPU event observation");
+                    for(const auto& read_id : resolved.at("read_artifacts")) {
+                        require(call("artifact_info", {{"artifact_id", read_id}}).at("pinned") == true,
+                                "push read pin");
+                        read_artifacts.push_back(read_id.get<std::string>());
+                    }
+                    checked["resolved"] = bytes;
+                }
+                if(pass != 0)
+                    require(state == original[case_at].at("draws")[draw_at].at("default"),
+                            "selection/coverage/provenance survive server restart");
+                item["draws"].push_back(std::move(checked));
+            }
+            require(call("artifact_info", {{"artifact_id", id}}).at("pinned") == true, "source capture remains pinned");
+            if(pass == 0) {
+                const auto& stages =
+                    item.at("draws")[0].at("default").at("execution").at("state").at("shaders").at("value");
+                const auto fragment = std::find_if(stages.begin(), stages.end(), [](const auto& stage) {
+                    return stage.at("stage") == "VK_SHADER_STAGE_FRAGMENT_BIT";
+                });
+                require(fragment != stages.end(), "push fixture fragment declaration");
+                const auto shader = call("capture_cpp_resource",
+                                         {{"capture_id", id},
+                                          {"resource_ref", fragment->at("serialized_byte_read").at("resource_ref")},
+                                          {"length", fragment->at("declared_bytes")},
+                                          {"pin", true}});
+                const auto oracle =
+                    run / "store/bundles" / id.get<std::string>() / "raw/application/shaders/state-constants.frag.spv";
+                require(shader.at("data") == hex(ngm::read_regular_file(oracle, 65536)) &&
+                            shader.at("sha256") == ngm::sha256_file(oracle),
+                        "exact independently retained push-consuming shader");
+                item["fragment_read"] = shader;
+                read_artifacts.push_back(shader.at("artifact_id").get<std::string>());
+            }
+            cases.push_back(std::move(item));
+        }
+        if(pass == 0)
+            original = cases;
+        else
+            for(const auto& id : read_artifacts)
+                require(call("artifact_info", {{"artifact_id", id}}).at("pinned") == true,
+                        "all read pins survive restart");
+        require(client.finish() == 0, "push validation server clean exit");
+        report["passes"].push_back(std::move(cases));
+        save(run / "push-query-report.json", report);
+    }
+    report["status"] = "pass";
+    save(run / "push-query-report.json", report);
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -255,7 +429,13 @@ int main(int argc, char** argv) {
             verify_mcp(fs::canonical(argv[2]), fs::canonical(argv[3]), fs::canonical(argv[4]));
             return;
         }
-        require(argc == 6, "FIXTURE SHADERS NSIGHT_ROOT OUTPUT_ROOT LAUNCH_ENVIRONMENT_JSON required");
+        if(argc == 5 && std::string_view(argv[1]) == "--verify-push") {
+            verify_push_mcp(fs::canonical(argv[2]), fs::canonical(argv[3]), fs::canonical(argv[4]));
+            return;
+        }
+        const bool constants = argc == 7 && std::string_view(argv[6]) == "--constants";
+        require(argc == 6 || constants,
+                "FIXTURE SHADERS NSIGHT_ROOT OUTPUT_ROOT LAUNCH_ENVIRONMENT_JSON [--constants] required");
         const auto fixture = fs::canonical(argv[1]), shaders = fs::canonical(argv[2]);
         const auto nsight = fs::canonical(argv[3]), output = fs::absolute(argv[4]);
         const auto overlay = load(fs::canonical(argv[5])).get<ngm::LaunchEnvironment>();
@@ -284,7 +464,10 @@ int main(int argc, char** argv) {
         options.environment = ngm::capture_environment();
         ngm::CaptureService service(options);
         try {
-            for(const auto* scenario : {"state-static", "state-dynamic", "state-indexed", "state-count"}) {
+            const std::vector<const char*> scenarios =
+                constants ? std::vector<const char*>{"state-constants", "state-constants-reuse"}
+                          : std::vector<const char*>{"state-static", "state-dynamic", "state-indexed", "state-count"};
+            for(const auto* scenario : scenarios) {
                 const auto directory = run / scenario;
                 fs::create_directory(directory);
                 std::vector<std::string> arguments{"--scenario", scenario, "--seed",       "42",
@@ -366,8 +549,7 @@ int main(int argc, char** argv) {
                 save(run / "report.json", report);
             }
             report["status"] = "pass";
-            report["scope"] =
-                "Four fresh documented C++ captures and private API witnesses; does not qualify a state query";
+            report["scope"] = "Fresh documented C++ captures and private API witnesses; does not qualify a state query";
         } catch(...) {
             report["status"] = "failed";
             save(run / "report.json", report);

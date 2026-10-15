@@ -98,7 +98,10 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
              "depth/culling and viewport/scissor state in a single generated Frame0Part00 submission stream. "
              "Requires 0.4.5+ capture-time input fingerprints and Nsight 2026.3.1.0/build 38722833. "
              "Static/core dynamic forms have per-field provenance and refusals. Recorded submissions do not "
-             "establish observed GPU event state, descriptors, push constants or uniform/material values."}}},
+             "establish observed GPU event state or descriptor/material contents. Push coverage tracks partial writes "
+             "and compatible layouts; explicit read_push_constants resolves opaque input bytes through the matching "
+             "configured reader, with retained provenance and bounded shared deadline. No shader-type reflection is "
+             "inferred."}}},
           {"resource_bytes",
            {{"available", storage && (!options.resource_workers.nsight_2026_3.empty() ||
                                       !options.resource_workers.nsight_2026_2.empty())},

@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
         for(const auto* name :
             {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert",
              "post.frag", "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp",
-             "performance-reference.comp", "performance-underfilled.comp"}) {
+             "performance-reference.comp", "performance-underfilled.comp", "state-constants.frag"}) {
             const std::string source = name;
             std::ofstream(directory / "shaders" / source) << "test";
             std::ofstream(directory / "shaders" / (source + ".spv")) << "test";

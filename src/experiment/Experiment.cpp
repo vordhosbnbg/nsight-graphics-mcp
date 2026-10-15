@@ -277,7 +277,7 @@ void validate_metadata(const Json& result, const fs::path& directory) {
     for(const auto& argument : compiler.at("arguments")) {
         require(argument.is_string(), "provenance.shader_compiler.arguments");
     }
-    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 12, "provenance.shaders");
+    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 13, "provenance.shaders");
     std::map<std::string, std::string> expected{{"scene.vert", "vertex"},
                                                 {"scene.frag", "fragment"},
                                                 {"shader-error.frag", "fragment"},
@@ -289,7 +289,8 @@ void validate_metadata(const Json& result, const fs::path& directory) {
                                                 {"compute-index-error.comp", "compute"},
                                                 {"compute-arithmetic-error.comp", "compute"},
                                                 {"performance-reference.comp", "compute"},
-                                                {"performance-underfilled.comp", "compute"}};
+                                                {"performance-underfilled.comp", "compute"},
+                                                {"state-constants.frag", "fragment"}};
     for(const auto& shader : provenance.at("shaders")) {
         const auto source = shader.at("source").get<std::string>();
         require(expected.contains(source) && shader.at("stage") == expected.at(source) &&

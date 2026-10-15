@@ -54,7 +54,8 @@ public:
                              std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json draw_executions(const std::string& capture_id, const std::string& section = "executions",
                                    std::size_t offset = 0, std::size_t limit = 50) const;
-    nlohmann::json draw_state(const std::string& capture_id, const std::string& execution_ref) const;
+    nlohmann::json draw_state(const std::string& capture_id, const std::string& execution_ref,
+                              bool read_push_constants = false, bool pin = false) const;
     nlohmann::json cpp_resources(const std::string& capture_id, const std::string& section = "resources",
                                  std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json cpp_resource(const std::string& capture_id, const std::string& resource_ref, std::size_t offset = 0,

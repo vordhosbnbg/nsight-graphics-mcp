@@ -285,6 +285,56 @@ Schema resource_span_schema() {
                           {"byte_count", integer_schema(1, 4194304)}},
                          {"path", "start_line", "end_line"});
 }
+Schema push_state_schema() {
+    const auto span = resource_span_schema();
+    const auto write = object_schema(
+        {{"event_index", integer_schema()},
+         {"source", span},
+         {"resource_source", span},
+         {"handle", integer_schema(0, 2147483647)},
+         {"macro", {{"type", "string"}, {"enum", {"NV_GET_RESOURCE_STATIC"}}}},
+         {"declared_bytes", integer_schema(1, 256)},
+         {"resource_offset", integer_schema(0, 255)}},
+        {"event_index", "source", "resource_source", "handle", "macro", "declared_bytes", "resource_offset"});
+    const auto segment = object_schema(
+        {{"offset", integer_schema(0, 255)},
+         {"length", integer_schema(1, 256)},
+         {"status",
+          {{"type", "string"}, {"enum", {"not_read", "qualified_recorded_state", "unavailable", "unsupported"}}}},
+         {"reason", nullable(string_schema(256, 1))},
+         {"data", nullable(string_schema(512))},
+         {"input_sha256", nullable(string_schema(64, 64))},
+         {"resource_ref", nullable(string_schema(64, 64))},
+         {"read_artifact", nullable(string_schema(39, 39))},
+         {"write", write}},
+        {"offset", "length", "status", "reason", "data", "input_sha256", "resource_ref", "read_artifact"});
+    const auto bank = object_schema({{"stage", string_schema(64, 1)},
+                                     {"offset", integer_schema(0, 255)},
+                                     {"length", integer_schema(1, 256)},
+                                     {"data", string_schema(512)}},
+                                    {"stage", "offset", "length", "data"});
+    const auto range = object_schema({{"stage", string_schema(64, 1)},
+                                      {"offset", integer_schema(0, 255)},
+                                      {"length", integer_schema(1, 256)},
+                                      {"segments", array_schema(segment, 64)}},
+                                     {"stage", "offset", "length", "segments"});
+    const auto coverage =
+        object_schema({{"layout", string_schema(64, 1)},
+                       {"layout_signature", string_schema(64, 64)},
+                       {"input_coverage_complete", boolean_schema()},
+                       {"ranges", array_schema(range, 5)},
+                       {"shader_usage", string_schema(160, 1)}},
+                      {"layout", "layout_signature", "input_coverage_complete", "ranges", "shader_usage"});
+    return object_schema(
+        {{"status",
+          {{"type", "string"}, {"enum", {"qualified_recorded_state", "unavailable", "unsupported", "not_applicable"}}}},
+         {"value", nullable(array_schema(bank, 5))},
+         {"reason", nullable(string_schema(256, 1))},
+         {"evidence", array_schema(span, 1)},
+         {"coverage", coverage},
+         {"read_artifacts", array_schema(string_schema(39, 39), 8)}},
+        {"status", "value", "reason", "evidence"});
+}
 Schema draw_execution_schema(bool include_state) {
     const auto span = resource_span_schema();
     const auto selection = object_schema({{"frame", integer_schema(0, 0)},
@@ -358,7 +408,8 @@ Schema draw_execution_schema(bool include_state) {
                                             {"reason", string_schema(256, 1)},
                                             {"evidence", array_schema(evidence, 0)}},
                                            {"status", "value", "reason", "evidence"});
-        for(const auto* key : {"descriptors", "push_constants", "uniform_material_values"})
+        properties["push_constants"] = push_state_schema();
+        for(const auto* key : {"descriptors", "uniform_material_values"})
             properties[key] = missing;
         Json required = Json::array();
         for(const auto& [key, unused] : properties.items()) {
@@ -1395,18 +1446,27 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
         });
     add_tool(
         tools, "capture_draw_state",
-        object_schema({{"capture_id", string_schema(39, 39)}, {"execution_ref", string_schema(64, 64)}},
+        object_schema({{"capture_id", string_schema(39, 39)},
+                       {"execution_ref", string_schema(64, 64)},
+                       {"read_push_constants", boolean_schema()},
+                       {"pin", boolean_schema()}},
                       {"capture_id", "execution_ref"}),
         recorded_state_schema(true),
         "Interpret recorded pipeline/shader, depth/culling and viewport/scissor state for one execution_ref listed "
         "by capture_draw_executions. Static and qualified core dynamic forms obey setter/static-bind lifetime rules. "
         "Fields have independent status, values and source evidence. Shader references link to capture_cpp_resource "
-        "for separately confined byte reads. Does not observe GPU event state, descriptor contents, push constants "
+        "for separately confined byte reads. Push-constant coverage tracks per-stage partial writes and layout "
+        "compatibility. "
+        "read_push_constants explicitly resolves qualified opaque input bytes through the configured worker; pin "
+        "retains read artifacts. "
+        "Defaults false; at most eight reads/2048 bytes with a shared 20-second query deadline. Does not observe GPU "
+        "event state, descriptor contents "
         "or post-GPU uniform/material values. Foreign/stale references and mutated capture inputs refuse; result <=256 "
         "KiB.",
-        true, false, [this](const Json& arguments) {
-            return InspectionService(service().artifacts())
-                .draw_state(artifact_id(arguments, "capture_id"), arguments.at("execution_ref").get<std::string>());
+        false, false, [this](const Json& arguments) {
+            return InspectionService(service().artifacts(), options_.resource_workers)
+                .draw_state(artifact_id(arguments, "capture_id"), arguments.at("execution_ref").get<std::string>(),
+                            arguments.value("read_push_constants", false), arguments.value("pin", false));
         });
     auto resource_input = inventory_input;
     resource_input["properties"]["section"] = {

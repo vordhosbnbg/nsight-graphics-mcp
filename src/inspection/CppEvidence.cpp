@@ -226,6 +226,10 @@ Call call(const Document& d, std::size_t at) {
 // These are the value/cast helpers observed in qualified recording/creation
 // blocks. This is deliberately a generated-source grammar, not a C++ evaluator.
 const std::set<std::string_view> value_types{"uint32_t",
+                                             "VkPipelineLayoutCreateInfo",
+                                             "VkPipelineLayoutCreateFlags",
+                                             "VkPushConstantRange",
+                                             "VkDescriptorSetLayout",
                                              "VkCommandBuffer",
                                              "VkCommandBufferResetFlags",
                                              "VkSemaphore",
@@ -606,10 +610,11 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
             check(aggregate_types.contains(v) || value_types.contains(v), "unrecognized aggregate in resource sibling");
         creation |= v == "VulkanReplay_CreateGraphicsPipelines" || v == "VulkanReplay_CreateShaderModule";
         if(state)
-            creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers";
+            creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers" ||
+                        v == "VulkanReplay_CreatePipelineLayout";
         relevant_handle |= v.starts_with("VkPipeline_uid_") || v.starts_with("VkShaderModule_uid_");
         if(state)
-            relevant_handle |= v.starts_with("VkCommandBuffer_uid_");
+            relevant_handle |= v.starts_with("VkCommandBuffer_uid_") || v.starts_with("VkPipelineLayout_uid_");
         if(i + 3 < end && t[i + 1].value == "(" && t[i + 2].value == "*" && t[i + 3].value == "reinterpret_cast") {
             const auto expression = d.expression(i + 1, t[i + 1].pair + 1);
             check(expression == "( * reinterpret_cast < xcb_connection_t * * > ( WindowSystemInstance ( ) . "
@@ -649,7 +654,8 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
             if(t[i].value != "NV_VK_REPLAY" || (t[i + 2].value != "VulkanReplay_CreateGraphicsPipelines" &&
                                                 t[i + 2].value != "VulkanReplay_CreateShaderModule" &&
                                                 !(state && (t[i + 2].value == "VulkanReplay_CreateRenderPass" ||
-                                                            t[i + 2].value == "VulkanReplay_AllocateCommandBuffers"))))
+                                                            t[i + 2].value == "VulkanReplay_AllocateCommandBuffers" ||
+                                                            t[i + 2].value == "VulkanReplay_CreatePipelineLayout"))))
                 continue;
             std::string symbol;
             try {
@@ -666,10 +672,11 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                     check(output.starts_with("& "), "unsupported shader output");
                     output = output.substr(2);
                 }
-                symbol = uid(output, pipeline                                             ? "VkPipeline_uid_"
-                                     : allocation                                         ? "VkCommandBuffer_uid_"
-                                     : invocation.name == "VulkanReplay_CreateRenderPass" ? "VkRenderPass_uid_"
-                                                                                          : "VkShaderModule_uid_");
+                symbol = uid(output, pipeline                                                 ? "VkPipeline_uid_"
+                                     : allocation                                             ? "VkCommandBuffer_uid_"
+                                     : invocation.name == "VulkanReplay_CreateRenderPass"     ? "VkRenderPass_uid_"
+                                     : invocation.name == "VulkanReplay_CreatePipelineLayout" ? "VkPipelineLayout_uid_"
+                                                                                              : "VkShaderModule_uid_");
                 const auto block = t[i].brace;
                 check(block != none && t[block].brace != none, "creation lacks object block");
                 const auto parent = t[block].brace;

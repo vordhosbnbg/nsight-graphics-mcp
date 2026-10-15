@@ -16,6 +16,11 @@ explicit execution/value limits. R-021 stays In Progress for the remaining
 assessment. Step E/R-022 remains Pending. The assessment below preserves its
 original scope; it is not a statement that all proposed state is now available.
 
+At **0.4.6**, step D also reconstructs bounded per-stage push input bytes through
+explicit existing-reader calls, including partial writes and compatible layout
+rebindings. Descriptor contents, uniform/material interpretation and general
+captured-execution correspondence remain unqualified; R-021 remains In Progress.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

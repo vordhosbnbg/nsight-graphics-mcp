@@ -1,5 +1,6 @@
 #include "ngm/Inspection.hpp"
 
+#include "PushState.hpp"
 #include "ResourceProfiles.hpp"
 #include "ngm/CppEvidence.hpp"
 #include "ngm/DrawState.hpp"
@@ -651,7 +652,10 @@ std::pair<Json, Json> resource_sources(ArtifactStore& store, const Capture& capt
 }
 } // namespace
 namespace {
-std::pair<Json, Json> state_sources(ArtifactStore& store, const Capture& capture) {
+struct StateInputs {
+    Json parsed, identities, resources;
+};
+StateInputs state_sources(ArtifactStore& store, const Capture& capture) {
     if(capture.cpp_metadata.has_unsupported_operation)
         fail(Error::ExportUnavailable, "Capture reports unsupported operations; inspect raw generated source");
     if(std::string_view(capture.profile->cli_version) != "2026.3.1.0")
@@ -711,7 +715,7 @@ std::pair<Json, Json> state_sources(ArtifactStore& store, const Capture& capture
     auto parsed = inspect_draw_executions(sources);
     // Resource references remain opaque and can be read through the existing
     // confined reader; never turn initial bytes into post-event values here.
-    const auto resources = inspect_cpp_resources(sources);
+    auto resources = inspect_cpp_resources(sources);
     const auto input_text = anchors.dump();
     const auto input_hash = sha256(std::as_bytes(std::span(input_text.data(), input_text.size())));
     for(auto& execution : parsed["executions"]) {
@@ -744,12 +748,37 @@ std::pair<Json, Json> state_sources(ArtifactStore& store, const Capture& capture
                     {"resource_ref", matches.size() == 1 ? matches[0] : Json(nullptr)}};
             }
         }
+        auto& push = execution["state"]["push_constants"];
+        if(push.contains("coverage"))
+            for(auto& range : push["coverage"]["ranges"])
+                for(auto& segment : range["segments"]) {
+                    if(segment.at("status") != "not_read")
+                        continue;
+                    const auto& write = segment.at("write");
+                    const auto& location = write.at("resource_source");
+                    Json matches = Json::array();
+                    for(const auto& resource : resources.at("resources"))
+                        if(resource.at("handle") == write.at("handle") && resource.at("macro") == write.at("macro") &&
+                           resource.at("expected_bytes") == write.at("declared_bytes") &&
+                           resource.at("readable") == true && resource.at("conditional") == false &&
+                           resource.at("source").at("path") == location.at("path") &&
+                           resource.at("source").at("start_line") == location.at("start_line") &&
+                           resource.at("source").at("end_line") == location.at("end_line"))
+                            matches.push_back(resource.at("resource_ref"));
+                    if(matches.size() == 1)
+                        segment["resource_ref"] = matches[0];
+                    else {
+                        segment["status"] = "unsupported";
+                        segment["reason"] = "push input has no unique readable source reference";
+                        push["coverage"]["input_coverage_complete"] = false;
+                    }
+                }
     }
-    return {std::move(parsed), std::move(anchors)};
+    return {std::move(parsed), std::move(anchors), std::move(resources)};
 }
 Json state_base(const Capture& capture, const Json& parsed, Json identities) {
     auto result = cpp_base_result(capture);
-    result["schema_profile"] = std::string(capture.profile->name) + "-recorded-state-v1";
+    result["schema_profile"] = std::string(capture.profile->name) + "-recorded-state-v2";
     for(const auto* key : {"selection_domain", "evidence_origin", "captured_gpu_execution_correspondence",
                            "full_effective_state_coverage"})
         result[key] = parsed.at(key);
@@ -765,7 +794,8 @@ Json InspectionService::draw_executions(const std::string& capture_id, const std
     if(section != "executions" && section != "unsupported")
         throw std::invalid_argument("State section must be executions or unsupported");
     auto capture = load_capture(artifacts_, capture_id, true);
-    auto [parsed, identities] = state_sources(artifacts_, capture);
+    auto [parsed, identities, references] = state_sources(artifacts_, capture);
+    (void)references;
     auto result = state_base(capture, parsed, std::move(identities));
     result["section"] = section;
     result["executions_total"] = parsed.at("executions").size();
@@ -777,11 +807,15 @@ Json InspectionService::draw_executions(const std::string& capture_id, const std
     return page_result(std::move(result), section.c_str(), rows, offset, limit,
                        [](const Json& value) { return value; });
 }
-Json InspectionService::draw_state(const std::string& capture_id, const std::string& execution_ref) const {
+Json InspectionService::draw_state(const std::string& capture_id, const std::string& execution_ref,
+                                   bool read_push_constants, bool pin) const {
+    if(pin && !read_push_constants)
+        throw std::invalid_argument("pin requires read_push_constants");
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
     if(execution_ref.size() != 64 || execution_ref.find_first_not_of("0123456789abcdef") != std::string::npos)
         throw std::invalid_argument("Execution reference must be a listed 64-character lowercase SHA-256 reference");
     auto capture = load_capture(artifacts_, capture_id, true);
-    auto [parsed, identities] = state_sources(artifacts_, capture);
+    auto [parsed, identities, references] = state_sources(artifacts_, capture);
     const auto& rows = parsed.at("executions");
     const auto found = std::find_if(rows.begin(), rows.end(),
                                     [&](const auto& row) { return row.at("execution_ref") == execution_ref; });
@@ -790,6 +824,57 @@ Json InspectionService::draw_state(const std::string& capture_id, const std::str
              "Execution reference is absent, foreign or stale; list this capture's draw executions");
     auto result = state_base(capture, parsed, std::move(identities));
     result["execution"] = *found;
+    auto& push = result["execution"]["state"]["push_constants"];
+    if(read_push_constants && push.contains("coverage")) {
+        std::map<std::string, Json> selected, reads;
+        std::size_t bytes = 0;
+        for(const auto& range : push.at("coverage").at("ranges"))
+            for(const auto& segment : range.at("segments"))
+                if(segment.at("status") == "not_read" && segment.at("resource_ref").is_string()) {
+                    const auto ref = segment.at("resource_ref").get<std::string>();
+                    if(selected.contains(ref))
+                        continue;
+                    const auto& rows_ = references.at("resources");
+                    const auto reference = std::find_if(rows_.begin(), rows_.end(),
+                                                        [&](const auto& row) { return row.at("resource_ref") == ref; });
+                    require(reference != rows_.end(), "Push reference not present in source inventory");
+                    bytes += number(*reference, "expected_bytes");
+                    selected.emplace(ref, *reference);
+                }
+        if(selected.size() > 8 || bytes > 2048)
+            fail(Error::LimitExceeded, "Push query exceeds eight reads/2048 input bytes");
+        if(!selected.empty() && workers_.nsight_2026_3.empty())
+            fail(Error::ExportUnavailable, "Push bytes require the matching configured 2026.3 resource worker");
+        const auto profile = Json::parse(resource_profiles_json).at("2026_3");
+        push["read_artifacts"] = Json::array();
+        for(const auto& [ref, reference] : selected) {
+            ResourceReadRequest request{capture_id,
+                                        capture.cpp_index.at("project_directory").get<std::string>(),
+                                        reference,
+                                        profile,
+                                        workers_.nsight_2026_3,
+                                        0,
+                                        number(reference, "expected_bytes"),
+                                        pin,
+                                        deadline};
+            auto read = read_cpp_resource(artifacts_, request);
+            for(const auto* name : {"data.bin", "data.bin.rec"}) {
+                const auto path = capture.cpp_index.at("project_directory").get<std::string>() + '/' + name;
+                const auto& anchors = result.at("input_files");
+                const auto match = std::find_if(anchors.begin(), anchors.end(),
+                                                [&](const auto& input) { return input.at("path") == path; });
+                require(match != anchors.end() && match->at("sha256") == read.at("inputs").at(name).at("sha256"),
+                        "Push reader snapshot differs from capture-time inputs");
+            }
+            require(read.at("returned_bytes") == number(reference, "expected_bytes") &&
+                        read.at("total_bytes") == number(reference, "expected_bytes") &&
+                        read.at("next_offset").is_null(),
+                    "Push payload size does not match its recorded static input");
+            push["read_artifacts"].push_back(read.at("artifact_id"));
+            reads.emplace(ref, std::move(read));
+        }
+        detail::resolve_push_data(push, reads);
+    }
     if(result.dump().size() > maximum_page_bytes || !fits_response(result))
         fail(Error::LimitExceeded, "Selected state exceeds the bounded response; inspect raw sources");
     return result;

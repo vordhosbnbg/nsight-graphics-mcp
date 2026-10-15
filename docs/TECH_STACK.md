@@ -9,6 +9,15 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.6 push-constant slice adds a separate pure byte-write tracker and shares
+the bounded replay-value grammar with the raster interpreter. Pipeline-layout
+push ranges establish compatibility; opaque payloads use the unchanged confined
+reader. A composing query supplies a shared read deadline rather than multiplying
+independent worker timeouts. No hydration, reflection library or new dependency
+is selected. Two fresh native captures cover partial writes, compatible/incompatible
+bind restoration and reused recordings; nine selected occurrences match private
+API byte witnesses. Descriptor/material and GPU-observed state remain unavailable.
+
 R-021's first recorded-state slice at 0.4.5 uses a bounded internal syntax
 representation from the existing lexer, a separate pure `DrawState.cpp`
 interpreter and the shared inspection adapter. Capture-time source/payload

@@ -747,6 +747,30 @@ void workflow_check(const std::string& server, const std::string& standin, const
         "export_unavailable");
     expect_tool_error(call(client, "capture_draw_executions", {{"capture_id", state_id}, {"section", "invalid"}}));
     expect_tool_error(call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", "18"}}));
+    expect_tool_error(
+        call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}, {"pin", true}}),
+        "pin requires read_push_constants");
+    auto push_arguments = cpp_arguments;
+    push_arguments["arguments"].push_back("--push-cpp");
+    const auto push_capture = successful_call(client, "capture_cpp", push_arguments);
+    require(await_job(client, push_capture["identity"]["job_id"])["state"] == "succeeded", "synthetic push capture");
+    const auto push_id = push_capture.at("artifact_id");
+    const auto push_listing = successful_call(client, "capture_draw_executions", {{"capture_id", push_id}});
+    require(push_listing.at("executions_total") == 1, "typed push source selection");
+    const auto push_ref = push_listing.at("executions")[0].at("execution_ref");
+    const auto usage_before = successful_call(client, "artifact_usage");
+    const auto push_value =
+        successful_call(client, "capture_draw_state", {{"capture_id", push_id}, {"execution_ref", push_ref}});
+    const auto& push_field = push_value.at("execution").at("state").at("push_constants");
+    require(push_field.at("status") == "unavailable" && push_field.at("value").is_null() &&
+                push_field.at("coverage").at("input_coverage_complete") == true &&
+                push_field.at("coverage").at("ranges")[0].at("segments")[0].at("resource_ref").is_string(),
+            "push coverage has source identity but no fabricated unread value");
+    require(successful_call(client, "artifact_usage").at("completed_bytes") == usage_before.at("completed_bytes"),
+            "default state query creates no byte snapshots");
+    expect_tool_error(call(client, "capture_draw_state",
+                           {{"capture_id", push_id}, {"execution_ref", push_ref}, {"read_push_constants", true}}),
+                      "worker");
     const auto other_state = successful_call(client, "capture_cpp", state_arguments);
     require(await_job(client, other_state["identity"]["job_id"])["state"] == "succeeded",
             "second independent state capture");
@@ -1070,6 +1094,8 @@ int target_main(int argc, char** argv) {
             wait = true;
         } else if(argument == "--state-cpp") {
             // Selects only the stand-in's synthetic source fixture.
+        } else if(argument == "--push-cpp") {
+            // Selects only the stand-in's synthetic partial-constant fixture.
         } else {
             return 83;
         }

@@ -71,6 +71,20 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+R-021's push-constant slice completes at **0.4.6**, retaining the **28-tool**
+surface. `capture_draw_state` tracks per-stage partial writes and push-layout
+compatibility. Its explicit `read_push_constants` option resolves bounded opaque
+input bytes with the existing five-file confined reader; optional `pin` protects
+the resulting read artifacts. No typed material/descriptor interpretation is
+inferred. All **34 CPU checks** pass. Two fresh matching 2026.3 captures cover
+three labelled draws, partial updates, compatible layouts, incompatible bind/
+restore and repeated primary-command-buffer submissions. Nine selected occurrences,
+41 schema-validated MCP results and restart/source/read pins pass. Qualification
+is pinned as `bundle-754e06a3afa984d58e2d073bac3b590f`. The fixture shader inventory
+is now 13 files. R-021 remains In Progress for descriptor/offset/value and general
+execution-correspondence assessment; R-022 remains Pending. See DRAW_STATE.md and
+BUILD_VALIDATION.md for the exact scope and external evidence.
+
 R-021's first bounded recorded-state capability is implemented at **0.4.5** with
 **28 tools**. `capture_draw_executions` selects capture-local recorded submission
 occurrences; `capture_draw_state` interprets pipeline/shader, depth/culling and

@@ -8,6 +8,13 @@ fingerprints and matching 2026.3 producer evidence. General GPU-observed state,
 descriptors, constants and material values remain unavailable.
 [DRAW_STATE.md](DRAW_STATE.md) defines the contract, bounds and qualification.
 
+At **0.4.6**, `capture_draw_state` adds optional `read_push_constants` and `pin`
+(both false by default). It reports partial per-stage write coverage without
+reading bytes, or explicitly resolves bounded opaque input bytes through the
+matching configured reader. `pin` requires the read option and protects its
+separate byte artifacts. No shader-type or post-GPU material interpretation is
+implied. This uses the same 28-tool surface and recorded-state profile v2.
+
 The visual release completes at **0.3.0**, preserving the 22-tool surface qualified
 at 0.2.12. [INSTALL.md](INSTALL.md) provides the exercised source-build and repair
 walkthrough; [VISUAL_RELEASE.md](VISUAL_RELEASE.md) consolidates acceptance scope.

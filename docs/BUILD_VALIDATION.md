@@ -1548,3 +1548,105 @@ remain unavailable. Captured GPU execution correspondence and full effective-sta
 coverage are always false in this subset; none of these checks qualify a general
 post-event memory read, indirect/secondary execution, game diagnosis, timing or
 counter correlation.
+
+
+## 0.4.6 opaque push-constant inputs, 2026-10-15
+
+The next R-021 increment adds per-stage byte-write/lifetime tracking and explicit
+bounded input reads to `capture_draw_state`. The tool count stays **28**, the
+recorded-state result profile becomes **v2**, and the artifact/index/input schemas
+remain version 1. Existing 0.4.5 capture-time fingerprints are accepted. This
+increment does not complete R-021 or infer descriptor contents, shader-reflected
+material types or captured GPU execution state.
+
+Source is based on **5536290**, with the 0.4.6 changes recorded dirty. The existing
+GCC **16.2.1** Debug preset, CMake **4.4.4**, Ninja **1.13.2**, Linux
+**7.2.7-zen1-1-zen**, matching Nsight **2026.3.1.0/build 38722833** and qualified
+stable **0.4.2** worker are used. No dependency, helper closure or machine setting
+changes. The diagnostic fixture adds `state-constants.frag`; its complete shader
+inventory becomes **13**, and source/provenance/experiment checks agree.
+
+```sh
+cmake --preset linux-gcc-debug
+cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+All **34/34 CPU checks pass**, without skips, in **343.25 seconds**. The new
+`ngm_push_state_check` verifies full/middle/overlapping writes against the Khronos
+incremental-update byte oracle, undefined holes, complete-source-but-unread
+status, compatible layouts with different symbols, incompatible layouts, bind/
+restore lifetime, overlapping-stage mask rules, size mismatch, no-push layouts
+and atomic refusal of truncated resolved data. Existing source and raster checks
+pass after sharing the bounded value grammar. MCP checks exercise linked opaque
+references, no hidden default snapshots, explicit worker prerequisite errors and
+`pin`/read validation. The reader's existing stand-in tests also refuse an expired
+composing deadline. All default checks remain independent of Nsight and GPU work.
+
+The C++ hardware runner is built explicitly, then invoked with the same absolute
+fixture, shader, matching-tool, managed-output and launch-environment inputs used
+for the preceding qualification, adding `--constants`. Its exact argument arrays
+are retained in `capture-inputs.json` and `verify-push-inputs.json`:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_draw_state_integration
+build/linux-gcc-debug/tests/ngm_draw_state_integration FIXTURE SHADERS NSIGHT_ROOT OUTPUT_PARENT ENV_JSON --constants
+build/linux-gcc-debug/tests/ngm_draw_state_integration --verify-push SERVER WORKER RUN
+```
+
+Both independent normal baselines and fresh C++ captures succeed with confirmed
+cleanup and released reservations. Inputs are seed **42**, **192×128**, wait-frames
+**2**, final application frame **20**. The driver selection is the existing
+matching 615.71.09 overlay without the layer-disable filter. Exports report
+**RTX 3080 Ti**, driver `61571`, Linux/Arch; independent Vulkan observations report
+**615.71.09**, Vulkan **1.4.351**. The desktop remains KDE Wayland with XCB/Xwayland.
+The first case has three labelled draws and one submission; the second has the
+same three draws submitted twice with a fence wait and no rerecording. This is
+Vulkan command-buffer reuse within one fresh target, not application-session reuse.
+
+External source/read store:
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/draw-state-ipCOis/store`.
+
+| Case | Independently pinned source |
+| --- | --- |
+| state-constants | `bundle-afc5e803e3e2dab6a81e132711f9f9d0` |
+| state-constants-reuse | `bundle-5ed33cfb1b4494c052d882f6826c34c6` |
+
+The private API witness records per-draw banks formed from the actual full input
+and later four-byte update, plus native pipeline/layout identities. The independently audited C++
+export contains four ordered binds (`41,47,53,47` within each capture), two push
+calls, and respectively one/two queue submits. The compatible layouts have equal
+push ranges; the intervening incompatible layout has a different range. No native
+handle is joined to an Nsight symbol by numeric equality.
+
+All **nine** listed occurrences have distinct capture/submission/draw references.
+Default queries preserve a null aggregate push value, explicit unread segments and
+unchanged completed artifact bytes. Explicit reads reconstruct the expected
+16-byte banks exactly, including preserved prefix/suffix and restored values:
+`01000000010000000000000078563412`, then
+`01000000010000000100000078563412`. These are opaque recorded input bytes; only
+the private fixture interprets its own uint32 layout. The push-consuming fragment
+SPIR-V also matches its independently retained application bytes/hash exactly.
+
+The final native query/restart validation retains **19** independently pinned
+read artifacts: fifteen push reads for the nine occurrences, two fragment reads,
+and two first-draw push rereads after restart. Their exact IDs and schemas are in
+`push-schema-validation.json`/`push-query-report.json`. Default fields, references,
+source hashes, capture pins and all earlier/new read pins survive restart. All
+**41** actual paging/default/resolved/shader results pass advertised JSON schemas.
+The source export audit is retained separately as `push-export-audit.json`.
+
+The consolidated **3,734,137-byte / 44-file** report, transcript, CPU log, code diff
+and first-party-source snapshot is pinned centrally as
+**bundle-754e06a3afa984d58e2d073bac3b590f**. Its importer remains the connected
+installed **0.4.1** server; the payload binds the source-built **0.4.6** server,
+fixture and harness hashes. No live connection upgrade is implied. Initial probe
+read artifacts remain pinned separately and are not substituted for the final
+native qualification.
+
+Read requests retain the existing 256 MiB database, 16 MiB record/blob and 64 KiB
+range limits. This composition further limits push inputs to 256 bytes per stage,
+eight distinct reads/2,048 input bytes, and a shared read deadline set twenty
+seconds after query entry; existing source parsing bounds and owned-process
+cleanup remain separate. Missing, incompatible or unread bytes never become
+zero-filled values. Descriptor/offset/value assessment, new 2026.2 state support
+and R-022 timing/counters remain outside this completed increment.

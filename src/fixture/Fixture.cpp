@@ -31,7 +31,7 @@ namespace ngm::fixture {
 namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
-constexpr std::array<std::string_view, 23> scenarios{"reference",
+constexpr std::array<std::string_view, 25> scenarios{"reference",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -53,8 +53,10 @@ constexpr std::array<std::string_view, 23> scenarios{"reference",
                                                      "state-static",
                                                      "state-dynamic",
                                                      "state-indexed",
-                                                     "state-count"};
-constexpr std::array<std::string_view, 12> shader_sources{"scene.vert",
+                                                     "state-count",
+                                                     "state-constants",
+                                                     "state-constants-reuse"};
+constexpr std::array<std::string_view, 13> shader_sources{"scene.vert",
                                                           "scene.frag",
                                                           "shader-error.frag",
                                                           "indirect.vert",
@@ -65,7 +67,8 @@ constexpr std::array<std::string_view, 12> shader_sources{"scene.vert",
                                                           "compute-index-error.comp",
                                                           "compute-arithmetic-error.comp",
                                                           "performance-reference.comp",
-                                                          "performance-underfilled.comp"};
+                                                          "performance-underfilled.comp",
+                                                          "state-constants.frag"};
 
 struct Workload {
     bool multipass = false;
@@ -75,6 +78,8 @@ struct Workload {
     bool dynamic_state = false;
     bool indexed = false;
     bool dynamic_count = false;
+    bool constants = false;
+    bool reuse_commands = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
     std::uint32_t instance_count = 1;
@@ -90,6 +95,8 @@ Workload workload(std::string_view scenario) {
     result.dynamic_state = scenario == "state-dynamic" || scenario == "state-count";
     result.indexed = scenario == "state-indexed";
     result.dynamic_count = scenario == "state-count";
+    result.constants = scenario.starts_with("state-constants");
+    result.reuse_commands = scenario == "state-constants-reuse";
     result.channel_order = scenario == "pass-output-error" || scenario == "combined-pass-error" ? 1u : 0u;
     result.resource_xor = scenario == "resource-selection-error" || scenario == "combined-resource-error" ? 1u : 0u;
     result.instance_count =
@@ -113,6 +120,9 @@ Json workload_metadata(std::string_view scenario) {
         {"state_validation", selected.state},
         {"dynamic_raster_depth_state", selected.dynamic_state},
         {"dynamic_viewport_scissor_count", selected.dynamic_count},
+        {"partial_push_constants", selected.constants},
+        {"submissions_per_frame", selected.reuse_commands ? 2 : 1},
+        {"draws_per_submission", selected.constants ? 3 : 1},
         {"render_pass_count", selected.multipass ? 2 : 1},
         {"minimum_api_version", "1.3.0"},
         {"required_device_extensions", {"VK_KHR_swapchain"}},
@@ -385,7 +395,8 @@ public:
             {"presentation_completion", maintenance_extension_.empty() ? "device_wait_idle" : maintenance_extension_}};
         metadata["selected_shader_artifacts"] = {
             workload_.indirect ? "shaders/indirect.vert.spv" : "shaders/scene.vert.spv",
-            workload_.bindless
+            workload_.constants ? "shaders/state-constants.frag.spv"
+            : workload_.bindless
                 ? "shaders/bindless.frag.spv"
                 : (options_.scenario == "shader-error" ? "shaders/shader-error.frag.spv" : "shaders/scene.frag.spv")};
         if(workload_.multipass) {
@@ -423,21 +434,31 @@ public:
             record(image_index, frame);
             const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             auto submit = vk_struct<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-            submit.waitSemaphoreCount = 1;
-            submit.pWaitSemaphores = &acquired_;
-            submit.pWaitDstStageMask = &wait_stage;
-            submit.commandBufferCount = 1;
-            submit.pCommandBuffers = &command_;
-            submit.signalSemaphoreCount = 1;
-            submit.pSignalSemaphores = &present_ready_[image_index];
-            check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
-            if(!options_.state_witness.empty()) {
-                state_witness_["submissions"].push_back({{"frame", frame},
-                                                         {"label", "frame." + std::to_string(frame)},
-                                                         {"queue_family", graphics_family_},
-                                                         {"command_buffer_count", 1},
-                                                         {"draw", draw_witness_}});
-                write_json(options_.state_witness, state_witness_);
+            const auto repetitions = workload_.reuse_commands ? 2u : 1u;
+            for(std::uint32_t occurrence = 0; occurrence < repetitions; ++occurrence) {
+                if(occurrence != 0) {
+                    check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns),
+                          "waiting before command-buffer reuse");
+                    check(vkResetFences(device_, 1, &submit_fence_), "resetting reused submission fence");
+                }
+                submit.waitSemaphoreCount = occurrence == 0 ? 1u : 0u;
+                submit.pWaitSemaphores = &acquired_;
+                submit.pWaitDstStageMask = &wait_stage;
+                submit.commandBufferCount = 1;
+                submit.pCommandBuffers = &command_;
+                submit.signalSemaphoreCount = occurrence + 1 == repetitions ? 1u : 0u;
+                submit.pSignalSemaphores = &present_ready_[image_index];
+                check(vkQueueSubmit(graphics_queue_, 1, &submit, submit_fence_), "submitting the scene");
+                if(!options_.state_witness.empty()) {
+                    state_witness_["submissions"].push_back({{"frame", frame},
+                                                             {"label", "frame." + std::to_string(frame)},
+                                                             {"queue_family", graphics_family_},
+                                                             {"command_buffer_count", 1},
+                                                             {"submission_occurrence", occurrence},
+                                                             {"constant_draws", constant_draws_},
+                                                             {"draw", draw_witness_}});
+                    write_json(options_.state_witness, state_witness_);
+                }
             }
             auto present = vk_struct<VkPresentInfoKHR>(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
             present.waitSemaphoreCount = 1;
@@ -1302,6 +1323,8 @@ private:
         auto depth = vk_struct<VkPipelineDepthStencilStateCreateInfo>(
             VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
         depth.depthTestEnable = depth.depthWriteEnable = workload_.dynamic_state ? VK_FALSE : VK_TRUE;
+        if(workload_.constants)
+            depth.depthWriteEnable = VK_FALSE;
         depth.depthCompareOp = workload_.dynamic_state ? VK_COMPARE_OP_GREATER : VK_COMPARE_OP_LESS;
         depth.maxDepthBounds = 1;
         const std::array<VkDynamicState, 7> dynamic_states{
@@ -1344,7 +1367,7 @@ private:
         create.renderPass = render_pass;
         check(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline), "creating " + label);
         if(workload_.state) {
-            state_witness_["pipeline_api_inputs"] = {
+            Json inputs = {
                 {"pipeline_handle", handle_bits(pipeline)},
                 {"layout_handle", handle_bits(create.layout)},
                 {"render_pass_handle", handle_bits(create.renderPass)},
@@ -1358,7 +1381,9 @@ private:
                  {viewport.x, viewport.y, viewport.width, viewport.height, viewport.minDepth, viewport.maxDepth}},
                 {"scissor", {scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height}},
                 {"dynamic_states", workload_.dynamic_state ? Json(dynamic_states) : Json::array()}};
-            auto& witness_stages = state_witness_["pipeline_api_inputs"]["stages"] = Json::array();
+            inputs["push_size"] = push_size;
+            inputs["label"] = label;
+            auto& witness_stages = inputs["stages"] = Json::array();
             for(const auto& stage : stages) {
                 auto module = shader_witness_.at(std::to_string(handle_bits(stage.module)));
                 module["stage"] = stage.stage;
@@ -1366,17 +1391,31 @@ private:
                 module["entry_point"] = stage.pName;
                 witness_stages.push_back(std::move(module));
             }
+            if(label == "fixture.scene.graphics")
+                state_witness_["pipeline_api_inputs"] = inputs;
+            state_witness_["pipelines"].push_back(std::move(inputs));
         }
         name(VK_OBJECT_TYPE_PIPELINE, pipeline, label);
     }
 
     void create_pipeline() {
-        make_pipeline(
-            workload_.indirect ? "indirect.vert.spv" : "scene.vert.spv",
-            workload_.bindless ? "bindless.frag.spv"
-                               : (options_.scenario == "shader-error" ? "shader-error.frag.spv" : "scene.frag.spv"),
-            descriptor_layout_, workload_.bindless ? 8u : 0u, workload_.multipass ? offscreen_pass_ : render_pass_,
-            pipeline_layout_, pipeline_, "fixture.scene.graphics");
+        make_pipeline(workload_.indirect ? "indirect.vert.spv" : "scene.vert.spv",
+                      workload_.constants ? "state-constants.frag.spv"
+                      : workload_.bindless
+                          ? "bindless.frag.spv"
+                          : (options_.scenario == "shader-error" ? "shader-error.frag.spv" : "scene.frag.spv"),
+                      descriptor_layout_,
+                      workload_.constants  ? 16u
+                      : workload_.bindless ? 8u
+                                           : 0u,
+                      workload_.multipass ? offscreen_pass_ : render_pass_, pipeline_layout_, pipeline_,
+                      "fixture.scene.graphics");
+        if(workload_.constants) {
+            make_pipeline("scene.vert.spv", "state-constants.frag.spv", descriptor_layout_, 16, render_pass_,
+                          compatible_layout_, compatible_pipeline_, "fixture.constants.compatible");
+            make_pipeline("scene.vert.spv", "state-constants.frag.spv", descriptor_layout_, 32, render_pass_,
+                          incompatible_layout_, incompatible_pipeline_, "fixture.constants.incompatible");
+        }
         if(workload_.multipass) {
             make_pipeline("post.vert.spv", "post.frag.spv", post_descriptor_layout_, 4, render_pass_,
                           post_pipeline_layout_, post_pipeline_, "fixture.post.graphics");
@@ -1442,7 +1481,9 @@ private:
 
     void record(std::uint32_t image_index, std::uint32_t frame) {
         auto begin = vk_struct<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
-        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        begin.flags = workload_.reuse_commands ? VkCommandBufferUsageFlags{0}
+                                               : VkCommandBufferUsageFlags{VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+        constant_draws_ = Json::array();
         check(vkBeginCommandBuffer(command_, &begin), "beginning frame commands");
         begin_label("frame." + std::to_string(frame));
         if(workload_.multipass) {
@@ -1521,7 +1562,9 @@ private:
             vkCmdPushConstants(command_, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                static_cast<std::uint32_t>(sizeof(selection)), selection.data());
         }
-        if(workload_.indirect) {
+        if(workload_.constants) {
+            record_constants();
+        } else if(workload_.indirect) {
             vkCmdDrawIndirect(command_, indirect_.handle, 0, 1, sizeof(VkDrawIndirectCommand));
         } else if(workload_.indexed) {
             vkCmdBindIndexBuffer(command_, indices_.handle, 0, VK_INDEX_TYPE_UINT32);
@@ -1597,6 +1640,42 @@ private:
         check(vkEndCommandBuffer(command_), "ending frame commands");
     }
 
+    void record_constants() {
+        std::array<std::uint32_t, 4> bank{1, 1, 0, 0x12345678};
+        const auto observe = [&](const char* label, VkPipeline pipeline, VkPipelineLayout layout) {
+            begin_label(label);
+            vkCmdDraw(command_, 3, 1, 0, 0);
+            std::string data;
+            constexpr char digits[] = "0123456789abcdef";
+            for(const auto value : std::as_bytes(std::span(bank))) {
+                const auto b = std::to_integer<unsigned>(value);
+                data += digits[b >> 4];
+                data += digits[b & 15];
+            }
+            constant_draws_.push_back({{"label", label},
+                                       {"pipeline_handle", handle_bits(pipeline)},
+                                       {"layout_handle", handle_bits(layout)},
+                                       {"offset", 0},
+                                       {"length", sizeof(bank)},
+                                       {"data", data},
+                                       {"stage", VK_SHADER_STAGE_FRAGMENT_BIT}});
+            draw_witness_["bound_pipeline_handle"] = handle_bits(pipeline);
+            end_label();
+        };
+        vkCmdPushConstants(command_, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(bank), bank.data());
+        observe("constants.initial", pipeline_, pipeline_layout_);
+        const std::uint32_t blue = 1;
+        vkCmdPushConstants(command_, compatible_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 8, sizeof(blue), &blue);
+        std::memcpy(reinterpret_cast<std::byte*>(bank.data()) + 8, &blue, sizeof(blue));
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, compatible_pipeline_);
+        vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, compatible_layout_, 0, 1, &descriptors_[0],
+                                0, nullptr);
+        observe("constants.partial", compatible_pipeline_, compatible_layout_);
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, incompatible_pipeline_);
+        vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, compatible_pipeline_);
+        observe("constants.restored", compatible_pipeline_, compatible_layout_);
+    }
+
     void write_image() {
         const auto path = options_.output / "image.ppm";
         std::ofstream output(path, std::ios::binary);
@@ -1670,6 +1749,10 @@ private:
             if(post_pipeline_) {
                 vkDestroyPipeline(device_, post_pipeline_, nullptr);
             }
+            if(compatible_pipeline_)
+                vkDestroyPipeline(device_, compatible_pipeline_, nullptr);
+            if(incompatible_pipeline_)
+                vkDestroyPipeline(device_, incompatible_pipeline_, nullptr);
             for(const auto shader : shaders_) {
                 vkDestroyShaderModule(device_, shader, nullptr);
             }
@@ -1679,6 +1762,10 @@ private:
             if(post_pipeline_layout_) {
                 vkDestroyPipelineLayout(device_, post_pipeline_layout_, nullptr);
             }
+            if(compatible_layout_)
+                vkDestroyPipelineLayout(device_, compatible_layout_, nullptr);
+            if(incompatible_layout_)
+                vkDestroyPipelineLayout(device_, incompatible_layout_, nullptr);
             if(descriptor_pool_) {
                 vkDestroyDescriptorPool(device_, descriptor_pool_, nullptr);
             }
@@ -1760,6 +1847,7 @@ private:
                         {"submissions", Json::array()}};
     Json draw_witness_;
     Json shader_witness_ = Json::object();
+    Json constant_draws_ = Json::array();
     xcb_connection_t* connection_ = nullptr;
     xcb_window_t window_ = XCB_WINDOW_NONE;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -1809,6 +1897,8 @@ private:
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     std::vector<VkShaderModule> shaders_;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
+    VkPipelineLayout compatible_layout_ = VK_NULL_HANDLE, incompatible_layout_ = VK_NULL_HANDLE;
+    VkPipeline compatible_pipeline_ = VK_NULL_HANDLE, incompatible_pipeline_ = VK_NULL_HANDLE;
     VkCommandPool command_pool_ = VK_NULL_HANDLE;
     VkCommandBuffer command_ = VK_NULL_HANDLE;
     VkFence submit_fence_ = VK_NULL_HANDLE;

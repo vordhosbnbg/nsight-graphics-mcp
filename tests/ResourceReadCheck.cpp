@@ -176,6 +176,9 @@ int main(int argc, char** argv) {
                         "failed inputs not retained");
             }
             auto bad_helper = request(id, fs::absolute(argv[1]));
+            auto expired = bad_helper;
+            expired.deadline = std::chrono::steady_clock::now();
+            rejected([&] { (void)ngm::read_cpp_resource(store, expired); });
             bad_helper.helper_profile["files"]["DllCommon.h"] = std::string(64, '0');
             rejected([&] { (void)ngm::read_cpp_resource(store, bad_helper); });
             snapshots(store, scratch.path);

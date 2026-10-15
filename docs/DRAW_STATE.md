@@ -6,6 +6,11 @@ recorded-state interpreter for generated Vulkan C++ captures from **Nsight
 This is the first state slice of R-021; the broader effective-state objective
 remains open. Existing `capture_cpp_draws` retains its source-relationship contract.
 
+At **0.4.6**, the same tools add per-stage push-constant coverage and explicit
+opaque-byte reads. The recorded-state result profile is now `recorded-state-v2`;
+the artifact/index and input-fingerprint schemas remain version 1. Captures with
+0.4.5 capture-time fingerprints remain eligible. The tool count stays 28.
+
 ## Select and inspect
 
 Capture with `capture_cpp`, then list submitted draw occurrences:
@@ -43,6 +48,7 @@ source references. The response's `input_files` supply their capture-time hashes
 | `cull_mode`, `front_face` | Static raster values or applicable core dynamic setters. |
 | `viewports` | Arrays of `[x,y,width,height,minDepth,maxDepth]`. |
 | `scissors` | Arrays of `[x,y,width,height]`. |
+| `push_constants` | Layout-compatible per-stage writes and, when explicitly requested, reconstructed opaque bytes. |
 
 Available fields use `qualified_recorded_state`. Missing dynamic writes use
 `unavailable`; unqualified creation/lifetime forms use `unsupported`. The
@@ -57,6 +63,49 @@ for independently confined bytes/hash and retained provenance. No byte read or
 new artifact is hidden inside the state query. A SPIR-V identity does not identify
 driver machine code. Existing worker/database/range limits remain in force;
 see [RESOURCE_QUERIES.md](RESOURCE_QUERIES.md).
+
+## Push constant inputs
+
+`capture_draw_state` defaults to `read_push_constants: false` and `pin: false`.
+To resolve the selected draw's push input bytes:
+
+```json
+{"capture_id":"bundle-…","execution_ref":"<listed reference>","read_push_constants":true,"pin":true}
+```
+
+The interpreter follows ordered partial writes for each graphics stage and byte.
+Compatibility uses identical push ranges, independently of descriptor layouts.
+Binding an incompatible pipeline and then returning to a compatible pipeline
+does not erase the push values. Missing writes, an incompatible last write layout
+and unsupported commands cannot leave earlier values falsely available. These
+rules follow [vkCmdPushConstants](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdPushConstants.html)
+and the [Khronos push-constant guide](https://docs.vulkan.org/guide/latest/push_constants.html).
+
+Without reads, `push_constants.value` is null and its status is `unavailable`.
+`coverage` exposes ranges and segments with `not_read`, `unavailable` or
+`unsupported` status, source references and per-write offsets. A complete recorded
+write history is distinct from resolved bytes. A layout without graphics push
+ranges is `not_applicable`. If all declared graphics-stage bytes are initialized,
+compatible and read successfully, the field becomes `qualified_recorded_state`;
+its value is a list of `{stage, offset, length, data}` ranges with hexadecimal
+bytes. Partial coverage keeps a null aggregate value and shows only known segments;
+undefined bytes are never filled with zero.
+
+Reads use the existing confined worker and producer-qualified five-file closure.
+The observed data grammar is a direct bounded `NV_GET_RESOURCE_STATIC(void*, …)`
+input, with agreeing command/resource sizes. The bounds are 256 bytes per stage,
+eight distinct input reads and 2,048 requested input bytes. The read sequence
+shares a deadline set twenty seconds after query entry; each individual reader
+keeps its existing ten-second maximum and bounded owned-process cleanup. Source
+parsing retains its existing size/node bounds. Each read retains database snapshots
+and provenance under the normal quota. `pin` requires `read_push_constants` and
+pins those read artifacts; pin the source capture separately.
+
+Segments retain `resource_ref`, `read_artifact` and `input_sha256`. The latter is
+the hash of the complete input payload from that read, even when a segment uses
+only part of it. These are recorded API input bytes. Shader usage, types, material
+meaning and captured GPU execution are not inferred. Descriptors and host/GPU-
+updated uniform buffers remain separate evidence problems.
 
 ## Grammar, refusals and bounds
 
@@ -139,13 +188,24 @@ server and checks stable fields/references/pins. `--inspect-retained RUN` runs
 only the pure witness comparison. Private `--state-witness` fixture output stays
 outside captured application evidence and never becomes a general product API.
 
-`descriptors`, `push_constants` and `uniform_material_values` remain unavailable.
+`descriptors` and `uniform_material_values` remain unavailable.
 Serialized initial resources cannot prove host/GPU-updated contents at a selected
 execution or actual bindless element access. Descriptor compatibility/write
-history, partial constant writes, typed layouts and captured-execution
+history, typed layouts and captured-execution
 correspondence remain R-021 follow-up. No wider proprietary hydration closure is
 introduced. New state support on Nsight 2026.2 is unqualified and its state query
 refuses explicitly; historical two-release capabilities retain their original
 scope. R-022's correlated timing/counters and I-038's graphics-format timeouts
 also remain separate work. No machine permissions, clocks or display settings
 are changed by this capability.
+
+The 0.4.6 `state-constants` and `state-constants-reuse` cases use three labelled
+draws, full then partial writes, compatible layouts and an incompatible bind
+followed by restoration. The second case submits the same primary recording twice
+with an intervening fence wait. Both fresh captures pass; nine draw occurrences
+match private API byte witnesses. The opt-in C++ runner accepts `--constants` as
+its final capture argument and `--verify-push SERVER WORKER RUN` for MCP byte,
+pagination, identity, shader and restart/pin validation. Its 41 actual results
+pass their advertised JSON schemas. See BUILD_VALIDATION.md for retained evidence.
+The fixture's complete shader inventory is now 13 files, including the diagnostic
+push-consuming `state-constants.frag`.

@@ -31,7 +31,8 @@ repaired capture matches the reference pixel for pixel.
 
 For qualified 2026.3 C++ captures, `capture_draw_executions` and
 `capture_draw_state` expose recorded pipeline/shader, depth/culling and
-viewport/scissor state with field-level provenance. GPU-observed state and
+viewport/scissor state with field-level provenance, plus explicit bounded
+push-constant input reads. GPU-observed state and
 descriptor/material values remain unavailable. [Recorded-state scope](docs/DRAW_STATE.md)
 
 **Validate compute results**

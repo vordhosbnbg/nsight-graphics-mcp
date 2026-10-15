@@ -81,7 +81,8 @@ Json read_cpp_resource(ArtifactStore& store, const ResourceReadRequest& request)
     require(handle <= 2147483647 && expected <= blob_limit && request.reference.at("readable") == true,
             "Resource reference is not readable");
     auto lease = store.lease(request.capture_id);
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    const auto deadline = std::min(std::chrono::steady_clock::now() + std::chrono::seconds(10),
+                                   request.deadline.value_or(std::chrono::steady_clock::time_point::max()));
     Json report{{"schema_version", 1},
                 {"project_version", project_version()},
                 {"evidence_origin", "nsight_generated_resource_read"},
