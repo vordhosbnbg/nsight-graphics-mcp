@@ -1743,3 +1743,108 @@ R-021 remains In Progress for the descriptor contents/value and general
 captured-execution feasibility outcome. R-022 timing/counters stays Pending.
 New state support on 2026.2 remains unqualified. No broader state or value
 availability follows from this recorded binding capability.
+
+## 0.4.8 profile collection controls and undefined cells, 2026-10-15
+
+This first R-022 slice retains the **28-tool** surface and artifact/index schema
+version 1. Nullable `time_every_action`/`hes_enabled` settings preserve tool
+defaults, retain exact requests/argv and verify exported per-action selection.
+HES activation remains unverified. Only exact **2026.3.1.0/build 38722833** regime
+`nan` cells become null/unavailable values. Finite cells remain available;
+comparison refuses a selected missing value. The C++ optional number and nullable
+MCP metric value require consumer handling; see [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md).
+
+The source build is based on **4ab02f2**, with the tested 0.4.8 code explicitly
+dirty. The recorded host is GCC **16.2.1**, CMake **4.4.4**, Ninja **1.13.2**,
+Linux **7.2.7-zen1-1-zen**, RTX **3080 Ti** / driver **615.71.09**, KDE Wayland
+with the fixture's XCB/Xwayland path. Only the matching 2026.3 installation is
+present. The explicit per-job overlay selects the existing matching library/ICD
+directory, QT XCB and SDL Wayland; no layer-disable filter is supplied. Desktop,
+overlay/library/ICD, compiler, diagnostic shader and executable identities are
+retained. The default NVML/library mismatch remains outside this change.
+
+The final serial aggregate passes **35/35 checks, zero skipped, in 352.11 s**:
+
+```sh
+CTEST_PARALLEL_LEVEL=1 cmake --build --preset linux-gcc-debug --target ngm_check_all
+```
+
+Existing profile evidence/workflow/comparison checks cover nullable types,
+defaults, explicit false versus unspecified settings, missing help, export
+mismatches, finite/unavailable neighbors and comparison refusal. The pure parser
+rejects unqualified producers/tokens and nonfinite timing/frame values. The
+sanitized 587-byte actual regime subset retains two undefined cells and duplicate
+column names. Discovery now recognizes option declaration lines, preventing
+flag-shaped diagnostic paths from satisfying a missing-help gate. Actual stdio
+and shared HTTP checks pass within the aggregate. Scoped formatting/whitespace
+review passes; no product code changes follow the final aggregate.
+
+The opt-in C++ `ngm_profile_controls_integration` target is excluded from ordinary
+CPU checks. Its reproduction command uses six absolute input paths:
+
+```sh
+cmake --build --preset linux-gcc-debug --target ngm_profile_controls_integration
+/absolute/build/tests/ngm_profile_controls_integration \
+  /absolute/build/nsight-graphics-mcp /absolute/build/ngm-vulkan-fixture \
+  /absolute/build/shaders/fixture /absolute/Nsight-installation \
+  /absolute/validation-parent /absolute/launch-environment.json
+```
+
+The runner explicitly forwards the desktop environment, then requests two fresh
+`state-descriptors-reuse` profiles: seed **42**, **192×128**, final application
+frame **300**, collect three frames after five presents, **1000 ms**, Throughput
+Metrics / Ampere GA10x, HES false, per-action timing false then true, **120000 ms**
+deadline, pinned. Both jobs succeed with owned-process cleanup and no retained GPU
+reservation. `REPRO_INFO.xls` confirms **No/Yes** respectively. No repeated-run
+performance or overhead comparison is inferred from this pair.
+
+External native validation store:
+`/home/vordhosbn/.local/share/nsight-graphics-mcp/capability-followup/profile-controls-NP8O6H/store`.
+
+| Per-action request | Independently pinned profile | Regime rows × numeric columns | Finite / unavailable cells |
+| --- | --- | --- | --- |
+| false | `bundle-238953e1f0532f26e65e9df6974dacf2` | 41 × 438 | 17812 / 146 |
+| true | `bundle-4c11944bc2bd355501defdefea0c8b04` | 42 × 438 | 18396 / 0 |
+
+An independent raw-table hash/position audit agrees with whole-table coverage
+and sampled finite/null metric cells. All four tables remain inspectable.
+Metadata and pins match after restart. All **202** native-run tool results pass
+their actual JSON Schema 2020-12 output contracts and text/structured parity.
+A final read-only restart after isolating I-041's incomplete negative copies
+confirms unchanged metadata and complete/pinned status; **four** additional
+results pass their schemas. The current server, fixture and harness binary
+hashes still match the exact successful-run report.
+
+A separate **CPU-only** compatibility run uses the installed **0.4.1** server and
+C++ Nsight stand-ins to create an intact ten-field native profile through the
+normal service. The source-built 0.4.8 server reads that unmodified store in two
+new processes, preserving the old request, pins and identical metadata. Omitted
+controls stay null; the exported default is observed rather than asserted as an
+explicit request. This is old-product-format compatibility, not real 2026.2
+hardware/tool qualification.
+
+I-040 preserves the earlier real export failure, including 292 undefined regime
+cells with timing enabled. The fresh off profile above also contains undefined
+cells; causation is unresolved. I-041 preserves the refused incomplete historical
+native-bundle restoration and its store-wide integrity consequence. Neither
+failed bundle is repaired/promoted. Before/after observations show unchanged
+profiling restriction, capability control files and device ACLs; pre-existing
+profiler-device/trace access suffices. No permission/clock/driver/display change
+is performed.
+
+The consolidated qualification is pinned as
+**bundle-193d06c97b109c55fb8a30e35f12b8f9**, **2,641,144 bytes / 63 files**, with a
+hash-verified **28-file** first-party source snapshot. All 63 imported files
+match their source hashes; complete/pinned state and released usage are checked.
+It retains reports, transcripts, actual output schemas, selected raw exports, final CPU log,
+exact commands, failure/isolation audits, code diff and hash-verified first-party
+sources. This is a selected-evidence snapshot, not a complete native-bundle
+backup or a typed profile import. Its connected generic importer is still the
+installed **0.4.1** server; payload identities bind the tested **0.4.8** binaries.
+No installed/live-server upgrade is implied.
+
+**R-022 remains In Progress.** Actual timing rows are present, but their
+direct/indexed draw or marker-occurrence correlation, repeated/nested/reused
+cases, independent timestamp/overhead sanity and counter scopes remain to be
+qualified. No draw-local metric, fragment-only interpretation, duplicate-column
+statistic/frame identity or new two-release support follows from this slice.

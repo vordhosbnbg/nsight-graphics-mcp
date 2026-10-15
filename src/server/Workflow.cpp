@@ -587,6 +587,17 @@ Schema cpp_resource_schema() {
 // enforce closed objects. This small validator applies the declared input
 // subset before any operation; malformed tool arguments become tool errors.
 void validate(const Json& value, const Schema& schema, const std::string& field = "arguments") {
+    if(schema.at("type").is_array()) {
+        const auto& types = schema.at("type");
+        if(types.size() != 2 || !types[0].is_string() || types[1] != "null")
+            throw std::logic_error("Unsupported internal nullable input schema");
+        if(value.is_null())
+            return;
+        auto nonnull = schema;
+        nonnull["type"] = types[0];
+        validate(value, nonnull, field);
+        return;
+    }
     const auto type = schema.at("type").get<std::string>();
     if(type == "object") {
         if(!value.is_object()) {
@@ -798,7 +809,9 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                        {"limit", integer_schema(1, 1000)},
                        {"duration_ms", integer_schema(1, 10000)},
                        {"architecture", string_schema(64, 1)},
-                       {"metric_set", string_schema(64, 1)}},
+                       {"metric_set", string_schema(64, 1)},
+                       {"time_every_action", nullable(boolean_schema())},
+                       {"hes_enabled", nullable(boolean_schema())}},
                       {"architecture"});
     auto profile_input = object_schema({{"executable", string_schema(4096, 1)},
                                         {"working_directory", string_schema(4096, 1)},
@@ -818,6 +831,9 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
              "submits, "
              "duration 1000 ms, Throughput Metrics, deadline 120000 ms. Clocks are always unaltered; permissions are "
              "never changed. "
+             "Optional time_every_action and hes_enabled are nullable booleans; null preserves tool defaults. "
+             "Explicit controls require matching help; per-action timing is verified against the reproduction export. "
+             "HES enable requests require a documented GB20x selector; active hardware state is not inferred. "
              "Poll job_status. This does not verify application correctness, warmup sufficiency or repeated-run "
              "equivalence.",
              false, false, [this](const Json& arguments) {
@@ -841,6 +857,10 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                     settings.value("duration_ms", std::uint64_t{1000}),
                                     settings.at("architecture"),
                                     settings.value("metric_set", "Throughput Metrics")};
+                 if(settings.contains("time_every_action") && !settings.at("time_every_action").is_null())
+                     request.profile.time_every_action = settings.at("time_every_action").get<bool>();
+                 if(settings.contains("hes_enabled") && !settings.at("hes_enabled").is_null())
+                     request.profile.hes_enabled = settings.at("hes_enabled").get<bool>();
                  return Json(service().capture(std::move(request)));
              });
     Json exported_fields = Json::object();
@@ -859,9 +879,12 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                                {"event_durations", profile_ref},
                                                {"regime_metrics", profile_ref}},
                                               {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"});
-    const auto coverage_status = object_schema(
-        {{"status", {{"type", "string"}, {"enum", {"available", "unavailable"}}}}, {"reason", string_schema(512)}},
-        {"status", "reason"});
+    const auto coverage_status =
+        object_schema({{"status", {{"type", "string"}, {"enum", {"available", "partial", "unavailable"}}}},
+                       {"reason", string_schema(512)},
+                       {"available_values", integer_schema(0, 16777216)},
+                       {"unavailable_values", integer_schema(0, 16777216)}},
+                      {"status", "reason", "available_values", "unavailable_values"});
     auto coverage_item = coverage_status;
     coverage_item["properties"]["rows"] = integer_schema(0, 4096);
     coverage_item["properties"]["numeric_columns"] = integer_schema(0, 4096);
@@ -872,6 +895,12 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                                                {"event_durations", coverage_item},
                                                {"regime_metrics", coverage_item}},
                                               {"frame_duration", "frame_metrics", "event_durations", "regime_metrics"});
+    const auto control_coverage = object_schema(
+        {{"requested", nullable(boolean_schema())},
+         {"exported", nullable(string_schema(4096))},
+         {"verification", {{"type", "string"}, {"enum", {"verified_export", "observed_export", "not_exported"}}}},
+         {"source", string_schema(256, 1)}},
+        {"requested", "exported", "verification", "source"});
     add_tool(tools, "profile_metadata", object_schema({{"profile_id", string_schema(39, 39)}}, {"profile_id"}),
              object_schema({{"profile_id", string_schema(39, 39)},
                             {"producer", string_schema(128, 1)},
@@ -879,13 +908,16 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                             {"driver", string_schema(4096, 1)},
                             {"settings", object_schema(exported_fields)},
                             {"requested", requested_schema},
+                            {"collection_controls",
+                             object_schema({{"time_every_action", control_coverage}, {"hes_enabled", control_coverage}},
+                                           {"time_every_action", "hes_enabled"})},
                             {"trace", profile_ref},
                             {"reproduction", profile_ref},
                             {"tables", profile_tables},
                             {"table_coverage", table_coverage},
                             {"scope", string_schema(512)}},
                            {"profile_id", "producer", "gpu", "driver", "settings", "requested", "trace", "reproduction",
-                            "tables", "table_coverage", "scope"}),
+                            "tables", "table_coverage", "scope", "collection_controls"}),
              "Inspect a complete service-produced GPU Trace using retained producer/settings evidence. No live tool or "
              "GPU is required. "
              "Imports and failed attempts are not qualified profiles; inspect them through artifact tools. "
@@ -896,9 +928,11 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
     const auto number = object_schema({{"column_index", integer_schema(0, 4096)},
                                        {"column_name", nullable(string_schema(4096))},
                                        {"text", string_schema(4096, 1)},
-                                       {"value", {{"type", "number"}}},
+                                       {"value", nullable({{"type", "number"}})},
+                                       {"status", {{"type", "string"}, {"enum", {"available", "unavailable"}}}},
+                                       {"reason", nullable(string_schema(256, 1))},
                                        {"unit", nullable(string_schema(16))}},
-                                      {"column_index", "column_name", "text", "value", "unit"});
+                                      {"column_index", "column_name", "text", "value", "unit", "status", "reason"});
     const auto profile_row = object_schema({{"row_index", integer_schema(0, 4096)},
                                             {"label", string_schema(4096, 1)},
                                             {"values", array_schema(number, 64)}},

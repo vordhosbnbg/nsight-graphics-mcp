@@ -611,16 +611,21 @@ CaptureSubmission CaptureService::capture(CaptureRequest request) {
         provenance["sdk"]["status"] = "not_applicable";
     }
     if(request.format == CaptureFormat::Profile) {
-        provenance["capture_settings"] = {{"format", "profile"},
-                                          {"delimiter", request.profile.delimiter},
-                                          {"start_after", request.profile.start_after},
-                                          {"limit", request.profile.limit},
-                                          {"duration_ms", request.profile.duration_ms},
-                                          {"architecture", request.profile.architecture},
-                                          {"metric_set", request.profile.metric_set},
-                                          {"gpu_clocks", "unaltered"},
-                                          {"multi_pass", false},
-                                          {"timeout_ms", request.timeout.count()}};
+        provenance["capture_settings"] = {
+            {"format", "profile"},
+            {"delimiter", request.profile.delimiter},
+            {"start_after", request.profile.start_after},
+            {"limit", request.profile.limit},
+            {"duration_ms", request.profile.duration_ms},
+            {"architecture", request.profile.architecture},
+            {"metric_set", request.profile.metric_set},
+            {"time_every_action",
+             request.profile.time_every_action.has_value() ? Json(*request.profile.time_every_action) : Json(nullptr)},
+            {"hes_enabled",
+             request.profile.hes_enabled.has_value() ? Json(*request.profile.hes_enabled) : Json(nullptr)},
+            {"gpu_clocks", "unaltered"},
+            {"multi_pass", false},
+            {"timeout_ms", request.timeout.count()}};
         provenance["sdk"]["status"] = "not_applicable";
     }
     auto attempt = std::make_shared<Attempt>();

@@ -152,9 +152,16 @@ NsightToolObservation inspect_tool(const ExecutableObservation& discovered, cons
                 observation.help_valid = true;
                 observation.accepted_discovery_exit_one |= observation.help_process.exit_code == 1;
                 const std::regex option_pattern("--[a-z][a-z0-9-]*");
-                for(auto match = std::sregex_iterator(output.begin(), output.end(), option_pattern);
-                    match != std::sregex_iterator(); ++match) {
-                    observation.documented_options.insert(match->str());
+                std::istringstream lines(output);
+                for(std::string line; std::getline(lines, line);) {
+                    const auto start = line.find_first_not_of(" \t\r");
+                    // Only option declaration lines. Diagnostics and echoed
+                    // environment/path values can contain flag-shaped text.
+                    if(start == std::string::npos || line[start] != '-')
+                        continue;
+                    for(auto match = std::sregex_iterator(line.begin(), line.end(), option_pattern);
+                        match != std::sregex_iterator(); ++match)
+                        observation.documented_options.insert(match->str());
                 }
             }
         }
@@ -704,6 +711,19 @@ void validate_profile_settings(const ProfileSettings& settings) {
         if(value->empty() || value->size() > 64 || value->find_first_not_of(characters) != std::string::npos ||
            value->front() == ' ' || value->back() == ' ')
             throw std::invalid_argument("Profile architecture and metric_set require 1..64 ASCII name characters");
+    if(settings.hes_enabled.value_or(false) && settings.architecture != "Blackwell GB20x" &&
+       settings.architecture != "T25x GB20x")
+        throw std::invalid_argument("HES enablement requires a documented GB20x architecture selector; the selector "
+                                    "does not verify actual hardware");
+}
+
+std::vector<std::string> profile_control_arguments(const ProfileSettings& settings) {
+    std::vector<std::string> result;
+    if(settings.time_every_action.value_or(false))
+        result.emplace_back("--time-every-action");
+    if(settings.hes_enabled.has_value())
+        result.emplace_back(*settings.hes_enabled ? "--hes-enabled=1" : "--hes-enabled=0");
+    return result;
 }
 
 NsightProfileResult run_nsight_profile(const NsightInstallation& installation, const NsightProfileOptions& options,
@@ -736,6 +756,14 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
     fs::path output;
     try {
         validate_profile_settings(options.settings);
+        for(const auto& [requested, flag] : std::vector<std::pair<bool, std::string>>{
+                {options.settings.time_every_action.has_value(), "--time-every-action"},
+                {options.settings.hes_enabled.has_value(), "--hes-enabled"}})
+            if(requested && !cli.documented_options.contains(flag)) {
+                operation.outcome = NsightOutcome::Unavailable;
+                operation.message = "ngfx help does not advertise requested profile control " + flag;
+                return result;
+            }
         const auto target = executable_path(options.executable);
         const auto directory = directory_path(options.working_directory, "Application working directory");
         const auto arguments = target_arguments(options.arguments);
@@ -757,6 +785,8 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
                              "--set-gpu-clocks=unaltered",
                              "--collect-screenshot=0",
                              "--auto-export"};
+        const auto controls = profile_control_arguments(options.settings);
+        process.arguments.insert(process.arguments.end(), controls.begin(), controls.end());
         if(!arguments.empty())
             process.arguments.push_back("--args=" + arguments);
         if(!run_operation(operation, process, stop))
@@ -815,6 +845,11 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
            !repro.settings.contains("Max Duration ") ||
            repro.settings.at("Max Duration ") != std::to_string(options.settings.duration_ms) + " ms")
             throw std::runtime_error("GPU Trace exported settings differ from requested collection");
+        if(options.settings.time_every_action.has_value() &&
+           (!repro.settings.contains("Time Every Action") ||
+            repro.settings.at("Time Every Action") != (*options.settings.time_every_action ? "Yes" : "No")))
+            throw std::runtime_error(
+                "GPU Trace Time Every Action export is missing or differs from the requested control");
         for(const auto& [name, file, kind] : std::vector<std::tuple<std::string, std::string, ProfileTableKind>>{
                 {"frame_duration", "FRAME.xls", ProfileTableKind::FrameDuration},
                 {"frame_metrics", "GPUTRACE_FRAME.xls", ProfileTableKind::FrameMetrics},
@@ -823,7 +858,10 @@ NsightProfileResult run_nsight_profile(const NsightInstallation& installation, c
             if(interrupted())
                 return result;
             const auto path = metadata.front().parent_path() / file;
-            (void)parse_profile_table(read_regular_file(path, ProfileEvidenceLimits::bytes), kind);
+            const auto policy = cli.version == "2026.3.1.0" && cli.build == "38722833"
+                                    ? ProfileTablePolicy::Nsight2026_3RegimeNan
+                                    : ProfileTablePolicy::FiniteOnly;
+            (void)parse_profile_table(read_regular_file(path, ProfileEvidenceLimits::bytes), kind, policy);
             result.tables.emplace(name, path);
         }
         if(interrupted())

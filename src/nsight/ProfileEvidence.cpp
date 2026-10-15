@@ -69,7 +69,7 @@ ProfileValue numeric(std::string_view text) {
 }
 } // namespace
 
-ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind) {
+ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind, ProfileTablePolicy policy) {
     const auto lines = cells(text);
     ProfileTable table;
     const bool header = kind == ProfileTableKind::EventDurations || kind == ProfileTableKind::RegimeMetrics;
@@ -98,8 +98,13 @@ ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind) {
         if(kind == ProfileTableKind::FrameMetrics && !metric_names.insert(line.front()).second)
             fail(Error::DuplicateIdentifier, "Duplicate GPU Trace frame metric");
         ProfileRow output{std::string(line.front()), {}};
-        for(std::size_t column = 1; column < width; ++column)
-            output.values.push_back(numeric(line[column]));
+        for(std::size_t column = 1; column < width; ++column) {
+            if(kind == ProfileTableKind::RegimeMetrics && policy == ProfileTablePolicy::Nsight2026_3RegimeNan &&
+               line[column] == "nan")
+                output.values.push_back({"nan", std::nullopt});
+            else
+                output.values.push_back(numeric(line[column]));
+        }
         table.rows.push_back(std::move(output));
     }
     return table;

@@ -1,0 +1,21 @@
+{
+  "producer": "2026.3.1.0/build 38722833",
+  "source_capture": "bundle-bef6722497c3c50eb4186f98a3294a27",
+  "investigation_pin": "bundle-0db93680346958bf72c60f67ff15d435",
+  "raw_sha256": "3a59556e6c7f25405a48d40de925b6ee8b4255e4849295cf507dd7c3f9a34703",
+  "fixture_sha256": "b2255d3541040a82c7c0985f428f40b3dfa2ba5b49ab244b719bc3f9fa57dafa",
+  "source_line_numbers_1_based": [
+    1,
+    2,
+    5
+  ],
+  "selected_numeric_columns_0_based": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "transformation": "First six numeric columns and two exact data rows; preserves duplicate headers, raw numbers and nan. No host identity or private application data."
+}

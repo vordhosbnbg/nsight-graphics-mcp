@@ -9,14 +9,25 @@ Keep the selected direction, remaining choices, and interview answers here.
 
 ## 2026-10-15 capability follow-up evaluation
 
+The 0.4.8 collection-control slice keeps the existing C++ job/adapter/inspection
+boundaries and adds no dependency. Nullable settings preserve tool defaults;
+retained argv and reproduction fields distinguish requests from observations.
+The pure table parser defaults to finite-only input. An exact producer policy
+retains observed 2026.3 regime `nan` cells as optional numbers with unavailable
+coverage, while timing/frame values remain strict. MCP clients must handle the
+corresponding nullable numeric response. No private trace decoder, new counter
+interpretation or proprietary helper extension is selected. R-022 still needs
+the same-profile correlation, units, scope and timing validation in the plan.
+
 The 0.4.7 descriptor slice remains a pure generated-source interpreter. It
 normalizes literal set definitions, joins explicit allocations, applies prefix/
 push-range compatibility and disturbance, and maps dynamic offsets by set,
 binding and array element. It shares qualified push-range identities with the
 existing tracker and adds no dependency or helper source. A separate C++ fixture
 oracle checks actual API inputs and exported debug-name/layout associations;
-those private expectations never enter product results. Descriptor contents,
-typed values and GPU execution correspondence remain feasibility work.
+those private expectations never enter product results. The subsequent conditional
+feasibility outcome retains descriptor contents, typed values and general GPU
+execution correspondence as unavailable; see DRAW_STATE_FEASIBILITY.md.
 
 The 0.4.6 push-constant slice adds a separate pure byte-write tracker and shares
 the bounded replay-value grammar with the raster interpreter. Pipeline-layout

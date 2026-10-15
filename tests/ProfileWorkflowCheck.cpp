@@ -95,6 +95,12 @@ int main(int argc, char** argv) {
         request.timeout = 15s;
         request.profile.architecture = "Ampere GA10x";
         request.pin = true;
+        auto invalid_hes = request;
+        invalid_hes.profile.hes_enabled = true;
+        rejected([&] {
+            ngm::CaptureService service(options);
+            service.capture(invalid_hes);
+        });
         std::string retained;
         std::string retained_empty;
         {
@@ -168,6 +174,11 @@ int main(int argc, char** argv) {
                 const auto metadata = inspection.metadata(job.artifact_id);
                 require(metadata.at("gpu") == "CPU stand-in (not GPU evidence)",
                         "observed identity is not a real compatibility claim");
+                require(metadata.at("collection_controls").at("time_every_action").at("requested").is_null() &&
+                            metadata.at("collection_controls").at("time_every_action").at("verification") ==
+                                "observed_export" &&
+                            metadata.at("collection_controls").at("hes_enabled").at("exported").is_null(),
+                        "tool-default controls are distinguished from explicit requests and hardware verification");
                 const auto page = inspection.metrics(job.artifact_id, "regime_metrics", 0, 1, 0, 1);
                 require(page.at("total_rows") == 2 && page.at("total_columns") == 2 && page.at("next_offset") == 1 &&
                             page.at("next_column_offset") == 1 &&
@@ -244,6 +255,81 @@ int main(int argc, char** argv) {
             const auto imported = service.artifacts().import_directory(source, Json::object(), {"note"}, true);
             rejected([&] { ngm::ProfileInspection(service.artifacts()).metadata(imported.summary.id); });
         }
+        {
+            ngm::CaptureService service(options);
+            for(const bool per_action : {false, true}) {
+                auto controlled = request;
+                controlled.profile.time_every_action = per_action;
+                controlled.profile.hes_enabled = false;
+                const auto job = service.capture(controlled);
+                require(completed(service, job).state == ngm::JobState::succeeded,
+                        "explicit collection controls succeed");
+                const auto report = Json::parse(service.artifacts().read(job.artifact_id, "raw/report.json"));
+                const auto args = report.at("profile").at("arguments").get<std::vector<std::string>>();
+                require((std::find(args.begin(), args.end(), "--time-every-action") != args.end()) == per_action &&
+                            std::count(args.begin(), args.end(), "--hes-enabled=0") == 1 &&
+                            report.at("capture_settings").at("time_every_action") == per_action &&
+                            report.at("capture_settings").at("hes_enabled") == false,
+                        "exact argument boundary and retained controls");
+                const auto metadata = ngm::ProfileInspection(service.artifacts()).metadata(job.artifact_id);
+                require(metadata.at("collection_controls").at("time_every_action").at("verification") ==
+                                "verified_export" &&
+                            metadata.at("collection_controls").at("time_every_action").at("exported") ==
+                                (per_action ? "Yes" : "No") &&
+                            metadata.at("collection_controls").at("hes_enabled").at("verification") == "not_exported",
+                        "per-action export is verified; active HES is not fabricated");
+            }
+            auto future = request;
+            future.profile.architecture = "Blackwell GB20x";
+            future.profile.hes_enabled = true;
+            const auto selected = service.capture(future);
+            require(completed(service, selected).state == ngm::JobState::succeeded &&
+                        ngm::ProfileInspection(service.artifacts())
+                            .metadata(selected.artifact_id)
+                            .at("collection_controls")
+                            .at("hes_enabled")
+                            .at("exported")
+                            .is_null(),
+                    "stand-in HES enable request does not qualify real hardware activation");
+        }
+        {
+            ngm::CaptureService service(options);
+            auto partial = request;
+            partial.arguments = {"--profile-undefined-regimes"};
+            const auto job = service.capture(partial);
+            require(completed(service, job).state == ngm::JobState::succeeded,
+                    "qualified undefined regime cells retain an inspectable profile");
+            ngm::ProfileInspection inspect(service.artifacts());
+            const auto coverage = inspect.metadata(job.artifact_id).at("table_coverage").at("regime_metrics");
+            const auto page = inspect.metrics(job.artifact_id, "regime_metrics");
+            const auto& missing = page.at("rows")[0].at("values")[0];
+            require(coverage.at("status") == "partial" && coverage.at("available_values") == 1 &&
+                        coverage.at("unavailable_values") == 3 && missing.at("value").is_null() &&
+                        missing.at("text") == "nan" && missing.at("status") == "unavailable" &&
+                        page.at("rows")[0].at("values")[1].at("value") == 2,
+                    "per-cell missing coverage preserves adjacent finite values");
+        }
+        {
+            auto older = options;
+            older.artifacts.root = scratch.path / "old-undefined";
+            older.environment["NGM_PROFILE_OLD_RELEASE"] = "1";
+            ngm::CaptureService service(older);
+            auto unsupported = request;
+            unsupported.arguments = {"--profile-undefined-regimes"};
+            require(completed(service, service.capture(unsupported)).state == ngm::JobState::failed,
+                    "new undefined-token grammar is not silently qualified on the older producer");
+        }
+        for(const auto mode : {"wrong-action-control", "missing-action-control"}) {
+            auto failure = options;
+            failure.artifacts.root = scratch.path / mode;
+            failure.environment["NGM_STANDIN_PROFILE_MODE"] = mode;
+            ngm::CaptureService service(failure);
+            auto controlled = request;
+            controlled.profile.time_every_action = true;
+            const auto job = service.capture(controlled);
+            require(completed(service, job).state == ngm::JobState::failed,
+                    "missing or mismatched per-action export refuses publication");
+        }
         for(const auto mode : {"fail", "missing", "malformed", "settings", "wrong-producer", "duplicate-trace",
                                "oversize", "symlink", "hardlink"}) {
             auto failure = options;
@@ -268,6 +354,22 @@ int main(int argc, char** argv) {
             const auto report = Json::parse(service.artifacts().read(job.artifact_id, "raw/report.json"));
             require(!report.contains("profile") || report.at("profile").at("launched") == false,
                     "unsupported profiling never launches the target");
+        }
+        for(const auto* flag : {"--time-every-action", "--hes-enabled"}) {
+            auto missing = options;
+            missing.artifacts.root = scratch.path / (std::string("control-help") + flag);
+            missing.environment["NGM_OMIT_PROFILE_OPTION"] = flag;
+            ngm::CaptureService service(missing);
+            auto controlled = request;
+            controlled.profile.time_every_action = false;
+            controlled.profile.hes_enabled = false;
+            const auto job = service.capture(controlled);
+            const auto status = completed(service, job);
+            const auto report = Json::parse(service.artifacts().read(job.artifact_id, "raw/report.json"));
+            require(status.state == ngm::JobState::failed,
+                    std::string("explicit controls require matching help even when false: ") + flag + " " +
+                        report.dump());
+            require(report.at("profile").at("launched") == false, "unsupported control never launches the target");
         }
         for(const bool cancel : {false, true}) {
             auto hanging = options;
@@ -303,13 +405,43 @@ int main(int argc, char** argv) {
                                                 store.string()};
             Client client(fs::absolute(argv[2]), scratch.path, args);
             initialize(client);
-            const auto submitted = call(client, "profile",
-                                        {{"executable", target.string()},
-                                         {"working_directory", scratch.path.string()},
-                                         {"arguments", {"--profile-header-only", "--profile-wide-empty-header"}},
-                                         {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
-                                         {"settings", {{"architecture", "Ampere GA10x"}}},
-                                         {"pin", true}});
+            for(const auto* key : {"time_every_action", "hes_enabled"}) {
+                const auto invalid =
+                    client.request(21, "tools/call",
+                                   {{"name", "profile"},
+                                    {"arguments",
+                                     {{"executable", target.string()},
+                                      {"working_directory", scratch.path.string()},
+                                      {"settings", {{"architecture", "Ampere GA10x"}, {key, "false"}}}}}});
+                require(invalid.at("result").value("isError", false) &&
+                            invalid.at("result").at("content")[0].at("text").get<std::string>().starts_with(
+                                "invalid_argument:"),
+                        "nullable controls still reject non-boolean non-null tool arguments");
+            }
+            const auto default_controls =
+                call(client, "profile",
+                     {{"executable", target.string()},
+                      {"working_directory", scratch.path.string()},
+                      {"settings",
+                       {{"architecture", "Ampere GA10x"}, {"time_every_action", nullptr}, {"hes_enabled", nullptr}}}});
+            const auto defaults_deadline = std::chrono::steady_clock::now() + 5s;
+            for(;;) {
+                const auto state =
+                    call(client, "job_status", {{"job_id", default_controls.at("identity").at("job_id")}});
+                if(state.at("state") == "succeeded")
+                    break;
+                require(state.at("state") != "failed" && std::chrono::steady_clock::now() < defaults_deadline,
+                        "explicit null preserves tool defaults");
+                std::this_thread::sleep_for(1ms);
+            }
+            const auto submitted = call(
+                client, "profile",
+                {{"executable", target.string()},
+                 {"working_directory", scratch.path.string()},
+                 {"arguments", {"--profile-header-only", "--profile-wide-empty-header"}},
+                 {"launch_environment", {{"SDL_VIDEODRIVER", "x11"}}},
+                 {"settings", {{"architecture", "Ampere GA10x"}, {"time_every_action", true}, {"hes_enabled", false}}},
+                 {"pin", true}});
             Json state;
             const auto deadline = std::chrono::steady_clock::now() + 5s;
             do {
@@ -330,6 +462,12 @@ int main(int argc, char** argv) {
                     "actual stdio profile propagates its job overlay");
             require(call(client, "profile_metadata", {{"profile_id", id}}).at("producer").is_string(),
                     "typed profile metadata");
+            const auto controls = call(client, "profile_metadata", {{"profile_id", id}}).at("collection_controls");
+            require(controls.at("time_every_action").at("requested") == true &&
+                        controls.at("time_every_action").at("verification") == "verified_export" &&
+                        controls.at("hes_enabled").at("requested") == false &&
+                        controls.at("hes_enabled").at("exported").is_null(),
+                    "actual MCP carries typed control requests and independent export coverage");
             const auto empty = call(client, "profile_metrics", {{"profile_id", id}, {"table", "event_durations"}});
             require(empty.at("rows").empty() && empty.at("total_rows") == 0 &&
                         empty.at("coverage").at("status") == "unavailable" &&

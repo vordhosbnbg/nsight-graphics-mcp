@@ -57,6 +57,10 @@ reduced measured dispatch times from approximately **0.60 ms to 0.06 ms** on the
 tested RTX 3080 Ti.
 [Measurement details](docs/PERFORMANCE.md#actual-selected-scenario-source-repair-036-validation)
 
+Profiles can select [per-action timing and HES collection controls](docs/PROFILE_CONTROLS.md).
+Unavailable exported counter cells remain explicit; draw correlation is still
+under qualification.
+
 ## MCP tools
 
 | Task | Tools and functionality |

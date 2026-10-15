@@ -20,6 +20,27 @@ void require(bool value, const char* message) {
     if(!value)
         throw InspectionError(Error::InvalidReport, message);
 }
+ProfileTablePolicy table_policy(const Json& index) {
+    return index.at("producer") == "2026.3.1.0 (build 38722833) (public-release)"
+               ? ProfileTablePolicy::Nsight2026_3RegimeNan
+               : ProfileTablePolicy::FiniteOnly;
+}
+Json cell_coverage(const ProfileTable& table) {
+    std::size_t available = 0, unavailable = 0;
+    for(const auto& row : table.rows)
+        for(const auto& value : row.values)
+            value.value.has_value() ? ++available : ++unavailable;
+    return {{"status", available == 0     ? "unavailable"
+                       : unavailable == 0 ? "available"
+                                          : "partial"},
+            {"reason", table.rows.empty()
+                           ? "The producer exported a valid header with no rows; no action/regime values are available"
+                       : unavailable
+                           ? "Producer-exported nan positions have no finite value; known cells remain available"
+                           : "Exported finite cells are available within their recorded scope"},
+            {"available_values", available},
+            {"unavailable_values", unavailable}};
+}
 Json parse(std::string_view text) {
     std::vector<std::set<std::string>> keys;
     return Json::parse(text, [&](int depth, Json::parse_event_t event, Json& value) {
@@ -171,13 +192,25 @@ OpenProfile open(ArtifactStore& artifacts, const std::string& id) {
                 requested.at("format") == "profile" && requested.at("gpu_clocks") == "unaltered" &&
                 requested.at("multi_pass") == false,
             "Profile settings differ across retained records");
-    require(requested.is_object() && requested.size() == 10 && requested.at("timeout_ms").is_number_integer() &&
-                requested.at("timeout_ms") >= 1 && requested.at("timeout_ms") <= 600000,
+    const bool controls = requested.contains("time_every_action") || requested.contains("hes_enabled");
+    require(requested.is_object() && requested.size() == (controls ? 12 : 10) &&
+                (!controls || (requested.contains("time_every_action") && requested.contains("hes_enabled"))) &&
+                requested.at("timeout_ms").is_number_integer() && requested.at("timeout_ms") >= 1 &&
+                requested.at("timeout_ms") <= 600000,
             "Invalid profile settings shape or deadline");
     for(const auto* field : {"start_after", "limit", "duration_ms"})
         require(requested.at(field).is_number_unsigned(), "Profile counters must be unsigned");
     ProfileSettings settings{requested.at("delimiter"),   requested.at("start_after"),  requested.at("limit"),
                              requested.at("duration_ms"), requested.at("architecture"), requested.at("metric_set")};
+    if(controls) {
+        for(const auto* key : {"time_every_action", "hes_enabled"})
+            require(requested.at(key).is_null() || requested.at(key).is_boolean(),
+                    "Invalid retained profile control type");
+        if(!requested.at("time_every_action").is_null())
+            settings.time_every_action = requested.at("time_every_action").get<bool>();
+        if(!requested.at("hes_enabled").is_null())
+            settings.hes_enabled = requested.at("hes_enabled").get<bool>();
+    }
     try {
         validate_profile_settings(settings);
     } catch(const std::invalid_argument&) {
@@ -200,10 +233,12 @@ OpenProfile open(ArtifactStore& artifacts, const std::string& id) {
                                       "--set-gpu-clocks=unaltered",
                                       "--collect-screenshot=0",
                                       "--auto-export"};
+    const auto control_arguments = profile_control_arguments(settings);
+    expected.insert(expected.end(), control_arguments.begin(), control_arguments.end());
     // Publication renames staging directories; validate the recorded launch path
     // by its suffix rather than treating today's retained path as the launch path.
     const auto arguments = operation.at("arguments").get<std::vector<std::string>>();
-    require(arguments.size() >= 13 && arguments.size() <= 14 && arguments[4].starts_with("--output-dir=/") &&
+    require(arguments.size() >= 13 && arguments.size() <= 16 && arguments[4].starts_with("--output-dir=/") &&
                 arguments[4].ends_with("/raw/profile"),
             "Invalid profile invocation output path");
     expected[4] = arguments[4];
@@ -224,6 +259,10 @@ OpenProfile open(ArtifactStore& artifacts, const std::string& id) {
                 repro.settings.at("Multi-Pass Metrics") == "Disabled" &&
                 repro.settings.at("Metric Set") == settings.metric_set,
             "Requested and exported collection settings differ");
+    require(!settings.time_every_action.has_value() ||
+                (repro.settings.contains("Time Every Action") &&
+                 repro.settings.at("Time Every Action") == (*settings.time_every_action ? "Yes" : "No")),
+            "Requested Time Every Action control differs from its retained export");
     require(index.at("tables").is_object() && index.at("tables").size() == 4,
             "Profile must inventory four observed tables");
     return result;
@@ -278,16 +317,32 @@ Json ProfileInspection::metadata(const std::string& id) const {
     return guarded([&] {
         const auto profile = open(artifacts_, id);
         const auto& index = profile.index;
+        const auto& settings = index.at("settings");
+        const auto time_requested = index.at("requested").value("time_every_action", Json(nullptr));
+        const auto time_exported =
+            settings.contains("Time Every Action") ? settings.at("Time Every Action") : Json(nullptr);
+        const Json controls{
+            {"time_every_action",
+             {{"requested", time_requested},
+              {"exported", time_exported},
+              {"verification", time_exported.is_null()    ? "not_exported"
+                               : time_requested.is_null() ? "observed_export"
+                                                          : "verified_export"},
+              {"source", "REPRO_INFO.xls:Time Every Action"}}},
+            {"hes_enabled",
+             {{"requested", index.at("requested").value("hes_enabled", Json(nullptr))},
+              {"exported", nullptr},
+              {"verification", "not_exported"},
+              {"source",
+               "Retained CLI arguments; active HES state is not established by the qualified export fields"}}}};
         Json coverage = Json::object();
         for(const auto& [name, ref] : index.at("tables").items()) {
-            const auto table = parse_profile_table(reference(artifacts_, id, ref), table_kind(name));
-            coverage[name] = {
-                {"status", table.rows.empty() ? "unavailable" : "available"},
-                {"rows", table.rows.size()},
-                {"numeric_columns", table.columns.empty() ? table.rows.at(0).values.size() : table.columns.size()},
-                {"reason", table.rows.empty()
-                               ? "Valid exported header contains no rows; action/regime evidence is unavailable"
-                               : "Exported rows are available within their recorded scope"}};
+            const auto table =
+                parse_profile_table(reference(artifacts_, id, ref), table_kind(name), table_policy(index));
+            coverage[name] = cell_coverage(table);
+            coverage[name]["rows"] = table.rows.size();
+            coverage[name]["numeric_columns"] =
+                table.columns.empty() ? table.rows.at(0).values.size() : table.columns.size();
         }
         return Json{{"profile_id", id},
                     {"producer", index.at("producer")},
@@ -295,6 +350,7 @@ Json ProfileInspection::metadata(const std::string& id) const {
                     {"driver", index.at("driver")},
                     {"settings", index.at("settings")},
                     {"requested", index.at("requested")},
+                    {"collection_controls", controls},
                     {"trace", index.at("trace")},
                     {"reproduction", index.at("reproduction")},
                     {"tables", index.at("tables")},
@@ -314,7 +370,7 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
     return guarded([&] {
         const auto profile = open(artifacts_, id);
         const auto& ref = profile.index.at("tables").at(name);
-        const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
+        const auto table = parse_profile_table(reference(artifacts_, id, ref), kind, table_policy(profile.index));
         const auto width = table.columns.empty() ? table.rows.at(0).values.size() : table.columns.size();
         auto end_column = std::min(width, column_offset + column_limit);
         Json columns = Json::array();
@@ -337,11 +393,16 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             const auto& row = table.rows[next];
             Json values = Json::array();
             for(auto column = column_offset; column < end_column; ++column) {
-                values.push_back({{"column_index", column},
-                                  {"column_name", table.columns.empty() ? Json(nullptr) : Json(table.columns[column])},
-                                  {"text", row.values[column].text},
-                                  {"value", row.values[column].value},
-                                  {"unit", kind == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)}});
+                values.push_back(
+                    {{"column_index", column},
+                     {"column_name", table.columns.empty() ? Json(nullptr) : Json(table.columns[column])},
+                     {"text", row.values[column].text},
+                     {"value", row.values[column].value.has_value() ? Json(*row.values[column].value) : Json(nullptr)},
+                     {"status", row.values[column].value.has_value() ? "available" : "unavailable"},
+                     {"reason", row.values[column].value.has_value()
+                                    ? Json(nullptr)
+                                    : Json("Producer exported nan; no finite measurement is available")},
+                     {"unit", kind == ProfileTableKind::EventDurations ? Json("ms") : Json(nullptr)}});
             }
             Json item{{"row_index", next}, {"label", row.label}, {"values", std::move(values)}};
             const auto size = item.dump().size();
@@ -362,12 +423,7 @@ Json ProfileInspection::metrics(const std::string& id, const std::string& name, 
             {"total_columns", width},
             {"label_column", table.label_column.empty() ? Json(nullptr) : Json(table.label_column)},
             {"columns", columns},
-            {"coverage",
-             {{"status", table.rows.empty() ? "unavailable" : "available"},
-              {"reason",
-               table.rows.empty()
-                   ? "The producer exported a valid header with no rows; no action/regime values are available"
-                   : "Exported rows are available within their recorded scope"}}},
+            {"coverage", cell_coverage(table)},
             {"offset", offset},
             {"column_offset", column_offset},
             {"rows", std::move(rows)},
@@ -403,6 +459,9 @@ Json ProfileInspection::compare(const ProfileComparison& request) const {
                     "Comparison requires distinct collection jobs");
             Json settings = profile.index.at("requested");
             settings.erase("timeout_ms"); // Process deadline is not a collection setting.
+            for(const auto* key : {"time_every_action", "hes_enabled"})
+                if(!settings.contains(key))
+                    settings[key] = nullptr;
             Json observed{{"producer", profile.index.at("producer")},
                           {"gpu", profile.index.at("gpu")},
                           {"driver", profile.index.at("driver")},
@@ -421,7 +480,8 @@ Json ProfileInspection::compare(const ProfileComparison& request) const {
             for(const auto& id : members) {
                 const auto& profile = profiles.at(id);
                 const auto& ref = profile.index.at("tables").at(request.table);
-                const auto table = parse_profile_table(reference(artifacts_, id, ref), kind);
+                const auto table =
+                    parse_profile_table(reference(artifacts_, id, ref), kind, table_policy(profile.index));
                 if(table.rows.empty())
                     throw std::invalid_argument("Selected table has no exported rows in profile " + id +
                                                 "; action/regime comparison is unavailable");
@@ -435,8 +495,12 @@ Json ProfileInspection::compare(const ProfileComparison& request) const {
                     throw std::invalid_argument("Selected column names differ across profiles");
                 std::vector<double> values;
                 for(const auto& row : table.rows)
-                    if(row.label == request.label)
-                        values.push_back(row.values[request.column_index].value);
+                    if(row.label == request.label) {
+                        if(!row.values[request.column_index].value.has_value())
+                            throw std::invalid_argument(
+                                "Selected comparison cell is unavailable (producer exported nan) in profile " + id);
+                        values.push_back(*row.values[request.column_index].value);
+                    }
                 if(values.empty())
                     throw std::invalid_argument("Selected exact row label is absent in a comparison profile");
                 auto stats = statistics(std::move(values));

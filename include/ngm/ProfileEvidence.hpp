@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,7 +21,8 @@ struct ProfileEvidenceLimits {
 // identity or min/mean/max statistic. Preserve duplicates and textual precision.
 struct ProfileValue {
     std::string text;
-    double value = 0;
+    // Qualified undefined tokens retain text and no numeric value; never zero.
+    std::optional<double> value;
 };
 struct ProfileRow {
     std::string label;
@@ -34,12 +36,16 @@ struct ProfileTable {
     std::vector<ProfileRow> rows;
 };
 enum class ProfileTableKind { FrameDuration, FrameMetrics, EventDurations, RegimeMetrics };
+enum class ProfileTablePolicy { FiniteOnly, Nsight2026_3RegimeNan };
 
 // Pure, bounded parsers. Throw NsightEvidenceError. No file access, provenance
 // authentication, unit scaling, event joins, or workload equivalence is inferred.
 // Empty files are rejected. Valid event/regime headers may have zero rows;
 // retain their columns and report missing data explicitly in consumers.
-ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind);
+// The default is finite-only. An explicitly producer-qualified 2026.3 policy
+// preserves only literal regime "nan" tokens as unavailable numeric values.
+ProfileTable parse_profile_table(std::string_view text, ProfileTableKind kind,
+                                 ProfileTablePolicy policy = ProfileTablePolicy::FiniteOnly);
 
 struct ProfileReproduction {
     std::string product_version;

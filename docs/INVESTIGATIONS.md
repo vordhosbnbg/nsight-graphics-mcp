@@ -1427,3 +1427,84 @@ failure or prove an underlying cause.
   and resource-lifetime/type evidence. The existing five-file production worker
   exception does not authorize adding VulkanStructHydrator. This scoped outcome
   is not a claim that Nsight can never expose these values.
+
+### I-040 — Per-action regime export contains undefined numeric cells
+
+- **Context:** 0.4.8 development controls, based on 4ab02f2; matching Nsight
+  **2026.3.1.0/build 38722833**, RTX 3080 Ti / driver **615.71.09**, existing
+  KDE Wayland/Xwayland session and selected matching library/ICD overlay.
+- **Reproduction:** Explicit C++ `ngm_profile_controls_integration` runs the
+  `state-descriptors-reuse` fixture at seed 42, 192×128, final frame 300. Fresh
+  profile jobs start after five presents and collect three frames/1000 ms,
+  Throughput Metrics for Ampere GA10x, HES explicitly off, clocks unaltered;
+  `time_every_action` is false, then true. Exact requests/argv/environment and
+  binary/source identities are retained with the attempt.
+- **Expected/observed:** Both Nsight processes exit **0** with cleanup confirmed.
+  The first managed profile succeeds. The second exports `Time Every Action: Yes`
+  but the strict parser rejects its regime table as a missing/nonfinite/malformed
+  numeric cell. That table has **39 rows / 438 numeric columns**, including **292
+  literal `nan` cells**. Its event table has **13 finite rows / three time columns**;
+  frame duration and all 146 frame-metric rows are also finite. The counter cells
+  have no usable finite value; the audit does not establish why they are undefined.
+- **Evidence/retention:** Complete/pinned investigation
+  **bundle-0db93680346958bf72c60f67ff15d435** retains reports, transcript, all ten
+  text exports, exact code snapshot and unchanged permission observations.
+  Successful source **bundle-d7f5a3fc5da5bc7b2ceb3be2280ab79a** and failed source
+  **bundle-bef6722497c3c50eb4186f98a3294a27** are independently pinned under
+  `capability-followup/profile-controls-tPCgnK/store`. The failed bundle remains
+  failed; it is not promoted to a typed profile. Existing profiler-device/trace
+  access suffices; no permission, clock or other machine change is made.
+- **Revisit:** Preserve this exact producer/table/token shape as explicit
+  unavailable cells, validate null/status coverage and missing-selection refusals,
+  then collect fresh profiles with both controls. Keep malformed tokens and
+  nonfinite timing/frame values rejected; do not replace missing counters by zero.
+
+I-040 follow-up, 2026-10-15: the producer-qualified regime parser now preserves
+only literal `nan` cells as null/unavailable. Two new 0.4.8 profiles succeed with
+per-action timing off/on and HES explicitly disabled. The off profile has 146
+undefined cells; the on profile has none. Finite neighbors, missing-selection
+refusals and identical metadata/pins after restart pass. All 35 serial CPU checks
+pass. This does not explain the undefined cells or establish draw correlation.
+Final qualification **bundle-193d06c97b109c55fb8a30e35f12b8f9** is complete/pinned;
+see PROFILE_CONTROLS.md and BUILD_VALIDATION.md for the exact scope.
+
+### I-041 — Embedded historical profiles are incomplete native-bundle backups
+
+- **Context:** Offline 0.4.8 compatibility probe against the raw R-009 snapshot
+  **bundle-d4db174806f33a707b908900599404d5**, containing historical exports from
+  matching Nsight **2026.2.0.0/build 37991608** and **2026.3.1.0/build 38722833**.
+  No GPU/tool collection occurs.
+- **Reproduction:** Initialize an empty managed store through the product, then
+  copy the snapshot's unmodified embedded native profile directories
+  **bundle-98667e6c4f224577892a438604d1c9cf** and
+  **bundle-f4ace6e396d66379f12e74b70d4a84c0** into it with their existing manifests
+  and pins. Query the first through `profile_metadata`.
+- **Expected/observed:** Inspection correctly refuses `corrupt: Artifact output
+  inventory differs`. Each embedded copy is missing four cache/configuration
+  files listed by its original manifest: GLCache bin/toc, NsightGraphics.conf
+  and .default.ngfx-proj. The available raw exports have no newly observed size
+  difference; they do not form a complete native backup. The second profile is
+  audited for the same missing-file condition, rather than represented as a
+  successful typed query. No manifest is rewritten or missing file fabricated.
+- **Evidence/retention:** Complete/pinned audit
+  **bundle-404b123f1d2fec9deea906890a71ca1e** retains the source manifests, missing
+  inventory, exact restoration script and rejected MCP transcript. The R-009 raw
+  snapshot remains pinned. This result does not establish a parser regression or
+  change the original retained measurement outcomes.
+- **Revisit:** Recover intact original native bundles before claiming real
+  historical-profile query compatibility. A separate CPU-only probe creates an
+  intact old-format profile through the installed 0.4.1 product and stand-ins;
+  current-server read/restart compatibility passes, with its narrower scope
+  recorded in BUILD_VALIDATION.md.
+
+I-041 follow-up: a later read-only restart also refuses inspection of the good
+profiles while those incomplete negative copies share the validation store;
+store-wide inventory checking correctly finds the earlier missing files. With
+no server using that store, only the two manually copied negative inputs are
+moved intact to `investigation-I041/incomplete-native-copies/`. Their manifests,
+pins and all available bytes are preserved with before/after file hashes. No
+original historical source is removed. The two fresh 0.4.8 profiles then return
+identical metadata and complete/pinned status through a clean server restart;
+four additional results pass actual output schemas. The failed restart transcript
+and isolation record accompany the complete/pinned final qualification
+**bundle-193d06c97b109c55fb8a30e35f12b8f9**.

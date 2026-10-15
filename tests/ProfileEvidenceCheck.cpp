@@ -104,6 +104,28 @@ int main(int argc, char** argv) {
         require(ngm::parse_profile_table("event_text\ttime_ms\r\n", Kind::EventDurations).rows.empty(),
                 "CRLF header-only export is valid");
         const auto exact = ngm::parse_profile_table("metric\t1.2500e-03\r\n", Kind::FrameMetrics);
+        const auto nan_policy = ngm::ProfileTablePolicy::Nsight2026_3RegimeNan;
+        const auto observed_undefined = ngm::parse_profile_table(
+            read(argv[1], "undefined-regimes/GPUTRACE_REGIMES.xls.tsv"), Kind::RegimeMetrics, nan_policy);
+        require(observed_undefined.rows.size() == 2 && observed_undefined.columns.size() == 6 &&
+                    !observed_undefined.rows[1].values[1].value.has_value() &&
+                    !observed_undefined.rows[1].values[4].value.has_value() &&
+                    observed_undefined.rows[1].values[0].value.has_value(),
+                "actual producer subset preserves missing and adjacent finite positions under duplicate headers");
+        const std::string undefined = "flattened_event_name\tmetric\tmetric\nmarker\tnan\t2\n";
+        const auto partial = ngm::parse_profile_table(undefined, Kind::RegimeMetrics, nan_policy);
+        require(!partial.rows[0].values[0].value.has_value() && partial.rows[0].values[0].text == "nan" &&
+                    partial.rows[0].values[1].value == 2,
+                "qualified undefined cells retain text and no fabricated numeric value");
+        rejected(Code::InvalidField, [&] { ngm::parse_profile_table(undefined, Kind::RegimeMetrics); });
+        for(const auto* token : {"NaN", "NAN", "-nan", "inf", "", "not-a-number"})
+            rejected(Code::InvalidField, [&] {
+                ngm::parse_profile_table(std::string("flattened_event_name\tm\nx\t") + token, Kind::RegimeMetrics,
+                                         nan_policy);
+            });
+        rejected(Code::InvalidField,
+                 [&] { ngm::parse_profile_table("event_text\ttime_ms\nx\tnan", Kind::EventDurations, nan_policy); });
+        rejected(Code::InvalidField, [&] { ngm::parse_profile_table("m\tnan", Kind::FrameMetrics, nan_policy); });
         require(exact.rows[0].values[0].text == "1.2500e-03" && exact.rows[0].values[0].value == .00125,
                 "text precision and CRLF preserved/accepted");
         const auto unicode = ngm::parse_profile_table("event_text\ttime_ms\n\xCE\xBB\t2", Kind::EventDurations);

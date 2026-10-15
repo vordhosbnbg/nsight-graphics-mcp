@@ -87,6 +87,15 @@ the label header, paginated column identities and explicit availability even for
 valid zero-row event/regime exports. Frame data stays available; comparisons
 refuse absent rows. See [PERFORMANCE.md](PERFORMANCE.md).
 
+At **0.4.8**, `profile.settings` adds nullable `time_every_action` and
+`hes_enabled`. Omission/null preserves tool defaults. Metadata separates the
+request, exported observation and verification; HES activation remains unverified.
+The exact qualified 2026.3 regime `nan` cells return a null numeric value,
+per-cell status/reason and whole-table available/unavailable counts. Coverage can
+be `partial`; comparisons refuse missing selected values. C++ `ProfileValue`
+also holds an optional number. Clients must handle these nullable values.
+The surface remains 28 tools; see [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md).
+
 | Tool | Inputs and behavior |
 | --- | --- |
 | `profile` | Required absolute `executable`, `working_directory`, and `settings.architecture`. Optional arguments, pin, application output option and deadline follow capture. Settings select frames/submits, start/limit/duration and metric set. Launches one fresh target through GPU Trace with clocks unaltered; never changes permissions. Returns identity/artifact ID. See PERFORMANCE.md for defaults and prerequisites. |

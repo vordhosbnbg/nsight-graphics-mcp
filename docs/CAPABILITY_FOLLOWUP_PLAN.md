@@ -38,6 +38,18 @@ This documentation-only closure does not add a full-state capability or extend
 the helper policy. Step E/R-022 is now In Progress. Earlier versioned implementation
 notes above retain their status at those increments.
 
+At **0.4.8**, step E's first implementation slice adds nullable per-action/HES
+controls, exported-setting verification and producer-qualified unavailable regime
+cells. All 35 serial CPU checks and two fresh matching 2026.3 off/on profiles
+pass, including restart and 202 schema-validated MCP results. This qualifies
+collection controls and nullable counter handling, not draw correlation or counter
+scope. R-022 stays In Progress for the repeated/nested direct/indexed timing
+matrix, independent timestamp/overhead sanity and supported counter associations.
+See [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md) and BUILD_VALIDATION.md.
+Qualification is pinned as `bundle-193d06c97b109c55fb8a30e35f12b8f9`, with both
+native source profiles independently pinned. The installed/live server remains
+0.4.1; these results bind the source-built 0.4.8 binaries.
+
 The owner's priorities are effective state at a selected captured draw, activation
 of the existing resource reader, correlated draw timing/counters, and controlled
 per-job launch environments, in that order. Draw state remains the main objective.

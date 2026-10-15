@@ -151,11 +151,27 @@ int main(int argc, char** argv) {
             std::cout << "unrelated program --help --version\n";
         } else if(is_cli) {
             std::cout << "NVIDIA Nsight Graphics [general_options] [activity_options]:\n--version --help --help-all\n";
-            for(const auto* option :
-                {"--activity", "--platform", "--exe", "--dir", "--output-dir", "--wait-frames", "--args", "--env",
-                 "--no-timeout", "--auto-export", "--architecture", "--metric-set-name", "--set-gpu-clocks",
-                 "--collect-screenshot", "--max-duration-ms", "--start-after-frames", "--start-after-submits",
-                 "--limit-to-frames", "--limit-to-submits"}) {
+            for(const auto* option : {"--activity",
+                                      "--platform",
+                                      "--exe",
+                                      "--dir",
+                                      "--output-dir",
+                                      "--wait-frames",
+                                      "--args",
+                                      "--env",
+                                      "--no-timeout",
+                                      "--auto-export",
+                                      "--architecture",
+                                      "--metric-set-name",
+                                      "--set-gpu-clocks",
+                                      "--collect-screenshot",
+                                      "--max-duration-ms",
+                                      "--start-after-frames",
+                                      "--start-after-submits",
+                                      "--limit-to-frames",
+                                      "--limit-to-submits",
+                                      "--time-every-action",
+                                      "--hes-enabled"}) {
                 if(environment("NGM_OMIT_CPP_OPTION") != option && environment("NGM_OMIT_PROFILE_OPTION") != option) {
                     std::cout << ' ' << option;
                 }
@@ -236,6 +252,11 @@ int main(int argc, char** argv) {
             << value(arguments, "--start-after-" + unit) << suffix << "\nLimited To\t"
             << value(arguments, "--limit-to-" + unit) << suffix << "\nMax Duration \t"
             << value(arguments, "--max-duration-ms") << " ms\n";
+        if(mode != "missing-action-control") {
+            std::ofstream(tables / "REPRO_INFO.xls", std::ios::app)
+                << "Time Every Action\t"
+                << ((has(arguments, "--time-every-action") != (mode == "wrong-action-control")) ? "Yes" : "No") << '\n';
+        }
         std::ofstream(tables / "FRAME.xls") << "GPU frame time\t0.5\n";
         std::ofstream(tables / "GPUTRACE_FRAME.xls") << "synthetic.metric\t1\nsecond.metric\t2\n";
         std::ofstream(tables / "D3DPERF_EVENTS.xls")
@@ -250,6 +271,10 @@ int main(int argc, char** argv) {
             for(std::string item; std::getline(items, item, ',');)
                 stream << label << '\t' << item << '\n';
         }
+        if(has(target_options, "--profile-undefined-regimes"))
+            std::ofstream(tables / "GPUTRACE_REGIMES.xls")
+                << "flattened_event_name\tsynthetic.metric\tsynthetic.metric\nsynthetic.work\tnan\t2\nall."
+                   "undefined\tnan\tnan\n";
         if(mode == "header-only" || has(target_options, "--profile-header-only")) {
             std::ofstream(tables / "D3DPERF_EVENTS.xls") << "event_text\ttime_ms\n";
             std::ofstream(tables / "GPUTRACE_REGIMES.xls")

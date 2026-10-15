@@ -10,6 +10,15 @@ cohorts. Independent acceptance and the pinned snapshot are detailed below.
 
 ## Profiling service
 
+The **0.4.8** follow-up adds nullable per-action/HES collection controls and
+requested/exported verification. It preserves qualified 2026.3 literal regime
+`nan` cells as null/unavailable, retaining adjacent finite measurements and
+explicit whole-table coverage. Comparisons refuse a selected missing cell.
+See [PROFILE_CONTROLS.md](PROFILE_CONTROLS.md) for the response-contract change,
+producer boundary and actual off/on qualification. These controls establish no
+new draw correlation, per-draw counter scope or instrumentation-overhead estimate;
+R-022 remains In Progress.
+
 At **0.4.4**, valid header-only event/regime exports preserve their headers and
 can accompany a successful profile with partial coverage. `profile_metadata`
 returns `table_coverage` (status, reason, row count and numeric column count).

@@ -71,6 +71,20 @@ GPU pipelines using NVIDIA Nsight Graphics.
 
 ## Starting point
 
+The first R-022 slice completes at **0.4.8**, retaining **28 tools**. Profiles
+accept nullable per-action/HES controls with exact retained requests and exported
+timing verification; active HES state remains unverified. Qualified literal `nan`
+regime cells return null/unavailable with finite neighbors intact. All **35 CPU
+checks** and two fresh matching **2026.3.1.0/build 38722833** profiles pass; **202**
+MCP results validate against advertised schemas, including restart checks.
+CPU-only old-product profile-format compatibility also passes. No new 2026.2
+control qualification, draw correlation, per-draw counter scope or timing-overhead
+claim is made. **R-022 remains In Progress**. See docs/PROFILE_CONTROLS.md and
+docs/BUILD_VALIDATION.md; I-040/I-041 retain failed attempts. Existing profiling
+access is observed unchanged; no machine-setting change is performed.
+Qualification is pinned as `bundle-193d06c97b109c55fb8a30e35f12b8f9`; the two
+native profiles remain independently pinned in the external validation store.
+
 R-021's descriptor binding/offset slice completes at **0.4.7**, retaining **28
 tools**. `capture_draw_state` joins literal allocations/layouts, applies prefix
 and push-range compatibility/disturbance, and maps dynamic offsets by set,

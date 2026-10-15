@@ -118,6 +118,26 @@ int main(int argc, char** argv) {
             different.candidate[0] = produce(service, "1");
             rejected([&] { inspect.compare(different); });
             --request.profile.start_after;
+            for(const bool per_action_control : {false, true}) {
+                if(per_action_control)
+                    request.profile.time_every_action = false;
+                else
+                    request.profile.hes_enabled = false;
+                auto changed_controls = spec;
+                changed_controls.candidate[0] = produce(service, "1");
+                request.profile.time_every_action.reset();
+                request.profile.hes_enabled.reset();
+                rejected([&] { inspect.compare(changed_controls); });
+            }
+            auto missing_values = spec;
+            missing_values.candidate[0] = produce(service, "1", {"--profile-undefined-regimes"});
+            bool unavailable = false;
+            try {
+                (void)inspect.compare(missing_values);
+            } catch(const std::invalid_argument& error) {
+                unavailable = std::string(error.what()).find("unavailable") != std::string::npos;
+            }
+            require(unavailable, "a selected nan cell refuses comparison instead of becoming zero or being skipped");
             for(int invalid = 0; invalid < 9; ++invalid) {
                 auto bad = spec;
                 switch(invalid) {
