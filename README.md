@@ -1,22 +1,47 @@
 # Nsight Graphics MCP
 
-A C++ MCP server for capturing and inspecting Vulkan applications with NVIDIA
-Nsight Graphics on Linux. Agents can diagnose a rendering defect, edit its
-source, rebuild, recapture and compare the result.
+**Capture a rendering bug, fix its source, and verify the result with your coding agent.**
 
-The server provides:
+Nsight Graphics MCP connects agents such as Codex to **NVIDIA Nsight Graphics on
+Linux** through the Model Context Protocol (MCP). It lets an agent capture your
+Vulkan application, inspect rendered images and shaders, investigate compute
+results, and compare GPU timings before and after a change.
 
-- Fresh application captures, generated C++ exports and standalone GPU replay.
-- Bounded event/object queries, shader/resource reads and supported source-state
-  and uniform-value reconstruction.
-- Image previews/comparisons, GPU Trace collection and repeated-run comparison.
-- Asynchronous jobs, cancellation and managed artifacts over stdio or local HTTP.
+Graphics capture works without adding instrumentation to your application.
+When source is available, the agent can edit and rebuild it with its usual
+development tools, then capture again to check the fix against actual output.
 
-It uses documented Nsight interfaces. Application instrumentation is optional;
-source edits use the agent's ordinary development tools. See
-[compatibility and limitations](docs/COMPATIBILITY.md) before relying on a result.
+See the [full tool list](docs/MCP.md#tools) for available operations and
+[compatibility guide](docs/COMPATIBILITY.md) for supported setups and inspection limits.
 
-## Build
+## What you can ask
+
+**Find and fix a rendering defect**
+
+> Capture the triangle demo, identify the shader responsible for the incorrect
+> colors, and verify the output after the fix.
+
+The included Vulkan demo has a shader that swaps red and blue. The agent can
+inspect the captured shader, correct the code, rebuild, and compare a fresh
+capture with the reference. The example below shows the verified repair:
+
+| Before: swapped color channels | After: corrected shader |
+| --- | --- |
+| ![Triangle with blue at the upper left and red at the bottom](docs/images/shader-before.png) | ![Triangle with red at the upper left and blue at the bottom](docs/images/shader-after.png) |
+
+The repaired capture matches the reference pixel for pixel.
+See the [source-repair workflow](docs/WORKFLOWS.md#diagnose-and-verify-a-source-repair).
+
+**Check whether a performance change helps**
+
+> Collect four GPU traces before and after the shader change, using the same
+> warmup. Compare dispatch times and report variation between runs.
+
+The agent can repeat measurements for both versions and compare GPU timings
+and how much they vary between runs, helping you judge whether a change improves
+your workload. See the [profiling workflow](docs/WORKFLOWS.md#profiling).
+
+## Get started
 
 Requires Linux x86-64, a C++20 compiler, CMake 3.25+, Ninja, Python 3, Git,
 pkg-config, binutils and XCB development files.
@@ -29,7 +54,8 @@ cmake --build --preset linux-gcc-debug --target ngm_check
 ```
 
 Capture also needs a compatible Nsight installation, NVIDIA driver and an existing
-X11/Xwayland desktop. CPU checks do not launch GPU workloads.
+X11/Xwayland desktop. CPU checks do not launch GPU workloads. Follow
+[Install and connect](docs/INSTALL.md) to connect your MCP client after building.
 
 ## Documentation
 
@@ -40,14 +66,4 @@ X11/Xwayland desktop. CPU checks do not launch GPU workloads.
 - [Development](docs/DEVELOPMENT.md): architecture, dependencies, tests and optional helpers.
 - [Roadmap](docs/ROADMAP.md): remaining accepted work.
 
-## Example repair
-
-The fixture's shader defect swaps red and blue. A source edit followed by rebuild
-and recapture restores the reference image; selecting a different fixture scenario
-is not a source repair.
-
-| Before | After |
-| --- | --- |
-| ![Shader defect](docs/images/shader-before.png) | ![Repaired shader](docs/images/shader-after.png) |
-
-The project is MIT licensed; dependency notices are in their source trees.
+The project is [MIT licensed](LICENSE); dependency notices are in their source trees.
