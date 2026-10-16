@@ -35,7 +35,8 @@ and libstdc++; other hardware/driver/compiler combinations need their own checks
   establish original live cost, replay-reset cost or causal instrumentation overhead.
 - GPU Trace counters can include other GPU activity. Exported names/positions do
   not establish application-only draw/fragment counts, units or scaling. Raw cells
-  stay available; physical interpretation remains the blocked roadmap item.
+  stay available; application attribution and physical interpretation are unsupported.
+  Revisit only with documented Graphics definitions and collection boundaries.
 - Product profiling is single-pass. A native multi-pass probe supplied additional
   raw counters but did not qualify their semantics or all-pass marker correspondence.
 - Compute numerical data comes from the application; Nsight inventories are
