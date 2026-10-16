@@ -4,6 +4,7 @@
 
 Build a C++ MCP server for Vulkan capture, shader diagnosis, compute correctness
 and GPU performance analysis using NVIDIA Nsight Graphics on Linux.
+Windows support is planned for a future release; Linux is the current supported platform.
 
 - Use documented Nsight CLI/SDK interfaces and exports only. GUI automation,
   private RPC, reverse-engineered formats and complementary backends are excluded.

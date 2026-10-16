@@ -14,6 +14,18 @@ development tools, then capture again to check the fix against actual output.
 See the [full tool list](docs/MCP.md#tools) for available operations and
 [compatibility guide](docs/COMPATIBILITY.md) for supported setups and inspection limits.
 
+## Requirements
+
+- **Platform:** Linux x86-64 with an existing X11/Xwayland desktop session.
+- **GPU:** A compatible NVIDIA GPU and driver with Vulkan 1.3 support.
+- **Profiler:** A separately installed NVIDIA Nsight Graphics release; see
+  [tested versions](docs/COMPATIBILITY.md#qualified-interfaces).
+- **Client:** An MCP-capable coding agent such as Codex.
+- **To build from source:** A C++20 compiler, CMake 3.25+, Ninja, Python 3, Git,
+  pkg-config, binutils and XCB development files.
+
+[Windows support](docs/ROADMAP.md#r-028) is planned for a future release.
+
 ## What you can ask
 
 **Find and fix a rendering defect**
@@ -43,9 +55,6 @@ your workload. See the [profiling workflow](docs/WORKFLOWS.md#profiling).
 
 ## Get started
 
-Requires Linux x86-64, a C++20 compiler, CMake 3.25+, Ninja, Python 3, Git,
-pkg-config, binutils and XCB development files.
-
 ```sh
 git submodule update --init --recursive
 cmake --preset linux-gcc-debug
@@ -53,8 +62,7 @@ cmake --build --preset linux-gcc-debug
 cmake --build --preset linux-gcc-debug --target ngm_check
 ```
 
-Capture also needs a compatible Nsight installation, NVIDIA driver and an existing
-X11/Xwayland desktop. CPU checks do not launch GPU workloads. Follow
+CPU checks do not launch GPU workloads. Follow
 [Install and connect](docs/INSTALL.md) to connect your MCP client after building.
 
 ## Documentation
