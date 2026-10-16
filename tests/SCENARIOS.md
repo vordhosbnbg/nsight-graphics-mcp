@@ -48,5 +48,5 @@ matrix. `--suite advanced` covers the ten advanced scenarios twice at each of tw
 input tuples (40 launches). `--suite all` covers fourteen scenarios plus the
 shader override (57 launches). A prerequisite failure remains `unsupported` in its
 row and fails the aggregate; it is never treated as a passing substitute workload.
-Advanced cases are pending real build/review/GPU validation when introduced; this
-file defines their contract, not an observed compatibility claim.
+This file defines private expectations. Supported interfaces are described in
+[Compatibility](../docs/COMPATIBILITY.md).
