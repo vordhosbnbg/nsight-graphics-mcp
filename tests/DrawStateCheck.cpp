@@ -38,8 +38,10 @@ int main() {
                     dynamic.at("cull_mode").at("value") == "VK_CULL_MODE_NONE" &&
                     dynamic.at("front_face").at("value") == "VK_FRONT_FACE_COUNTER_CLOCKWISE",
                 "dynamic setters beat disagreeing creation values");
-        require(dynamic.at("viewports").at("value") == Json::array({{4.0, 6.0, 16.0, 16.0, 0.25, 0.75}}) &&
-                    dynamic.at("scissors").at("value") == Json::array({{2, 3, 8, 8}}),
+        const auto expected_viewports = Json::array({{4.0, 6.0, 16.0, 16.0, 0.25, 0.75}});
+        const auto expected_scissors = Json::array({{2, 3, 8, 8}});
+        require(dynamic.at("viewports").at("value") == expected_viewports &&
+                    dynamic.at("scissors").at("value") == expected_scissors,
                 "dynamic arrays");
         auto missing = sources<ngm::CppSource>(true, begin + bind + draw + end);
         const auto absent = state(missing);
@@ -81,6 +83,68 @@ int main() {
                     duplicate_submit.at("executions")[0].at("selection").at("submission_index") == 0 &&
                     duplicate_submit.at("executions")[1].at("selection").at("submission_index") == 1,
                 "reused recording has distinct submitted occurrences");
+        const std::string queue_begin = R"cpp(
+{ BEGIN_DATA_SCOPE();
+static VkDebugUtilsLabelEXT VkDebugUtilsLabelEXT_queue[1] = {VkDebugUtilsLabelEXT{
+VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,nullptr,"Frame submit",NV_TO_ARRAY(0.0f,0.0f,0.0f,0.0f)}};
+NV_VK_REPLAY(VulkanReplay_QueueBeginDebugUtilsLabelEXT(VkQueue_uid_5,VkDebugUtilsLabelEXT_queue));
+}
+)cpp";
+        const std::string queue_end = "NV_VK_REPLAY(VulkanReplay_QueueEndDebugUtilsLabelEXT(VkQueue_uid_5));\n";
+        const auto labelled =
+            ngm::inspect_draw_executions(sources<ngm::CppSource>(false, {}, frame(queue_begin + submit + queue_end)));
+        require(labelled.at("executions").size() == 1 && labelled.at("unsupported").empty(),
+                "balanced queue labels preserve recorded draw occurrences: " + labelled.at("unsupported").dump());
+        const auto& queue_labels = labelled.at("executions")[0].at("queue_labels");
+        require(queue_labels.size() == 1 && queue_labels[0].at("name") == "Frame submit" &&
+                    queue_labels[0].at("source").at("path") == "Frame0Part00.cpp" &&
+                    labelled.at("executions")[0].at("state") == duplicate_submit.at("executions")[0].at("state"),
+                "queue metadata retains source provenance without changing raster state");
+        const auto nested_begin = replace(queue_begin, "\"Frame submit\"", "\"Nested\"");
+        const auto nested = ngm::inspect_draw_executions(
+            sources<ngm::CppSource>(false, {}, frame(queue_begin + nested_begin + submit + queue_end + queue_end)));
+        require(nested.at("executions").size() == 1 && nested.at("unsupported").empty() &&
+                    nested.at("executions")[0].at("queue_labels")[1].at("name") == "Nested",
+                "nested queue scopes preserve their recorded order");
+        const auto other_begin =
+            replace(replace(queue_begin, "VkQueue_uid_5", "VkQueue_uid_6"), "\"Frame submit\"", "\"Other queue\"");
+        const auto other_end = replace(queue_end, "VkQueue_uid_5", "VkQueue_uid_6");
+        const auto other_submit = replace(submit, "VkQueue_uid_5", "VkQueue_uid_6");
+        const auto multiple_queues = ngm::inspect_draw_executions(sources<ngm::CppSource>(
+            false, {}, frame(queue_begin + other_begin + submit + queue_end + other_submit + other_end)));
+        require(multiple_queues.at("executions").size() == 2 && multiple_queues.at("unsupported").empty() &&
+                    multiple_queues.at("executions")[0].at("queue_labels")[0].at("name") == "Frame submit" &&
+                    multiple_queues.at("executions")[1].at("queue_labels")[0].at("name") == "Other queue",
+                "independent queues do not share label stacks");
+        const auto reused = ngm::inspect_draw_executions(
+            sources<ngm::CppSource>(false, {}, frame(queue_begin + submit + queue_end + submit)));
+        require(reused.at("executions").size() == 2 && reused.at("unsupported").empty() &&
+                    reused.at("executions")[0].at("queue_labels").size() == 1 &&
+                    reused.at("executions")[1].at("queue_labels").empty(),
+                "recording reuse receives submission-local queue labels");
+        for(const auto& statements :
+            {queue_end + submit, queue_begin + submit, queue_begin + submit + other_end,
+             replace(queue_begin, "\"Frame submit\"", "0u") + submit + queue_end,
+             replace(queue_begin, "VkQueue_uid_5,VkDebugUtilsLabelEXT_queue", "VkQueue_uid_5") + submit + queue_end,
+             queue_begin + submit + replace(queue_end, "VkQueue_uid_5)", "VkQueue_uid_5,0u)"),
+             replace(queue_begin, "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", "VK_UNKNOWN") + submit + queue_end})
+            refused(sources<ngm::CppSource>(false, {}, frame(statements)));
+        std::string too_deep;
+        for(std::size_t i = 0; i < 17; ++i)
+            too_deep += queue_begin;
+        too_deep += submit;
+        for(std::size_t i = 0; i < 17; ++i)
+            too_deep += queue_end;
+        refused(sources<ngm::CppSource>(false, {}, frame(too_deep)));
+        refused(sources<ngm::CppSource>(
+            false, {}, frame(replace(queue_begin, "Frame submit", std::string(257, 'x')) + submit + queue_end)));
+        std::string too_many_queues;
+        for(std::size_t i = 0; i < 65; ++i) {
+            const auto queue = "VkQueue_uid_" + std::to_string(i + 100);
+            too_many_queues +=
+                replace(queue_begin, "VkQueue_uid_5", queue) + replace(queue_end, "VkQueue_uid_5", queue);
+        }
+        refused(sources<ngm::CppSource>(false, {}, frame(too_many_queues + submit)));
         input = sources<ngm::CppSource>(false, {}, frame(submit + submit));
         input[0].text = replace(input[0].text, "VkCommandBufferUsageFlags(0)",
                                 "VkCommandBufferUsageFlags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)");

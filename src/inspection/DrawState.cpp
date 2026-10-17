@@ -575,6 +575,7 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
         std::map<std::string, std::size_t> generations;
         std::set<std::pair<std::string, std::size_t>> one_time_submissions;
         std::set<std::string> submitted_recordings;
+        std::map<std::string, Json> queue_labels;
         std::size_t submission = 0;
         std::size_t result_bytes = result.at("unsupported").dump().size();
         for(const auto& call : replay.frame) {
@@ -593,6 +594,24 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
                 require(a.size() == 2 && number(unwrap(a[1], "VkCommandBufferResetFlags")) == 0,
                         "unsupported command buffer reset");
                 active.erase(symbol(a[0], "VkCommandBuffer"));
+            } else if(call.name == "VulkanReplay_QueueBeginDebugUtilsLabelEXT") {
+                require(a.size() == 2, "unsupported queue label begin arity");
+                const auto queue = symbol(a[0], "VkQueue");
+                auto& stack = queue_labels.try_emplace(queue, Json::array()).first->second;
+                require(queue_labels.size() <= 64 && stack.size() < 16, "queue label count/depth exceeds bounds");
+                const auto label = fields(a[1], call.visible, "VkDebugUtilsLabelEXT", 4);
+                structure(label, "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT");
+                require(label[2].text.size() <= 258 && label[2].text.starts_with('"'),
+                        "unsupported queue label literal");
+                auto name = Json::parse(label[2].text);
+                require(name.is_string(), "queue label name is not a string");
+                stack.push_back({{"name", std::move(name)}, {"source", call.source}});
+            } else if(call.name == "VulkanReplay_QueueEndDebugUtilsLabelEXT") {
+                require(a.size() == 1, "unsupported queue label end arity");
+                const auto queue = symbol(a[0], "VkQueue");
+                require(queue_labels.contains(queue) && !queue_labels.at(queue).empty(), "unmatched queue label end");
+                auto& stack = queue_labels.at(queue);
+                stack.erase(stack.size() - 1);
             } else if(call.name == "VulkanReplay_QueueSubmit") {
                 require(a.size() == 4 && number(a[1]) > 0 && number(a[1]) <= 16,
                         "unsupported queue submission count/arity");
@@ -642,6 +661,8 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
                                                       {"event_index", draw.at("event_index")},
                                                       {"indirect_subdraw", nullptr}};
                             execution["submission_source"] = call.source;
+                            execution["queue_labels"] =
+                                queue_labels.contains(queue) ? queue_labels.at(queue) : Json::array();
                             result_bytes += execution.dump().size();
                             result["executions"].push_back(std::move(execution));
                             require(result["executions"].size() <= 10000 && result_bytes <= 16U * 1024U * 1024U,
@@ -663,6 +684,10 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
                 require(a.size() == counts.at(call.name), "unqualified frame call arity");
             } else
                 throw Unqualified("unqualified frame call prevents execution association: " + call.name);
+        }
+        for(const auto& [queue, stack] : queue_labels) {
+            (void)queue;
+            require(stack.empty(), "unclosed queue label scope in captured frame");
         }
         for(const auto& [name, recording] : replay.recordings)
             if(!submitted_recordings.contains(name))

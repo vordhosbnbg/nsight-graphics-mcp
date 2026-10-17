@@ -516,9 +516,11 @@ Schema draw_execution_schema(bool include_state) {
          {"function", {{"type", "string"}, {"enum", {"VulkanReplay_CmdDraw", "VulkanReplay_CmdDrawIndexed"}}}},
          {"arguments", array_schema(string_schema(16384, 1), 6)},
          {"labels", array_schema(string_schema(256), 16)},
+         {"queue_labels",
+          array_schema(object_schema({{"name", string_schema(256)}, {"source", span}}, {"name", "source"}), 16)},
          {"source", span},
          {"submission_source", span}},
-        {"execution_ref", "selection", "event_index", "function", "arguments", "labels", "source",
+        {"execution_ref", "selection", "event_index", "function", "arguments", "labels", "queue_labels", "source",
          "submission_source"});
     if(include_state) {
         const auto evidence = object_schema({{"path", string_schema(512, 1)},
@@ -2001,7 +2003,8 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                            arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
         });
     auto execution_input = inventory_input;
-    execution_input["properties"]["section"] = {{"type", "string"}, {"enum", {"executions", "unsupported"}}};
+    execution_input["properties"]["section"] = {
+        {"type", "string"}, {"maxLength", 32}, {"enum", {"executions", "unsupported"}}};
     add_tool(
         tools, "capture_draw_executions", execution_input, recorded_state_schema(false),
         "List capture-local submitted draw occurrences from qualified Nsight 2026.3.1.0/build 38722833 generated C++. "

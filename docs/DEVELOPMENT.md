@@ -87,6 +87,12 @@ Recorded-state and replay-timing validation retain a 512 MiB aggregate fingerpri
 read budget and existing query deadlines; larger files do not grant larger responses.
 Use an optimized build for large-capture inspection: Debug hashing can exhaust
 those deadlines even when the same inputs fit the Release budget.
+Recorded draw-state inspection also accepts balanced queue debug-label scopes
+within the captured frame: at most 64 literal queue symbols and 16 labels per
+queue. `queue_labels` records the submission-local names and begin-call sources;
+command-buffer `labels` remain separate. Missing ends, cross-queue ends, malformed
+labels and unknown frame effects refuse rather than preserve a partial prefix.
+
 Header-only event/regime exports explicitly report unavailable marker coverage;
 frame metrics remain separate.
 The build-required fingerprints/patch are part of the toolchain, not validation archives.

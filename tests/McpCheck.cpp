@@ -841,6 +841,10 @@ void workflow_check(const std::string& server, const std::string& standin, const
     expect_tool_error(
         call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", std::string(64, '0')}}),
         "export_unavailable");
+    require(successful_call(client, "capture_draw_executions",
+                            {{"capture_id", state_id}, {"section", "unsupported"}, {"limit", 1}})
+                    .at("section") == "unsupported",
+            "valid bounded unsupported-section query reaches inspection");
     expect_tool_error(call(client, "capture_draw_executions", {{"capture_id", state_id}, {"section", "invalid"}}));
     expect_tool_error(call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", "18"}}));
     expect_tool_error(
