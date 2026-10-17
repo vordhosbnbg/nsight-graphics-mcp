@@ -27,6 +27,18 @@ int main(int argc, char** argv) {
                                                      Kind::EventDurations);
         const auto regimes = ngm::parse_profile_table(ngm::read_regular_file(root / "GPUTRACE_REGIMES.xls.tsv", 16384),
                                                       Kind::RegimeMetrics);
+        for(const auto empty_events : {false, true}) {
+            auto e = events;
+            auto r = regimes;
+            if(empty_events)
+                e.rows.clear();
+            else
+                r.rows.clear();
+            const auto empty = ngm::correlate_profile_markers(e, r);
+            require(empty.status == Status::Unavailable && empty.rows.empty() &&
+                        empty.reason.find("Producer exported no") == 0,
+                    "header-only data reports missing producer rows without discarding raw frame metrics");
+        }
         const auto first = ngm::correlate_profile_marker(events, regimes, 4);
         require(first.status == Status::Available &&
                     first.path == std::vector<std::string>{"frame.5", "scene.raster", "timing.batch", "branch.a",

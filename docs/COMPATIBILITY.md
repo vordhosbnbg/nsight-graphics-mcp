@@ -36,6 +36,13 @@ and libstdc++; other hardware/driver/compiler combinations need their own checks
   Confined source-scoped descriptor/resource reads work on the Training input
   within the existing 256 MiB worker address-space limit. This does not qualify
   arbitrary larger inputs or the full uniform-value model for this workload.
+- Live unlabelled Training profiles with Time Every Action verified Yes export
+  header-only event/regime tables on this producer/driver combination. Explicit
+  application queue/command labels produce 70 event/regime ranges, usable through
+  `profile_marker` under its qualified single-frame contract. These ranges may
+  contain several draws and do not establish original execution IDs or exclusive
+  application counters. The saved replay's 84 source draw occurrences still lack
+  complete literal per-draw marker ranges and attributable per-draw durations.
 - Draw timing uses qualified original literal paths and generated-source calls.
   Ambiguous/repeated/multi-draw ranges refuse. Saved replay durations do not
   establish original live cost, replay-reset cost or causal instrumentation overhead.

@@ -20,6 +20,9 @@ ProfileMarkerTable correlate_profile_markers(const ProfileTable& events, const P
        regimes.label_column != "flattened_event_name")
         return refuse(Status::Unsupported,
                       "Marker association requires qualified single-column event headers and regime headers");
+    if(events.rows.empty() || regimes.rows.empty())
+        return refuse(Status::Unavailable,
+                      "Producer exported no event-duration or regime rows; per-range timing is unavailable");
     std::map<std::string, std::pair<std::size_t, std::size_t>> regime_paths;
     for(std::size_t row = 0; row < regimes.rows.size(); ++row) {
         const auto& item = regimes.rows[row];
