@@ -36,6 +36,11 @@ and libstdc++; other hardware/driver/compiler combinations need their own checks
   Confined source-scoped descriptor/resource reads work on the Training input
   within the existing 256 MiB worker address-space limit. This does not qualify
   arbitrary larger inputs or the full uniform-value model for this workload.
+- The Training export's 84 direct/indexed source draws use the qualified bounded
+  Vulkan 1.3 dynamic-rendering/Sync2/QueueSubmit2 subset. Supported recorded state
+  and source shader relationships are available, including balanced queue-label
+  scopes around submissions. Queue labels carry their own source provenance;
+  GPU execution correspondence and descriptor visibility remain unproved.
 - Live unlabelled Training profiles with Time Every Action verified Yes export
   header-only event/regime tables on this producer/driver combination. Explicit
   application queue/command labels produce 70 event/regime ranges, usable through

@@ -226,13 +226,24 @@ Schema cpp_source_schema() {
         result["required"].push_back(key);
     return result;
 }
+Schema specialization_schema() {
+    const auto entry = object_schema({{"constant_id", integer_schema(0, UINT32_MAX)},
+                                      {"offset", integer_schema(0, 65535)},
+                                      {"bytes", integer_schema(1, 65536)}},
+                                     {"constant_id", "offset", "bytes"});
+    return nullable(object_schema({{"map", array_schema(entry, 64)},
+                                   {"resource_handle", integer_schema()},
+                                   {"declared_bytes", integer_schema(1, 65536)}},
+                                  {"map", "resource_handle", "declared_bytes"}));
+}
 Schema cpp_draws_schema() {
     auto result = cpp_inspection_schema();
     const auto span = object_schema({{"path", string_schema(512, 1)},
                                      {"start_line", integer_schema(1, 4194304)},
                                      {"end_line", integer_schema(1, 4194304)}},
                                     {"path", "start_line", "end_line"});
-    const auto stage = object_schema({{"stage", string_schema(64, 1)},
+    const auto stage = object_schema({{"specialization", specialization_schema()},
+                                      {"stage", string_schema(64, 1)},
                                       {"module", string_schema(64, 1)},
                                       {"entry_point_expression", string_schema(258, 1)},
                                       {"stage_source", span},
@@ -251,7 +262,7 @@ Schema cpp_draws_schema() {
         {{"recording", string_schema(65536, 1)},
          {"event_index", integer_schema()},
          {"function", string_schema(64, 1)},
-         {"arguments", array_schema(string_schema(16384, 1), 5)},
+         {"arguments", array_schema(string_schema(16384, 1), 6)},
          {"source", span},
          {"association_status", {{"type", "string"}, {"enum", {"resolved_source_relationship", "unavailable"}}}},
          {"reason", nullable(string_schema(256, 1))},
@@ -539,7 +550,8 @@ Schema draw_execution_schema(bool include_state) {
                 {"status", "value", "reason", "evidence"});
         };
         auto stage = object_schema(
-            {{"stage", string_schema(64, 1)},
+            {{"specialization", specialization_schema()},
+             {"stage", string_schema(64, 1)},
              {"module", string_schema(64, 1)},
              {"entry_point_expression", string_schema(258, 1)},
              {"stage_source", span},
@@ -553,19 +565,25 @@ Schema draw_execution_schema(bool include_state) {
                                                     {"status", "sha256", "reason", "resource_ref"})}},
             {"stage", "module", "entry_point_expression", "stage_source", "module_source", "resource_handle",
              "declared_bytes", "serialized_byte_read"});
-        Json properties{{"pipeline", field(object_schema({{"symbol", string_schema(64, 1)},
-                                                          {"layout", string_schema(64, 1)},
-                                                          {"render_pass", string_schema(64, 1)},
-                                                          {"subpass", integer_schema(0, 0)}},
-                                                         {"symbol", "layout", "render_pass", "subpass"}))},
-                        {"shaders", field(array_schema(stage, 8))},
-                        {"depth_test", field(boolean_schema())},
-                        {"depth_write", field(boolean_schema())},
-                        {"depth_compare", field(string_schema(64, 1))},
-                        {"cull_mode", field(string_schema(64, 1))},
-                        {"front_face", field(string_schema(64, 1))},
-                        {"viewports", field(array_schema(array_schema({{"type", "number"}}, 6), 16))},
-                        {"scissors", field(array_schema(array_schema(integer_schema(0, 2147483647), 4), 16))}};
+        Json properties{
+            {"pipeline", field(object_schema(
+                             {{"symbol", string_schema(64, 1)},
+                              {"layout", string_schema(64, 1)},
+                              {"render_pass", nullable(string_schema(64, 1))},
+                              {"dynamic_rendering", object_schema({{"colors", array_schema(string_schema(64, 1), 8)},
+                                                                   {"depth", string_schema(64, 1)},
+                                                                   {"stencil", string_schema(64, 1)}},
+                                                                  {"colors", "depth", "stencil"})},
+                              {"subpass", integer_schema(0, 0)}},
+                             {"symbol", "layout", "render_pass", "subpass"}))},
+            {"shaders", field(array_schema(stage, 8))},
+            {"depth_test", field(boolean_schema())},
+            {"depth_write", field(boolean_schema())},
+            {"depth_compare", field(string_schema(64, 1))},
+            {"cull_mode", field(string_schema(64, 1))},
+            {"front_face", field(string_schema(64, 1))},
+            {"viewports", field(array_schema(array_schema({{"type", "number"}}, 6), 16))},
+            {"scissors", field(array_schema(array_schema(integer_schema(0, 2147483647), 4), 16))}};
         const auto missing = object_schema({{"status", {{"type", "string"}, {"enum", {"unavailable"}}}},
                                             {"value", {{"type", "null"}}},
                                             {"reason", string_schema(256, 1)},

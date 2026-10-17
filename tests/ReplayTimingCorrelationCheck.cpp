@@ -1,6 +1,7 @@
 #include "Check.hpp"
 #include "CppReplay.hpp"
 #include "DrawStateFixture.hpp"
+#include "Vulkan13Fixture.hpp"
 #include "ngm/Inspection.hpp"
 #include "ngm/ReplayTiming.hpp"
 
@@ -103,6 +104,12 @@ void refused(const std::vector<ngm::CppSource>& source) {
 } // namespace
 int main() {
     return ngm::check::run([] {
+        const auto v13 = ngm::correlate_replay_draws(
+            ngm::check::vulkan13::sources<ngm::CppSource>(),
+            ngm::parse_profile_table("event_text\ttime_ms\n", ngm::ProfileTableKind::EventDurations),
+            ngm::parse_profile_table("flattened_event_name\tunknown_counter\n", ngm::ProfileTableKind::RegimeMetrics));
+        require(v13.at("unsupported").empty(), "Vulkan 1.3 source coverage: " + v13.dump());
+        unavailable(v13, 1);
         const auto events = event_table(), regimes = regime_table();
         const auto result = ngm::correlate_replay_draws(inputs(), events, regimes);
         require(result.at("unsupported").empty() && result.at("draws").size() == 4,
@@ -237,11 +244,8 @@ NV_VK_REPLAY(VulkanReplay_GetQueryPoolResults(VkDevice_uid_4,VkQueryPool_uid_99,
         const auto annotated = ngm::correlate_replay_draws(source, events, regimes);
         require(annotated.at("draws").size() == 4 && annotated.at("draws")[0].at("status") == "available",
                 "bounded blocking recording annotation and host-only query output do not change membership");
-        try {
-            (void)ngm::detail::parse_cpp_replay(source);
-            require(false, "old recorded-state grammar must not inherit timing extensions");
-        } catch(const ngm::InspectionError&) {
-        }
+        require(ngm::detail::parse_cpp_replay(source).frame.size() > 0,
+                "recorded-state grammar also qualifies bounded host reads and blocking recording annotations");
         auto invalid = source;
         invalid[2].text = replace(invalid[2].text, "NV_THREAD_BEGIN", "NV_THREAD_NON_BLOCKING_BEGIN");
         refused(invalid);

@@ -1,5 +1,6 @@
 #include "Check.hpp"
 #include "CppEvidenceFixture.hpp"
+#include "Vulkan13Fixture.hpp"
 #include "ngm/CppEvidence.hpp"
 #include "ngm/Inspection.hpp"
 
@@ -35,6 +36,27 @@ void rejected(const std::string& commands, const std::string& objects = resource
 
 int main() {
     return ngm::check::run([] {
+        const auto v13 = ngm::inspect_cpp_draws(ngm::check::vulkan13::sources<ngm::CppSource>());
+        require(v13.at("draws").size() == 1 && v13.at("unsupported_recordings").empty() &&
+                    v13.at("draws")[0].at("association_status") == "resolved_source_relationship",
+                "Vulkan 1.3 literal indexed draw relationship: " + v13.dump());
+        const auto& specialization = v13.at("draws")[0].at("pipeline").at("stages")[0].at("specialization");
+        require(specialization.at("resource_handle") == 77 && specialization.at("map")[0].at("bytes") == 4,
+                "specialization remains an opaque source reference");
+        for(const auto& [from, to] :
+            {std::pair{"0u,0u,4ull", "0u,2u,4ull"}, std::pair{"const void*,77,4ull", "const void*,77,8ull"}}) {
+            auto bad = ngm::check::vulkan13::sources<ngm::CppSource>();
+            bad[1].text = replace(bad[1].text, from, to);
+            require(ngm::inspect_cpp_draws(bad).at("draws")[0].at("association_status") == "unavailable",
+                    "invalid specialization map/resource refuses shader relationship");
+        }
+        auto invalid_v13_call = ngm::check::vulkan13::sources<ngm::CppSource>();
+        invalid_v13_call[0].text =
+            replace(invalid_v13_call[0].text, "CmdBeginRendering(cmdBuffer,VkRenderingInfo_render)",
+                    "CmdBeginRendering(cmdBuffer)");
+        const auto invalid_v13 = ngm::inspect_cpp_draws(invalid_v13_call);
+        require(invalid_v13.at("draws").empty() && !invalid_v13.at("unsupported_recordings").empty(),
+                "malformed Vulkan 1.3 call arity cannot manufacture a literal draw relationship");
         const auto command = recording(begin + draw + end);
         const auto result = inspect(command);
         require(result["unsupported_recordings"].empty() && result["unsupported_objects"].empty(),

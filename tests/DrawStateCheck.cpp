@@ -1,5 +1,6 @@
 #include "Check.hpp"
 #include "DrawStateFixture.hpp"
+#include "Vulkan13Fixture.hpp"
 #include "ngm/DrawState.hpp"
 #include "ngm/Inspection.hpp"
 
@@ -24,6 +25,42 @@ void refused(const std::vector<ngm::CppSource>& input) {
 } // namespace
 int main() {
     return ngm::check::run([] {
+        auto v13 = ngm::check::vulkan13::sources<ngm::CppSource>();
+        const auto v13_state = state(v13);
+        require(v13_state.at("pipeline").at("status") == "qualified_recorded_state" &&
+                    v13_state.at("depth_test").at("value") == true &&
+                    v13_state.at("shaders").at("status") == "qualified_recorded_state",
+                "dynamic rendering, Sync2, indexed/vertex binds and padded timestamp host reads: " + v13_state.dump());
+        auto mismatch = v13;
+        mismatch[1].text = replace(mismatch[1].text, "VK_FORMAT_D32_SFLOAT,VK_FORMAT_UNDEFINED",
+                                   "VK_FORMAT_D16_UNORM,VK_FORMAT_UNDEFINED");
+        require(state(mismatch).at("pipeline").at("status") == "unsupported",
+                "incompatible dynamic depth formats refuse state");
+        for(const auto& [from, to] :
+            {std::pair{"VkRenderingFlags(0)", "VkRenderingFlags(VK_RENDERING_RESUMING_BIT)"},
+             std::pair{"VK_STRUCTURE_TYPE_RENDERING_INFO,nullptr", "VK_STRUCTURE_TYPE_RENDERING_INFO,UnknownExtension"},
+             std::pair{"CmdEndRendering", "CmdEndRenderPass"},
+             std::pair{"VkRenderingAttachmentInfo_depth,nullptr", "nullptr,nullptr"},
+             std::pair{"0u,1u,NV_TO_STACK_PTR(VkBuffer_uid_73)", "16u,1u,NV_TO_STACK_PTR(VkBuffer_uid_73)"}}) {
+            auto bad = v13;
+            bad[0].text = replace(bad[0].text, from, to);
+            if(std::string(from) == "VkRenderingAttachmentInfo_depth,nullptr")
+                require(state(bad).at("pipeline").at("status") == "unsupported",
+                        "missing active depth refuses compatible state");
+            else
+                refused(bad);
+        }
+        for(const auto& [from, to] :
+            {std::pair{"VkCommandBuffer_uid_42,0u", "VkCommandBuffer_uid_42,1u"},
+             std::pair{"VkSubmitFlags(0)", "VkSubmitFlags(1)"},
+             std::pair{"VkSemaphore_uid_45,0ull", "VkSemaphore_uid_45,1ull"},
+             std::pair{"16ull,VkQueryResultFlags", "8ull,VkQueryResultFlags"}, std::pair{"6u,128ull", "9u,128ull"},
+             std::pair{"VK_QUERY_RESULT_WITH_AVAILABILITY_BIT", "VK_QUERY_RESULT_WAIT_BIT"},
+             std::pair{"std_vector_of_uint8_t_temp_1.data()", "unknown.data()"}}) {
+            auto bad = v13;
+            bad[2].text = replace(bad[2].text, from, to);
+            refused(bad);
+        }
         auto input = sources<ngm::CppSource>();
         const auto fixed = state(input);
         require(fixed.at("depth_test").at("value") == true &&

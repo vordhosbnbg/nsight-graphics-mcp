@@ -238,7 +238,37 @@ Call call(const Document& d, std::size_t at) {
 }
 // These are the value/cast helpers observed in qualified recording/creation
 // blocks. This is deliberately a generated-source grammar, not a C++ evaluator.
-const std::set<std::string_view> value_types{"uint32_t",
+const std::set<std::string_view> value_types{"VkPhysicalDeviceVulkan13Features",
+                                             "VkQueryPoolCreateInfo",
+                                             "VkQueryPoolCreateFlags",
+                                             "VkQueryPipelineStatisticFlags",
+                                             "VkDependencyInfo",
+                                             "VkMemoryBarrier2",
+                                             "VkBufferMemoryBarrier2",
+                                             "VkImageMemoryBarrier2",
+                                             "VkPipelineStageFlags2",
+                                             "VkAccessFlags2",
+                                             "VkBuffer",
+                                             "VkRenderPass",
+                                             "VkRenderingAttachmentInfo",
+                                             "VkRenderingInfo",
+                                             "VkRenderingFlags",
+                                             "VkPipelineRenderingCreateInfo",
+                                             "VkFormat",
+                                             "VkImageView",
+                                             "VkImageViewCreateInfo",
+                                             "VkImageViewCreateFlags",
+                                             "VkComponentMapping",
+                                             "VkSpecializationInfo",
+                                             "VkSpecializationMapEntry",
+                                             "VkVertexInputBindingDescription",
+                                             "VkVertexInputAttributeDescription",
+                                             "VkSemaphoreSubmitInfo",
+                                             "VkCommandBufferSubmitInfo",
+                                             "VkSubmitInfo2",
+                                             "VkSubmitFlags",
+                                             "VkQueryResultFlags",
+                                             "uint32_t",
                                              "uint64_t",
                                              "VkDescriptorSet",
                                              "VkDescriptorSetAllocateInfo",
@@ -366,7 +396,7 @@ bool value_lifetime_creation(const Document& d, std::string_view name) {
 }
 void value_expression(const Document& d, Range r) {
     const auto& t = d.tokens;
-    if(d.values && (r.second == r.first + 7 || r.second == r.first + 8) && t[r.first].value == "Serialization" &&
+    if((r.second == r.first + 7 || r.second == r.first + 8) && t[r.first].value == "Serialization" &&
        t[r.first + 1].value == ":" && t[r.first + 2].value == ":" && t[r.first + 3].value == "DATABASE_HANDLE" &&
        t[r.first + 4].value == "(" && t[r.first + 4].pair == r.second - 1) {
         for(auto n = r.first; n < r.second; ++n)
@@ -409,7 +439,8 @@ Declaration declaration(const Document& d, std::size_t at, std::size_t& next) {
     const auto& t = d.tokens;
     if(d.values && !value_type(d, t.at(at + 1).value))
         throw Unsupported("unqualified value declaration type: " + std::string(t.at(at + 1).value));
-    check(t.at(at).value == "static" && value_type(d, t.at(at + 1).value), "unsupported declaration type");
+    if(t.at(at).value != "static" || !value_type(d, t.at(at + 1).value))
+        throw Unsupported("unsupported declaration type: " + std::string(t.at(at + 1).value.substr(0, 128)));
     Declaration result{std::string(t.at(at + 1).value), std::string(t.at(at + 2).value), {}, {at, at}, {}, 0};
     check(result.name.starts_with(result.type + "_") && result.name.find("_uid_") == std::string::npos,
           "unsupported or shadowing declaration name");
@@ -543,6 +574,7 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                                              "VkSubpassDescriptionFlags",
                                              "VkSwapchainCreateFlagsKHR",
                                              "VkSwapchainKHR",
+                                             "VkWaylandSurfaceCreateFlagsKHR",
                                              "VkXcbSurfaceCreateFlagsKHR",
                                              "VulkanHelper_AllocateAndInitializeMemory3",
                                              "VulkanHelper_CreateBuffer3",
@@ -568,13 +600,17 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                                              "VulkanReplay_CreateSemaphore",
                                              "VulkanReplay_CreateShaderModule",
                                              "VulkanReplay_CreateSwapchainKHR",
+                                             "VulkanReplay_CreateWaylandSurfaceKHR",
                                              "VulkanReplay_CreateXcbSurfaceKHR",
                                              "VulkanReplay_GetDeviceQueue",
                                              "VulkanReplay_GetSwapchainImagesKHR"};
     const auto helper = [&](std::string_view name) {
-        return helpers.contains(name) || (d.values && name == "VulkanReplay_CreateQueryPool");
+        return helpers.contains(name) || name == "VulkanReplay_CreateQueryPool";
     };
-    const std::set<std::string_view> aggregate_types{"VkApplicationInfo",
+    const std::set<std::string_view> aggregate_types{"VkPhysicalDeviceFeatures",
+                                                     "VkMemoryDedicatedAllocateInfo",
+                                                     "VkWaylandSurfaceCreateInfoKHR",
+                                                     "VkApplicationInfo",
                                                      "VkAttachmentDescription",
                                                      "VkAttachmentReference",
                                                      "VkBindBufferMemoryInfo",
@@ -664,7 +700,8 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
                                (type == "const" && t.at(i + 2).value == "char" && t.at(i + 3).value == "*");
             if(d.values && !known)
                 throw Unsupported("unqualified value resource declaration type: " + std::string(type));
-            check(known, "unrecognized resource declaration type");
+            if(!known)
+                throw Unsupported("unrecognized resource declaration type: " + std::string(type.substr(0, 128)));
             std::size_t assignments = 0;
             for(auto j = i; j < finish; ++j)
                 assignments += t[j].value == "=";
@@ -697,20 +734,27 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
             check(aggregate_types.contains(v) || value_type(d, v), "unrecognized aggregate in resource sibling");
         creation |= v == "VulkanReplay_CreateGraphicsPipelines" || v == "VulkanReplay_CreateShaderModule";
         if(state)
-            creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanReplay_AllocateCommandBuffers" ||
-                        v == "VulkanReplay_CreatePipelineLayout" || v == "VulkanReplay_CreateDescriptorSetLayout" ||
-                        v == "VulkanReplay_AllocateDescriptorSets" || value_lifetime_creation(d, v);
+            creation |= v == "VulkanReplay_CreateRenderPass" || v == "VulkanHelper_CreateImageView" ||
+                        v == "VulkanReplay_AllocateCommandBuffers" || v == "VulkanReplay_CreatePipelineLayout" ||
+                        v == "VulkanReplay_CreateDescriptorSetLayout" || v == "VulkanReplay_AllocateDescriptorSets" ||
+                        value_lifetime_creation(d, v);
         relevant_handle |= v.starts_with("VkPipeline_uid_") || v.starts_with("VkShaderModule_uid_");
         if(state)
-            relevant_handle |= v.starts_with("VkCommandBuffer_uid_") || v.starts_with("VkPipelineLayout_uid_") ||
-                               v.starts_with("VkDescriptorSetLayout_uid_") || v.starts_with("VkDescriptorSet_uid_");
+            relevant_handle |= v.starts_with("VkImageView_uid_") || v.starts_with("VkCommandBuffer_uid_") ||
+                               v.starts_with("VkPipelineLayout_uid_") || v.starts_with("VkDescriptorSetLayout_uid_") ||
+                               v.starts_with("VkDescriptorSet_uid_");
         if(i + 3 < end && t[i + 1].value == "(" && t[i + 2].value == "*" && t[i + 3].value == "reinterpret_cast") {
             const auto expression = d.expression(i + 1, t[i + 1].pair + 1);
-            check(expression == "( * reinterpret_cast < xcb_connection_t * * > ( WindowSystemInstance ( ) . "
-                                "GetDisplayAddr ( ) ) )" ||
-                      expression ==
-                          "( * reinterpret_cast < xcb_window_t * > ( WindowSystemInstance ( ) . GetWindowAddr ( ) ) )",
-                  "unrecognized native window handle expression");
+            check(
+                expression == "( * reinterpret_cast < xcb_connection_t * * > ( WindowSystemInstance ( ) . "
+                              "GetDisplayAddr ( ) ) )" ||
+                    expression ==
+                        "( * reinterpret_cast < xcb_window_t * > ( WindowSystemInstance ( ) . GetWindowAddr ( ) ) )" ||
+                    expression ==
+                        "( * reinterpret_cast < wl_display * * > ( WindowSystemInstance ( ) . GetDisplayAddr ( ) ) )" ||
+                    expression ==
+                        "( * reinterpret_cast < wl_surface * * > ( WindowSystemInstance ( ) . GetWindowAddr ( ) ) )",
+                "unrecognized native window handle expression");
             i = t[i + 1].pair;
             continue;
         }
@@ -725,7 +769,8 @@ bool qualified_resource_sibling(const Document& d, std::size_t opening, bool sta
     if(creation) {
         const auto parsed = body(d, opening, false);
         check(parsed.calls.size() == 1 || (state && parsed.calls.size() == 2 &&
-                                           parsed.calls.front().name == "VulkanReplay_AllocateDescriptorSets" &&
+                                           (parsed.calls.front().name == "VulkanReplay_AllocateDescriptorSets" ||
+                                            parsed.calls.front().name == "VulkanHelper_CreateImageView") &&
                                            parsed.calls.back().name == "VulkanHelper_RegisterObject"),
               "creation sibling must have one creation and an optional descriptor registration");
         return true;
@@ -747,6 +792,7 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                (t[i + 2].value != "VulkanReplay_CreateGraphicsPipelines" &&
                 t[i + 2].value != "VulkanReplay_CreateShaderModule" &&
                 !(state && (t[i + 2].value == "VulkanReplay_CreateRenderPass" ||
+                            t[i + 2].value == "VulkanHelper_CreateImageView" ||
                             t[i + 2].value == "VulkanReplay_AllocateCommandBuffers" ||
                             t[i + 2].value == "VulkanReplay_CreatePipelineLayout" ||
                             t[i + 2].value == "VulkanReplay_CreateDescriptorSetLayout" ||
@@ -759,8 +805,13 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                 auto invocation = call(d, i);
                 const bool pipeline = invocation.name == "VulkanReplay_CreateGraphicsPipelines";
                 const bool descriptors = invocation.name == "VulkanReplay_AllocateDescriptorSets";
+                const bool image_view = invocation.name == "VulkanHelper_CreateImageView";
                 const bool allocation = invocation.name == "VulkanReplay_AllocateCommandBuffers" || descriptors;
-                check(invocation.args.size() == (pipeline ? 6 : allocation ? 3 : 4), "unsupported creation call arity");
+                check(invocation.args.size() == (pipeline     ? 6
+                                                 : allocation ? 3
+                                                 : image_view ? 5
+                                                              : 4),
+                      "unsupported creation call arity");
                 auto output = expr(d, invocation.args.back());
                 if(descriptors) {
                     const auto range = invocation.args.back();
@@ -785,7 +836,8 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                         output = output.substr(2);
                     }
                     symbol =
-                        uid(output, pipeline                                                 ? "VkPipeline_uid_"
+                        uid(output, image_view                                               ? "VkImageView_uid_"
+                                    : pipeline                                               ? "VkPipeline_uid_"
                                     : allocation                                             ? "VkCommandBuffer_uid_"
                                     : invocation.name == "VulkanReplay_CreateRenderPass"     ? "VkRenderPass_uid_"
                                     : invocation.name == "VulkanReplay_CreatePipelineLayout" ? "VkPipelineLayout_uid_"
@@ -833,16 +885,19 @@ std::map<std::string, Creation> creations(const std::vector<Document>& docs, Jso
                 auto content = body(d, block, false);
                 check(!content.calls.empty() && content.calls.front().at == invocation.at,
                       "creation must precede optional descriptor registration");
-                check(content.calls.size() == 1 || (descriptors && content.calls.size() == 2 && outputs.size() == 1 &&
-                                                    content.calls.back().name == "VulkanHelper_RegisterObject"),
+                check(content.calls.size() == 1 ||
+                          ((descriptors || image_view) && content.calls.size() == 2 && outputs.size() == 1 &&
+                           content.calls.back().name == "VulkanHelper_RegisterObject"),
                       "ambiguous creation block");
                 if(content.calls.size() == 2) {
                     const auto& registration = content.calls.back();
                     check(registration.args.size() == 3 &&
-                              expr(d, registration.args[0]) == "VK_OBJECT_TYPE_DESCRIPTOR_SET" &&
+                              expr(d, registration.args[0]) ==
+                                  (image_view ? "VK_OBJECT_TYPE_IMAGE_VIEW" : "VK_OBJECT_TYPE_DESCRIPTOR_SET") &&
                               expr(d, registration.args[1]) == "uint64_t ( " + symbol + " )" &&
                               (d.values ? integer(expr(d, registration.args[2])) != 0
-                                        : integer(expr(d, registration.args[2])) == integer(symbol.substr(20))),
+                                        : integer(expr(d, registration.args[2])) ==
+                                              integer(symbol.substr(image_view ? 16 : 20))),
                           "descriptor registration does not match its allocation");
                 }
                 check(!t[i].conditional, "conditional creation unsupported");
@@ -879,9 +934,16 @@ Json pipeline_evidence(const Creation& pipeline, const std::map<std::string, Cre
     check(expr(d, args[2]) == "1u", "only one literal pipeline creation supported");
     const auto fields =
         initializer(d, pipeline.content, expr(d, args[3]), "VkGraphicsPipelineCreateInfo", pipeline.invocation.at);
-    check(fields.size() == 19 && expr(d, fields[0]) == "VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO" &&
-              expr(d, fields[1]) == "nullptr",
+    check(fields.size() == 19 && expr(d, fields[0]) == "VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO",
           "unsupported graphics pipeline initializer");
+    if(expr(d, fields[1]) != "nullptr") {
+        const auto rendering = initializer(d, pipeline.content, expr(d, fields[1]), "VkPipelineRenderingCreateInfo",
+                                           pipeline.invocation.at);
+        check(rendering.size() == 7 && expr(d, rendering[0]) == "VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO" &&
+                  expr(d, rendering[1]) == "nullptr" && integer(expr(d, rendering[2])) == 0 &&
+                  integer(expr(d, rendering[3])) <= 8 && expr(d, fields[15]) == "VkRenderPass ( VK_NULL_HANDLE )",
+              "unsupported dynamic pipeline extension");
+    }
     const auto stage_count = integer(expr(d, fields[3]));
     check(stage_count > 0 && stage_count <= 8, "stage count out of bounds");
     const auto stages = pipeline.content.declarations.find(expr(d, fields[4]));
@@ -894,8 +956,8 @@ Json pipeline_evidence(const Creation& pipeline, const std::map<std::string, Cre
     for(const auto constructor : stages->second.constructors) {
         const auto f = arguments(d, constructor);
         check(f.size() == 7 && expr(d, f[0]) == "VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO" &&
-                  expr(d, f[1]) == "nullptr" && expr(d, f[6]) == "nullptr",
-              "unsupported shader stage extensions/specialization");
+                  expr(d, f[1]) == "nullptr",
+              "unsupported shader stage extension");
         check(f[5].second == f[5].first + 1 && d.tokens[f[5].first].value.starts_with('"') &&
                   d.tokens[f[5].first].value.size() > 2 && d.tokens[f[5].first].value.size() <= 258,
               "entry point must be a bounded string literal");
@@ -924,7 +986,42 @@ Json pipeline_evidence(const Creation& pipeline, const std::map<std::string, Cre
         const auto bytes = integer(expr(sd, sf[3]));
         check(bytes > 0 && bytes <= 16U * 1024U * 1024U && bytes % 4 == 0 && bytes == integer(expr(sd, resource[2])),
               "shader byte counts disagree or exceed bounds");
-        result["stages"].push_back({{"stage", stage},
+        Json specialization = nullptr;
+        if(expr(d, f[6]) != "nullptr") {
+            const auto info =
+                initializer(d, pipeline.content, expr(d, f[6]), "VkSpecializationInfo", pipeline.invocation.at);
+            check(info.size() == 4, "unsupported specialization info");
+            const auto count = integer(expr(d, info[0])), size = integer(expr(d, info[2]));
+            check(count > 0 && count <= 64 && size > 0 && size <= 65536, "specialization exceeds bounds");
+            const auto entries = pipeline.content.declarations.find(expr(d, info[1]));
+            check(entries != pipeline.content.declarations.end() &&
+                      entries->second.type == "VkSpecializationMapEntry" && entries->second.extent == count &&
+                      entries->second.constructors.size() == count && entries->second.scope.second < info[1].first,
+                  "specialization map/count mismatch");
+            std::set<std::uint64_t> ids;
+            Json mappings = Json::array();
+            for(const auto entry : entries->second.constructors) {
+                const auto map = arguments(d, entry);
+                check(map.size() == 3, "invalid specialization map entry");
+                const auto id = integer(expr(d, map[0])), offset = integer(expr(d, map[1])),
+                           width = integer(expr(d, map[2]));
+                check(id <= UINT32_MAX && ids.insert(id).second && width > 0 && offset < size && width <= size - offset,
+                      "specialization map range or duplicate ID");
+                mappings.push_back({{"constant_id", id}, {"offset", offset}, {"bytes", width}});
+            }
+            const auto data = info[3];
+            check(d.tokens[data.first].value == "NV_GET_RESOURCE_CHECKED" && d.tokens[data.first + 1].value == "(" &&
+                      d.tokens[data.first + 1].pair + 1 == data.second,
+                  "unsupported specialization resource");
+            const auto reference = arguments(d, data.first + 1);
+            check(reference.size() == 3 && expr(d, reference[0]) == "const void *" &&
+                      integer(expr(d, reference[2])) == size,
+                  "specialization resource size/type mismatch");
+            specialization = {
+                {"map", mappings}, {"resource_handle", integer(expr(d, reference[1]))}, {"declared_bytes", size}};
+        }
+        result["stages"].push_back({{"specialization", specialization},
+                                    {"stage", stage},
                                     {"module", module},
                                     {"entry_point_expression", expr(d, f[5])},
                                     {"stage_source", d.span(constructor, d.tokens[constructor].pair)},
@@ -962,6 +1059,16 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
                                             "VulkanReplay_CmdBeginDebugUtilsLabelEXT",
                                             "VulkanReplay_CmdEndDebugUtilsLabelEXT",
                                             "VulkanReplay_CmdPipelineBarrier",
+                                            "VulkanReplay_CmdPipelineBarrier2",
+                                            "VulkanReplay_CmdBeginRendering",
+                                            "VulkanReplay_CmdEndRendering",
+                                            "VulkanReplay_CmdBindVertexBuffers",
+                                            "VulkanReplay_CmdBindIndexBuffer",
+                                            "VulkanReplay_CmdSetViewport",
+                                            "VulkanReplay_CmdSetScissor",
+                                            "VulkanReplay_CmdResetQueryPool",
+                                            "VulkanReplay_CmdWriteTimestamp2",
+                                            "VulkanReplay_CmdDrawIndexed",
                                             "VulkanReplay_CmdBeginRenderPass",
                                             "VulkanReplay_CmdEndRenderPass",
                                             "VulkanReplay_CmdBindPipeline",
@@ -969,6 +1076,12 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
                                             "VulkanReplay_CmdPushConstants",
                                             "VulkanReplay_CmdDraw",
                                             "VulkanReplay_CmdDrawIndirect"};
+        const std::map<std::string, std::size_t> vulkan13_arities{
+            {"VulkanReplay_CmdPipelineBarrier2", 2}, {"VulkanReplay_CmdBeginRendering", 2},
+            {"VulkanReplay_CmdEndRendering", 1},     {"VulkanReplay_CmdBindVertexBuffers", 5},
+            {"VulkanReplay_CmdBindIndexBuffer", 4},  {"VulkanReplay_CmdSetViewport", 4},
+            {"VulkanReplay_CmdSetScissor", 4},       {"VulkanReplay_CmdResetQueryPool", 4},
+            {"VulkanReplay_CmdWriteTimestamp2", 4},  {"VulkanReplay_CmdDrawIndexed", 6}};
         std::set<std::string> all_functions;
         for(const auto& d : docs) {
             if(!std::filesystem::path(d.source.path).filename().string().starts_with("CommandList"))
@@ -1023,6 +1136,8 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
                         const auto& c = parsed.calls[n];
                         check(allowed.contains(c.name) && !c.args.empty() && expr(d, c.args[0]) == "cmdBuffer",
                               "unknown command or different command-buffer operand");
+                        if(const auto arity = vulkan13_arities.find(c.name); arity != vulkan13_arities.end())
+                            check(c.args.size() == arity->second, "unsupported Vulkan 1.3 command arity");
                         check(events.insert(c.event).second, "duplicate event annotation");
                         check((c.name != "VulkanReplay_BeginCommandBuffer" || n == 0) &&
                                   (c.name != "VulkanReplay_EndCommandBuffer" || n + 1 == parsed.calls.size()),
@@ -1033,8 +1148,10 @@ nlohmann::json inspect_cpp_draws(const std::vector<CppSource>& sources) {
                             (void)uid(expr(d, c.args[2]), "VkPipeline_uid_");
                             binding = &c;
                         }
-                        if(c.name == "VulkanReplay_CmdDraw" || c.name == "VulkanReplay_CmdDrawIndirect") {
-                            check(c.args.size() == 5, "unsupported draw arity");
+                        if(c.name == "VulkanReplay_CmdDraw" || c.name == "VulkanReplay_CmdDrawIndirect" ||
+                           c.name == "VulkanReplay_CmdDrawIndexed") {
+                            check(c.args.size() == (c.name == "VulkanReplay_CmdDrawIndexed" ? 6 : 5),
+                                  "unsupported draw arity");
                             Json arguments_json = Json::array();
                             for(const auto r : c.args)
                                 arguments_json.push_back(expr(d, r));
@@ -1144,7 +1261,7 @@ void charge_copy(const ReplayValue& value, SyntaxBudget& budget) {
         charge_copy(argument, budget);
 }
 ReplayCall frame_call(const Document& d, const Call& call, const ReplayDeclarations& visible, SyntaxBudget& budget) {
-    if(!d.timing || call.name != "VulkanReplay_GetQueryPoolResults")
+    if(call.name != "VulkanReplay_GetQueryPoolResults")
         return replay_call(d, call, budget);
     check(call.args.size() == 8, "unsupported timing host query arity");
     ReplayCall result;
@@ -1180,10 +1297,16 @@ ReplayCall frame_call(const Document& d, const Call& call, const ReplayDeclarati
     }
     const auto& a = result.arguments;
     const auto count = integer(a[3].text), bytes = integer(a[4].text);
-    check(count > 0 && count <= 8192 && bytes == count * 8 && bytes == integer(a[5].arguments[0].text) &&
-              integer(a[6].text) == 8 && a[7].constructor == "VkQueryResultFlags" && a[7].arguments.size() == 1 &&
-              a[7].arguments[0].text == "VK_QUERY_RESULT_64_BIT",
-          "timing host query requires bounded packed 64-bit output; no output values are interpreted");
+    check(a[7].constructor == "VkQueryResultFlags" && a[7].arguments.size() == 1,
+          "host query flags require one literal cast");
+    const auto flags = a[7].arguments[0].text;
+    const bool availability = flags == "VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT" ||
+                              flags == "VK_QUERY_RESULT_WITH_AVAILABILITY_BIT | VK_QUERY_RESULT_64_BIT";
+    const auto stride = integer(a[6].text);
+    const auto width = availability ? 16U : 8U;
+    check(count > 0 && count <= 8192 && (availability || flags == "VK_QUERY_RESULT_64_BIT") && stride == width &&
+              bytes >= count * width && bytes <= 65536 && bytes == integer(a[5].arguments[0].text),
+          "host query requires bounded 64-bit output with optional availability; no values are interpreted");
     return result;
 }
 std::size_t value_log_end(const Document& d, std::size_t at) {
@@ -1214,7 +1337,7 @@ void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visib
             check(t.at(i + 1).value == "(" && t.at(i + 2).value == ")" && t.at(i + 3).value == ";",
                   "unsupported frame scope macro");
             i += 4;
-        } else if(d.timing && (t[i].value == "NV_THREAD_BEGIN" || t[i].value == "NV_THREAD_END")) {
+        } else if((t[i].value == "NV_THREAD_BEGIN" || t[i].value == "NV_THREAD_END")) {
             check(t.at(i + 1).value == "(" && t.at(i + 1).pair == i + 3 && t.at(i + 4).value == ";",
                   "unsupported timing thread annotation");
             const auto id = integer(t[i + 2].value);
@@ -1227,7 +1350,7 @@ void frame_body(const Document& d, std::size_t opening, ReplayDeclarations visib
                 thread.reset();
             }
             i += 5;
-        } else if(d.timing && t[i].value == "std") {
+        } else if(t[i].value == "std") {
             check(d.expression(i, i + 7) == "std : : vector < uint8_t >" && t.at(i + 8).value == "(" &&
                       t.at(i + 8).pair == i + 10 && t.at(i + 11).value == ";",
                   "unsupported timing host byte-vector declaration");

@@ -111,8 +111,77 @@ Json scissor(const ReplayValue& value) {
             "scissor extent overflow");
     return result;
 }
+bool null_handle(const ReplayValue& value, const std::string& type) {
+    return unwrap(value, type).text == "VK_NULL_HANDLE";
+}
+std::string attachment_format(const ReplayValue& value) {
+    return enumeration(value, {"VK_FORMAT_UNDEFINED", "VK_FORMAT_D16_UNORM", "VK_FORMAT_D32_SFLOAT",
+                               "VK_FORMAT_B8G8R8A8_UNORM", "VK_FORMAT_B8G8R8A8_SRGB", "VK_FORMAT_R8G8B8A8_UNORM",
+                               "VK_FORMAT_R8G8B8A8_SRGB", "VK_FORMAT_R16G16B16A16_SFLOAT", "VK_FORMAT_R32_SFLOAT",
+                               "VK_FORMAT_R16_SFLOAT"});
+}
+Json pipeline_rendering(const ReplayValue& reference, const ReplayDeclarations& values) {
+    const auto f = fields(reference, values, "VkPipelineRenderingCreateInfo", 7);
+    structure(f, "VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO");
+    require(number(f[2]) == 0 && number(f[3]) <= 8, "multiview or oversized dynamic rendering unsupported");
+    Json colors = Json::array();
+    if(number(f[3]))
+        for(const auto& format : array(f[4], values, "VkFormat", number(f[3])))
+            colors.push_back(attachment_format(format));
+    else
+        require(f[4].text == "nullptr", "zero color count requires null formats");
+    return {{"colors", colors}, {"depth", attachment_format(f[5])}, {"stencil", attachment_format(f[6])}};
+}
+std::string view_format(const CppReplay& replay, const ReplayValue& attachment, const ReplayDeclarations& values) {
+    const auto f = fields(attachment, values, "VkRenderingAttachmentInfo", 10);
+    structure(f, "VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO");
+    require(f[4].text == "VK_RESOLVE_MODE_NONE" && null_handle(f[5], "VkImageView"),
+            "dynamic attachment resolves unsupported");
+    const auto found = replay.objects.find(symbol(f[2], "VkImageView"));
+    require(found != replay.objects.end() && found->second.creation.name == "VulkanHelper_CreateImageView",
+            "dynamic attachment view creation unavailable");
+    const auto& object = found->second;
+    require(object.creation.arguments.size() == 5 && number(object.creation.arguments[2]) == 0,
+            "dynamic attachment view helper flags unsupported");
+    const auto view = fields(object.creation.arguments[1], object.values, "VkImageViewCreateInfo", 8);
+    structure(view, "VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO", "VkImageViewCreateFlags");
+    require(view[4].text == "VK_IMAGE_VIEW_TYPE_2D", "dynamic attachment view type unsupported");
+    return attachment_format(view[5]);
+}
+Json active_rendering(const CppReplay& replay, const ReplayValue& reference, const ReplayDeclarations& values) {
+    const auto f = fields(reference, values, "VkRenderingInfo", 10);
+    structure(f, "VK_STRUCTURE_TYPE_RENDERING_INFO", "VkRenderingFlags");
+    require(number(f[4]) == 1 && number(f[5]) == 0 && number(f[6]) <= 8,
+            "layered or multiview dynamic rendering unsupported");
+    (void)scissor(array(f[3], values, "VkRect2D", 1)[0]);
+    Json colors = Json::array();
+    if(number(f[6]))
+        for(const auto& attachment : array(f[7], values, "VkRenderingAttachmentInfo", number(f[6])))
+            colors.push_back(view_format(replay, attachment, values));
+    else
+        require(f[7].text == "nullptr", "zero color count requires null attachments");
+    return {{"colors", colors},
+            {"depth", f[8].text == "nullptr" ? "VK_FORMAT_UNDEFINED" : view_format(replay, f[8], values)},
+            {"stencil", f[9].text == "nullptr" ? "VK_FORMAT_UNDEFINED" : view_format(replay, f[9], values)}};
+}
+// Barriers cannot alter the binding banks reported here. Validate the observed
+// image-only Sync2 form; the independent value interpreter still owns writes.
+void image_barrier2(const ReplayValue& reference, const ReplayDeclarations& values) {
+    const auto f = fields(reference, values, "VkDependencyInfo", 9);
+    structure(f, "VK_STRUCTURE_TYPE_DEPENDENCY_INFO", "VkDependencyFlags");
+    require(number(f[3]) == 0 && f[4].text == "nullptr" && number(f[5]) == 0 && f[6].text == "nullptr" &&
+                number(f[7]) > 0 && number(f[7]) <= 64,
+            "only bounded image Sync2 barriers are qualified");
+    for(const auto& barrier : array(f[8], values, "VkImageMemoryBarrier2", number(f[7]))) {
+        require(barrier.constructor == "VkImageMemoryBarrier2" && barrier.arguments.size() == 12,
+                "invalid image Sync2 barrier");
+        structure(barrier.arguments, "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2");
+        (void)symbol(barrier.arguments[10], "VkImage");
+    }
+}
 struct Pipeline {
     std::string symbol, render_pass;
+    std::optional<Json> rendering;
     Json identity, shaders;
     Json values = Json::object();
     std::set<std::string> dynamic;
@@ -155,19 +224,29 @@ Pipeline pipeline(const CppReplay& replay, const std::string& name) {
     require(object.creation.arguments.size() == 6 && number(object.creation.arguments[2]) == 1,
             "pipeline batch unsupported");
     const auto f = fields(object.creation.arguments[3], object.values, "VkGraphicsPipelineCreateInfo", 19);
-    structure(f, "VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO", "VkPipelineCreateFlags");
+    require(f[0].text == "VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO" &&
+                number(unwrap(f[2], "VkPipelineCreateFlags")) == 0,
+            "unsupported graphics pipeline structure/flags");
     require(number(f[16]) == 0 && (f[17].text == "VkPipeline ( VK_NULL_HANDLE )" || f[17].text == "VK_NULL_HANDLE") &&
                 (f[18].text == "0" || f[18].text == "- 1"),
             "subpass or derived pipeline unsupported");
     Pipeline result;
     result.symbol = name;
     result.source = object.source;
-    result.render_pass = symbol(f[15], "VkRenderPass");
+    if(null_handle(f[15], "VkRenderPass")) {
+        result.rendering = pipeline_rendering(f[1], object.values);
+        result.render_pass = "$dynamic";
+    } else {
+        require(f[1].text == "nullptr", "unsupported legacy pipeline extension");
+        result.render_pass = symbol(f[15], "VkRenderPass");
+    }
     result.identity = available({{"symbol", name},
                                  {"layout", symbol(f[14], "VkPipelineLayout")},
-                                 {"render_pass", result.render_pass},
+                                 {"render_pass", result.rendering ? Json(nullptr) : Json(result.render_pass)},
                                  {"subpass", 0}},
                                 Json::array({object.source}));
+    if(result.rendering)
+        result.identity["value"]["dynamic_rendering"] = *result.rendering;
     result.shaders =
         object.shader_relationship.contains("stages")
             ? available(object.shader_relationship.at("stages"), Json::array({object.source}))
@@ -219,7 +298,8 @@ Pipeline pipeline(const CppReplay& replay, const std::string& name) {
         throw Unqualified(error.what());
     }
     try {
-        const bool depth_attachment = has_depth(replay, result.render_pass);
+        const bool depth_attachment = result.rendering ? result.rendering->at("depth") != "VK_FORMAT_UNDEFINED"
+                                                       : has_depth(replay, result.render_pass);
         if(!depth_attachment) {
             for(const auto* key : {"depth_test", "depth_write", "depth_compare"})
                 result.values[key] = unavailable("subpass has no depth attachment", "not_applicable");
@@ -295,6 +375,7 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
     Json binding;
     std::string pipeline_reason = "no graphics pipeline bind", pass;
     bool index_bound = false;
+    std::optional<Json> rendering;
     std::map<std::string, Json> dynamic_values;
     std::map<std::string, DynamicArray> arrays;
     std::set<std::uint64_t> events;
@@ -337,7 +418,13 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
             arity(10);
             continue;
         }
-        if(value_selection && (name == "VulkanReplay_CmdResetQueryPool" || name == "VulkanReplay_CmdWriteTimestamp")) {
+        if(name == "VulkanReplay_CmdPipelineBarrier2") {
+            arity(2);
+            image_barrier2(a[1], recording.values);
+            continue;
+        }
+        if(name == "VulkanReplay_CmdResetQueryPool" || name == "VulkanReplay_CmdWriteTimestamp" ||
+           name == "VulkanReplay_CmdWriteTimestamp2") {
             arity(4);
             const auto pool = symbol(a[name == "VulkanReplay_CmdResetQueryPool" ? 1 : 2], "VkQueryPool");
             (void)pool;
@@ -360,6 +447,20 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
             // remains a GPU write that the separate value model must invalidate.
             continue;
         }
+        if(name == "VulkanReplay_CmdBeginRendering") {
+            arity(2);
+            require(pass.empty(), "nested dynamic rendering unsupported");
+            rendering = active_rendering(replay, a[1], recording.values);
+            pass = "$dynamic";
+            continue;
+        }
+        if(name == "VulkanReplay_CmdEndRendering") {
+            arity(1);
+            require(pass == "$dynamic", "unmatched dynamic rendering end");
+            pass.clear();
+            rendering.reset();
+            continue;
+        }
         if(name == "VulkanReplay_CmdBeginRenderPass") {
             arity(3);
             require(pass.empty() && a[2].text == "VK_SUBPASS_CONTENTS_INLINE",
@@ -371,7 +472,7 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
         }
         if(name == "VulkanReplay_CmdEndRenderPass") {
             arity(1);
-            require(!pass.empty(), "unmatched render pass end");
+            require(!pass.empty() && pass != "$dynamic", "unmatched render pass end");
             pass.clear();
             continue;
         }
@@ -407,6 +508,16 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
         if(name == "VulkanReplay_CmdPushConstants") {
             arity(6);
             push.record(replay, c, recording.values);
+            continue;
+        }
+        if(name == "VulkanReplay_CmdBindVertexBuffers") {
+            arity(5);
+            const auto first = number(a[1]), count = number(a[2]);
+            require(count > 0 && count <= 16 && first + count <= 16, "vertex binding range exceeds bounds");
+            for(const auto& buffer : array(a[3], recording.values, "VkBuffer", count))
+                (void)symbol(buffer, "VkBuffer");
+            for(const auto& offset : array(a[4], recording.values, "uint64_t", count))
+                (void)number(offset);
             continue;
         }
         if(name == "VulkanReplay_CmdBindIndexBuffer") {
@@ -472,7 +583,7 @@ Json recording_draws(const CppReplay& replay, const ReplayRecording& recording, 
             for(const auto* key : {"pipeline", "shaders", "depth_test", "depth_write", "depth_compare", "cull_mode",
                                    "front_face", "viewports", "scissors"})
                 state[key] = unavailable(pipeline_reason, "unsupported");
-            if(current && current->render_pass == pass) {
+            if(current && current->render_pass == pass && current->rendering == rendering) {
                 state["pipeline"] = current->identity;
                 state["shaders"] = current->shaders;
                 for(const auto& [key, dynamic] : dynamic_names) {
@@ -612,19 +723,15 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
                 require(queue_labels.contains(queue) && !queue_labels.at(queue).empty(), "unmatched queue label end");
                 auto& stack = queue_labels.at(queue);
                 stack.erase(stack.size() - 1);
-            } else if(call.name == "VulkanReplay_QueueSubmit") {
+            } else if(call.name == "VulkanReplay_QueueSubmit" || call.name == "VulkanReplay_QueueSubmit2") {
+                const bool sync2 = call.name.ends_with("2");
                 require(a.size() == 4 && number(a[1]) > 0 && number(a[1]) <= 16,
                         "unsupported queue submission count/arity");
                 const auto queue = symbol(a[0], "VkQueue");
-                const auto submits = array(a[2], call.visible, "VkSubmitInfo", number(a[1]));
+                const auto submits = array(a[2], call.visible, sync2 ? "VkSubmitInfo2" : "VkSubmitInfo", number(a[1]));
                 for(std::size_t submit_at = 0; submit_at < submits.size(); ++submit_at) {
-                    const auto& info = submits[submit_at];
-                    require(info.constructor == "VkSubmitInfo" && info.arguments.size() == 9, "invalid submit info");
-                    const auto& f = info.arguments;
-                    structure(f, "VK_STRUCTURE_TYPE_SUBMIT_INFO");
-                    const auto count = number(f[5]);
-                    require(count > 0 && count <= 64, "empty or oversized command-buffer submission");
-                    const auto buffers = array(f[6], call.visible, "VkCommandBuffer", count);
+                    const auto buffers = submitted_buffers(submits[submit_at], call.visible, sync2);
+                    require(!buffers.empty(), "empty command-buffer submission");
                     for(std::size_t buffer_at = 0; buffer_at < buffers.size(); ++buffer_at) {
                         const auto buffer = symbol(buffers[buffer_at], "VkCommandBuffer");
                         require(active.contains(buffer),
@@ -673,14 +780,16 @@ nlohmann::json inspect_draw_executions(const std::vector<CppSource>& sources) {
                 ++submission;
             } else if(call.name == "VulkanReplay_WaitForFences" || call.name == "VulkanReplay_ResetFences" ||
                       call.name == "VulkanReplay_AcquireNextImageKHR" || call.name == "VulkanReplay_QueuePresentKHR" ||
-                      call.name == "VulkanHelper_UpdateMappedMemory2") {
+                      call.name == "VulkanHelper_UpdateMappedMemory2" ||
+                      call.name == "VulkanHelper_UpdateDescriptorSetsFromDatabase" ||
+                      call.name == "VulkanReplay_GetQueryPoolResults") {
                 // These observed calls cannot alter the raster fields interpreted
                 // here. Their data/descriptor visibility is deliberately absent.
-                const std::map<std::string, std::size_t> counts{{"VulkanReplay_WaitForFences", 5},
-                                                                {"VulkanReplay_ResetFences", 3},
-                                                                {"VulkanReplay_AcquireNextImageKHR", 6},
-                                                                {"VulkanReplay_QueuePresentKHR", 2},
-                                                                {"VulkanHelper_UpdateMappedMemory2", 8}};
+                const std::map<std::string, std::size_t> counts{
+                    {"VulkanReplay_WaitForFences", 5},       {"VulkanReplay_ResetFences", 3},
+                    {"VulkanReplay_AcquireNextImageKHR", 6}, {"VulkanReplay_QueuePresentKHR", 2},
+                    {"VulkanHelper_UpdateMappedMemory2", 8}, {"VulkanHelper_UpdateDescriptorSetsFromDatabase", 6},
+                    {"VulkanReplay_GetQueryPoolResults", 8}};
                 require(a.size() == counts.at(call.name), "unqualified frame call arity");
             } else
                 throw Unqualified("unqualified frame call prevents execution association: " + call.name);

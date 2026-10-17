@@ -851,6 +851,29 @@ void workflow_check(const std::string& server, const std::string& standin, const
         call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}, {"pin", true}}),
         "pin requires read_push_constants");
     auto push_arguments = cpp_arguments;
+    auto v13_arguments = cpp_arguments;
+    v13_arguments["arguments"].push_back("--vulkan13-cpp");
+    const auto v13_capture = successful_call(client, "capture_cpp", v13_arguments);
+    require(await_job(client, v13_capture["identity"]["job_id"])["state"] == "succeeded", "Vulkan 1.3 fixture capture");
+    const auto v13_id = v13_capture.at("artifact_id");
+    const auto v13_listing = successful_call(client, "capture_draw_executions", {{"capture_id", v13_id}, {"limit", 1}});
+    validate_inspection("capture_draw_executions", v13_listing);
+    require(v13_listing.at("executions_total") == 1, "Vulkan 1.3 submission through MCP");
+    const auto v13_state = successful_call(
+        client, "capture_draw_state",
+        {{"capture_id", v13_id}, {"execution_ref", v13_listing.at("executions")[0].at("execution_ref")}});
+    validate_inspection("capture_draw_state", v13_state);
+    require(v13_state.at("execution").at("state").at("pipeline").at("value").at("render_pass").is_null() &&
+                v13_state.at("execution")
+                        .at("state")
+                        .at("shaders")
+                        .at("value")[0]
+                        .at("specialization")
+                        .at("declared_bytes") == 4,
+            "dynamic rendering and specialization output match the MCP schema");
+    const auto v13_draws = successful_call(client, "capture_cpp_draws", {{"capture_id", v13_id}});
+    validate_inspection("capture_cpp_draws", v13_draws);
+    require(v13_draws.at("draws_total") == 1, "indexed literal draw arguments match the MCP schema");
     auto descriptor_arguments = cpp_arguments;
     descriptor_arguments["arguments"].push_back("--descriptor-cpp");
     const auto descriptor_capture = successful_call(client, "capture_cpp", descriptor_arguments);
@@ -1208,7 +1231,7 @@ int target_main(int argc, char** argv) {
             record = argv[++index];
         } else if(argument == "--wait") {
             wait = true;
-        } else if(argument == "--state-cpp") {
+        } else if(argument == "--state-cpp" || argument == "--vulkan13-cpp") {
             // Selects only the stand-in's synthetic source fixture.
         } else if(argument == "--push-cpp") {
             // Selects only the stand-in's synthetic partial-constant fixture.

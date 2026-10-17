@@ -82,18 +82,20 @@ Recording recording(const ReplayRecording& input) {
     result.one_time = flags == "VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT";
     std::set<std::uint64_t> event_ids;
     const std::map<std::string, std::size_t> state{
-        {"VulkanReplay_CmdBindPipeline", 3},         {"VulkanReplay_CmdBindIndexBuffer", 4},
-        {"VulkanReplay_CmdBindDescriptorSets", 8},   {"VulkanReplay_CmdPushConstants", 6},
-        {"VulkanReplay_CmdSetViewport", 4},          {"VulkanReplay_CmdSetScissor", 4},
-        {"VulkanReplay_CmdSetViewportWithCount", 3}, {"VulkanReplay_CmdSetScissorWithCount", 3},
-        {"VulkanReplay_CmdSetDepthTestEnable", 2},   {"VulkanReplay_CmdSetDepthWriteEnable", 2},
-        {"VulkanReplay_CmdSetDepthCompareOp", 2},    {"VulkanReplay_CmdSetCullMode", 2},
-        {"VulkanReplay_CmdSetFrontFace", 2}};
+        {"VulkanReplay_CmdBindVertexBuffers", 5},   {"VulkanReplay_CmdBindPipeline", 3},
+        {"VulkanReplay_CmdBindIndexBuffer", 4},     {"VulkanReplay_CmdBindDescriptorSets", 8},
+        {"VulkanReplay_CmdPushConstants", 6},       {"VulkanReplay_CmdSetViewport", 4},
+        {"VulkanReplay_CmdSetScissor", 4},          {"VulkanReplay_CmdSetViewportWithCount", 3},
+        {"VulkanReplay_CmdSetScissorWithCount", 3}, {"VulkanReplay_CmdSetDepthTestEnable", 2},
+        {"VulkanReplay_CmdSetDepthWriteEnable", 2}, {"VulkanReplay_CmdSetDepthCompareOp", 2},
+        {"VulkanReplay_CmdSetCullMode", 2},         {"VulkanReplay_CmdSetFrontFace", 2}};
     const std::map<std::string, std::size_t> work{
         {"VulkanReplay_CmdPipelineBarrier", 10}, {"VulkanReplay_CmdBeginRenderPass", 3},
         {"VulkanReplay_CmdEndRenderPass", 1},    {"VulkanReplay_CmdCopyBufferToImage", 6},
         {"VulkanReplay_CmdBlitImage", 8},        {"VulkanReplay_CmdResetQueryPool", 4},
-        {"VulkanReplay_CmdWriteTimestamp", 4}};
+        {"VulkanReplay_CmdWriteTimestamp", 4},   {"VulkanReplay_CmdPipelineBarrier2", 2},
+        {"VulkanReplay_CmdBeginRendering", 2},   {"VulkanReplay_CmdEndRendering", 1},
+        {"VulkanReplay_CmdWriteTimestamp2", 4}};
     for(std::size_t at = 0; at < input.calls.size(); ++at) {
         const auto& c = input.calls[at];
         const auto& a = c.arguments;
@@ -224,11 +226,15 @@ Json correlate_replay_draws(const std::vector<CppSource>& sources, const Profile
             ++paths[path];
             return path;
         };
-        const std::map<std::string, std::size_t> host{
-            {"VulkanReplay_WaitForFences", 5},       {"VulkanReplay_ResetFences", 3},
-            {"VulkanReplay_GetFenceStatus", 2},      {"VulkanReplay_AcquireNextImageKHR", 6},
-            {"VulkanReplay_QueuePresentKHR", 2},     {"VulkanReplay_QueueWaitIdle", 1},
-            {"VulkanHelper_UpdateMappedMemory2", 8}, {"VulkanReplay_GetQueryPoolResults", 8}};
+        const std::map<std::string, std::size_t> host{{"VulkanReplay_WaitForFences", 5},
+                                                      {"VulkanReplay_ResetFences", 3},
+                                                      {"VulkanReplay_GetFenceStatus", 2},
+                                                      {"VulkanReplay_AcquireNextImageKHR", 6},
+                                                      {"VulkanReplay_QueuePresentKHR", 2},
+                                                      {"VulkanReplay_QueueWaitIdle", 1},
+                                                      {"VulkanHelper_UpdateMappedMemory2", 8},
+                                                      {"VulkanReplay_GetQueryPoolResults", 8},
+                                                      {"VulkanHelper_UpdateDescriptorSetsFromDatabase", 6}};
         for(const auto& c : replay.frame) {
             const auto& a = c.arguments;
             if(c.name == "VulkanHelper_RecordCommandBuffer") {
@@ -287,20 +293,13 @@ Json correlate_replay_draws(const std::vector<CppSource>& sources, const Profile
                 auto& stack = queues[queue];
                 require(!stack.empty(), "unmatched queue marker end");
                 stack.pop_back();
-            } else if(c.name == "VulkanReplay_QueueSubmit") {
+            } else if(c.name == "VulkanReplay_QueueSubmit" || c.name == "VulkanReplay_QueueSubmit2") {
+                const bool sync2 = c.name.ends_with("2");
                 require(a.size() == 4 && number(a[1]) > 0 && number(a[1]) <= 16, "unqualified queue submit");
                 const auto queue = symbol(a[0], "VkQueue");
-                const auto submits = array(a[2], c.visible, "VkSubmitInfo", number(a[1]));
+                const auto submits = array(a[2], c.visible, sync2 ? "VkSubmitInfo2" : "VkSubmitInfo", number(a[1]));
                 for(std::size_t info_at = 0; info_at < submits.size(); ++info_at) {
-                    const auto& info = submits[info_at];
-                    require(info.constructor == "VkSubmitInfo" && info.arguments.size() == 9, "invalid submit info");
-                    const auto& f = info.arguments;
-                    structure(f, "VK_STRUCTURE_TYPE_SUBMIT_INFO");
-                    const auto count = number(f[5]);
-                    require(count <= 64 && (count != 0 || f[6].text == "nullptr"),
-                            "unqualified submitted buffer count");
-                    const auto buffers =
-                        count ? array(f[6], c.visible, "VkCommandBuffer", count) : std::vector<ReplayValue>{};
+                    const auto buffers = submitted_buffers(submits[info_at], c.visible, sync2);
                     for(std::size_t buffer_at = 0; buffer_at < buffers.size(); ++buffer_at) {
                         const auto buffer = symbol(buffers[buffer_at], "VkCommandBuffer");
                         require_primary(buffer);

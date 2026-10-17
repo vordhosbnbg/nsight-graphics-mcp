@@ -73,4 +73,44 @@ inline void structure(const std::vector<ReplayValue>& f, const std::string& type
     if(!flags.empty())
         require(f.size() >= 3 && number(unwrap(f[2], flags)) == 0, "unsupported structure flags");
 }
+// Shared literal submission grammar. No semaphore completion or GPU ordering
+// beyond the recorded command-buffer list is inferred here.
+inline std::vector<ReplayValue> submitted_buffers(const ReplayValue& info, const ReplayDeclarations& values,
+                                                  bool sync2) {
+    const auto& f = info.arguments;
+    require(info.constructor == (sync2 ? "VkSubmitInfo2" : "VkSubmitInfo") && f.size() == 9, "invalid submit info");
+    structure(f, sync2 ? "VK_STRUCTURE_TYPE_SUBMIT_INFO_2" : "VK_STRUCTURE_TYPE_SUBMIT_INFO",
+              sync2 ? "VkSubmitFlags" : "");
+    const auto count = number(f[5]);
+    require(count <= 64 && (count != 0 || f[6].text == "nullptr"), "unqualified submitted buffer count");
+    if(!sync2)
+        return count ? array(f[6], values, "VkCommandBuffer", count) : std::vector<ReplayValue>{};
+    for(const auto at : {3, 7}) {
+        const auto size = number(f[at]);
+        require(size <= 64 && (size != 0 || f[at + 1].text == "nullptr"), "unqualified semaphore submit count");
+        if(size)
+            for(const auto& semaphore : array(f[at + 1], values, "VkSemaphoreSubmitInfo", size)) {
+                require(semaphore.constructor == "VkSemaphoreSubmitInfo" && semaphore.arguments.size() == 6,
+                        "invalid semaphore submit info");
+                structure(semaphore.arguments, "VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO");
+                (void)symbol(semaphore.arguments[2], "VkSemaphore");
+                require(number(semaphore.arguments[3]) == 0 && number(semaphore.arguments[5]) == 0,
+                        "timeline or device-group semaphore submit unsupported");
+                require(semaphore.arguments[4].constructor == "VkPipelineStageFlags2" &&
+                            semaphore.arguments[4].arguments.size() == 1,
+                        "semaphore stage mask must be an explicit flags2 value");
+            }
+    }
+    std::vector<ReplayValue> buffers;
+    if(count)
+        for(const auto& buffer : array(f[6], values, "VkCommandBufferSubmitInfo", count)) {
+            require(buffer.constructor == "VkCommandBufferSubmitInfo" && buffer.arguments.size() == 4,
+                    "invalid command buffer submit info");
+            structure(buffer.arguments, "VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO");
+            require(number(buffer.arguments[3]) == 0, "device-group command buffer submit unsupported");
+            (void)symbol(buffer.arguments[2], "VkCommandBuffer");
+            buffers.push_back(buffer.arguments[2]);
+        }
+    return buffers;
+}
 } // namespace ngm::detail

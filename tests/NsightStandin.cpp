@@ -3,6 +3,7 @@
 #include "DrawStateFixture.hpp"
 #include "PushStateFixture.hpp"
 #include "ReplayTimingFixture.hpp"
+#include "Vulkan13Fixture.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -343,10 +344,11 @@ int main(int argc, char** argv) {
         const auto project =
             std::filesystem::path(value(arguments, "--output-dir")) / "CppCaptures/cpu-synthetic-project";
         std::filesystem::create_directories(project);
+        const bool vulkan13_case = value(arguments, "--args").find("--vulkan13-cpp") != std::string::npos;
         const bool push_case = value(arguments, "--args").find("--push-cpp") != std::string::npos;
         const bool descriptor_case = value(arguments, "--args").find("--descriptor-cpp") != std::string::npos;
-        const bool state_case =
-            descriptor_case || push_case || value(arguments, "--args").find("--state-cpp") != std::string::npos;
+        const bool state_case = vulkan13_case || descriptor_case || push_case ||
+                                value(arguments, "--args").find("--state-cpp") != std::string::npos;
         struct Source {
             std::string path, text;
         };
@@ -367,6 +369,7 @@ int main(int argc, char** argv) {
             timing_interval = wait - std::max(std::uint64_t{2}, count);
         }
         const auto state_sources = mode == "timing-analysis" ? ngm::check::timing::sources<Source>(timing_interval)
+                                   : vulkan13_case           ? ngm::check::vulkan13::sources<Source>()
                                    : descriptor_case         ? ngm::check::descriptor::sources<Source>()
                                    : push_case               ? ngm::check::push::sources<Source>()
                                                              : ngm::check::state::sources<Source>(true);
