@@ -133,6 +133,7 @@ private:
 
 class ArtifactStore {
 public:
+    static constexpr std::size_t maximum_fingerprint_bytes = 512U * 1024U * 1024U;
     // Owns an exclusive advisory lock until all store/writer/lease handles close.
     // Never adopts a nonempty directory lacking the store marker.
     explicit ArtifactStore(ArtifactOptions options);
@@ -166,7 +167,8 @@ public:
     std::string read(const std::string& id, const std::string& relative_path,
                      std::size_t maximum_bytes = 1024 * 1024) const;
     // Streaming content identity with inventoried size, a usage lease and
-    // no-symlink traversal. Does not expose or snapshot file contents.
+    // no-symlink traversal. Does not expose or snapshot file contents; the
+    // caller's bound cannot exceed maximum_fingerprint_bytes.
     std::string fingerprint(const std::string& id, const std::string& relative_path, std::size_t maximum_bytes,
                             std::chrono::steady_clock::time_point deadline) const;
     // Stream one inventoried regular file into a fresh path in an owned staging

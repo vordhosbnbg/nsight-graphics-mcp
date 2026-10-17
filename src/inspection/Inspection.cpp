@@ -739,12 +739,13 @@ validated_cpp_sources(ArtifactStore& store, const Capture& capture,
         require(expected.erase(path) == 1 && digest.size() == 64 &&
                     digest.find_first_not_of("0123456789abcdef") == std::string::npos,
                 "Missing, duplicated or invalid state-input identity");
-        const auto size = inventoried(capture, path, 256U * 1024U * 1024U);
+        const auto size = inventoried(capture, path, ArtifactStore::maximum_fingerprint_bytes);
         require(number(file, "bytes") == size, "State-input size does not match inventory");
         total += size;
         if(total > 512U * 1024U * 1024U)
             fail(Error::LimitExceeded, "State inputs exceed the 512 MiB fingerprint budget");
-        if(store.fingerprint(capture.info.summary.id, path, 256U * 1024U * 1024U, deadline) != digest)
+        if(store.fingerprint(capture.info.summary.id, path, ArtifactStore::maximum_fingerprint_bytes, deadline) !=
+           digest)
             fail(Error::InvalidExport,
                  "State input changed since capture: " + path + "; recapture rather than reusing execution references");
         identities.emplace(path, file);

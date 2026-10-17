@@ -590,7 +590,7 @@ Schema recorded_state_schema(bool selected) {
     properties["captured_gpu_execution_correspondence"] = {{"type", "boolean"}, {"const", false}};
     properties["full_effective_state_coverage"] = {{"type", "boolean"}, {"const", false}};
     auto identity = cpp_file_schema();
-    identity["properties"]["bytes"] = integer_schema(0, 268435456);
+    identity["properties"]["bytes"] = integer_schema(0, ArtifactStore::maximum_fingerprint_bytes);
     properties["input_files"] = array_schema(identity, 260);
     properties["association_scope"] = string_schema(512, 1);
     if(selected)
@@ -678,7 +678,7 @@ Schema draw_values_schema() {
     p["selection_domain"] = {{"type", "string"}, {"enum", {"generated_cpp_captured_submission"}}};
     p["captured_gpu_execution_correspondence"] = boolean_schema();
     auto input = cpp_file_schema();
-    input["properties"]["bytes"] = integer_schema(0, 268435456);
+    input["properties"]["bytes"] = integer_schema(0, ArtifactStore::maximum_fingerprint_bytes);
     p["input_files"] = array_schema(input, 260);
     p["inputs_sha256"] = string_schema(64, 64);
     p["association_scope"] = string_schema(512, 1);
@@ -748,8 +748,9 @@ Schema cpp_resources_schema() {
     return result;
 }
 Schema cpp_resource_schema() {
-    const auto input = object_schema({{"bytes", integer_schema(0, 268435456)}, {"sha256", string_schema(64, 64)}},
-                                     {"bytes", "sha256"});
+    const auto input = object_schema(
+        {{"bytes", integer_schema(0, ArtifactStore::maximum_fingerprint_bytes)}, {"sha256", string_schema(64, 64)}},
+        {"bytes", "sha256"});
     auto result = object_schema(
         {{"capture_id", string_schema(39, 39)},
          {"resource_ref", string_schema(64, 64)},
@@ -834,8 +835,9 @@ Schema cpp_descriptor_writes_schema() {
                 {"recipe_sha256", hash},
                 {"patch_sha256", hash}});
     auto file = cpp_file_schema();
-    file["properties"]["bytes"] = integer_schema(0, 268435456);
-    const auto input = closed({{"bytes", integer_schema(0, 268435456)}, {"sha256", hash}});
+    file["properties"]["bytes"] = integer_schema(0, ArtifactStore::maximum_fingerprint_bytes);
+    const auto input =
+        closed({{"bytes", integer_schema(0, ArtifactStore::maximum_fingerprint_bytes)}, {"sha256", hash}});
     const auto read = closed({{"capture_id", string_schema(39, 39)},
                               {"update_ref", hash},
                               {"reference", update},
@@ -2065,7 +2067,7 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
         "qualified reader for that producer. Requires --resource-worker-2026-3 or --resource-worker-2026-2. "
         "Revalidates source, fingerprints helpers, snapshots inputs under leases and validates the worker response. "
         "Default offset 0, length 65536; returns hex and byte hashes. Each call creates an evidence bundle retaining "
-        "the input databases (up to 272 MiB), output and logs, subject to artifact quotas. Optional pin defaults "
+        "the input databases (up to 528 MiB), output and logs, subject to artifact quotas. Optional pin defaults "
         "false; "
         "pinning the read does not pin the source capture. Ten-second operation deadline. Unsupported confinement "
         "fails closed. This does not reconstruct descriptor contents or resource state after a GPU event.",

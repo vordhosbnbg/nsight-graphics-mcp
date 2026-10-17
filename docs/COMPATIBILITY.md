@@ -30,6 +30,12 @@ and libstdc++; other hardware/driver/compiler combinations need their own checks
   invocations/registers or numeric Graphics Capture event correspondence.
 - Serialized bytes are capture database contents, not a general after-event
   memory API. Unknown source effects, layouts or lifetimes refuse.
+- Streamed validation admits files up to 512 MiB within the unchanged 512 MiB
+  aggregate query budget. Release inspection covers a 333,587,928-byte 4K Training
+  database and its 434,972,120-byte saved-replay database on driver 615.78.08.
+  Confined source-scoped descriptor/resource reads work on the Training input
+  within the existing 256 MiB worker address-space limit. This does not qualify
+  arbitrary larger inputs or the full uniform-value model for this workload.
 - Draw timing uses qualified original literal paths and generated-source calls.
   Ambiguous/repeated/multi-draw ranges refuse. Saved replay durations do not
   establish original live cost, replay-reset cost or causal instrumentation overhead.

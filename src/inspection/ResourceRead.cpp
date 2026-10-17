@@ -4,6 +4,7 @@
 #include "ngm/Inspection.hpp"
 #include "ngm/Process.hpp"
 #include "ngm/Version.hpp"
+#include "ngm/WorkerConfinement.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -146,7 +147,8 @@ Json read_cpp_resource(ArtifactStore& store, const ResourceReadRequest& request)
         report["worker_profile"] = profile;
         Json inputs = Json::object();
         for(const auto& name : {"data.bin", "data.bin.rec"}) {
-            const std::size_t maximum = std::string_view(name) == "data.bin" ? 256U * 1024U * 1024U : blob_limit;
+            const std::size_t maximum =
+                std::string_view(name) == "data.bin" ? maximum_resource_database_bytes : blob_limit;
             const auto copied = store.snapshot_file(request.capture_id, request.project_directory + '/' + name, writer,
                                                     std::string("raw/input/") + name, maximum, deadline);
             inputs[name] = {{"bytes", copied.bytes},

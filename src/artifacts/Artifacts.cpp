@@ -1379,8 +1379,8 @@ std::string ArtifactStore::fingerprint(const std::string& id, const std::string&
                                        std::size_t maximum_bytes,
                                        std::chrono::steady_clock::time_point deadline) const {
     check_relative(relative_path);
-    if(maximum_bytes > 256U * 1024U * 1024U)
-        throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Fingerprint limit cannot exceed 256 MiB");
+    if(maximum_bytes > maximum_fingerprint_bytes)
+        throw ArtifactError(ArtifactErrorCode::InvalidArgument, "Fingerprint limit cannot exceed 512 MiB");
     auto protection = lease(id);
     std::uint64_t expected = 0;
     {

@@ -236,7 +236,8 @@ Analysis open(ArtifactStore& store, const std::string& id, Budget& budget) {
     const auto& source = index.at("source");
     const auto capture_hash = digest(source, "original_capture_sha256");
     require(digest(source, "observed_capture_sha256") == capture_hash, "Timing input did not match capture-time bytes");
-    fingerprint(store, a, "raw/input/capture.ngfx-capture", capture_hash, 256U * 1024U * 1024U, budget);
+    fingerprint(store, a, "raw/input/capture.ngfx-capture", capture_hash, ArtifactStore::maximum_fingerprint_bytes,
+                budget);
     const auto source_report_bytes = read(store, a, "raw/input/report.json", json_bound, budget);
     const auto original_metadata =
         read(store, a, "raw/input/metadata.raw", NsightEvidenceLimits::maximum_bytes, budget);
@@ -260,7 +261,7 @@ Analysis open(ArtifactStore& store, const std::string& id, Budget& budget) {
     require(original.at("capture").at("executable") == source.at("capture_tool").at("path") &&
                 original.at("capture").at("output") == "raw/capture.ngfx-capture" &&
                 number(original.at("capture"), "output_bytes") ==
-                    size(a, "raw/input/capture.ngfx-capture", 256U * 1024U * 1024U),
+                    size(a, "raw/input/capture.ngfx-capture", ArtifactStore::maximum_fingerprint_bytes),
             "Source capture operation differs from its input snapshot");
     require((a.count == 1 && m.captured_frame == std::to_string(first) && !m.captured_frames) ||
                 (a.count == 3 && !m.captured_frame &&
@@ -314,9 +315,9 @@ Analysis open(ArtifactStore& store, const std::string& id, Budget& budget) {
     for(const auto& identity : files) {
         const auto path = relative_path(text(identity, "path", 512), project + '/');
         require(identity.size() == 3 && expected.erase(path) == 1 &&
-                    number(identity, "bytes") == size(a, path, 256U * 1024U * 1024U),
+                    number(identity, "bytes") == size(a, path, ArtifactStore::maximum_fingerprint_bytes),
                 "C++ input inventory differs");
-        fingerprint(store, a, path, digest(identity, "sha256"), 256U * 1024U * 1024U, budget);
+        fingerprint(store, a, path, digest(identity, "sha256"), ArtifactStore::maximum_fingerprint_bytes, budget);
         identities.emplace(path, identity);
     }
     require(expected.empty(), "C++ fingerprint set omits required inputs");

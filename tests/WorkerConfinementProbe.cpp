@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
                     return 3;
             }
         }
-        check(mode == "probe", "known mode");
+        check(mode == "probe" || mode == "probe-large" || mode == "probe-too-large", "known mode");
         char byte = 0;
         check(read(inherited, &byte, 1) == -1 && errno == EBADF, "inherited descriptor closed");
         const int input = open((root / "data.bin").c_str(), O_RDONLY | O_CLOEXEC);

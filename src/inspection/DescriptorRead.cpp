@@ -4,6 +4,7 @@
 #include "ngm/Inspection.hpp"
 #include "ngm/Process.hpp"
 #include "ngm/Version.hpp"
+#include "ngm/WorkerConfinement.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -247,7 +248,8 @@ Json read_cpp_descriptor_writes(ArtifactStore& store, const DescriptorReadReques
         keys(request.expected_inputs, {"data.bin", "data.bin.rec"});
         Json inputs = Json::object();
         for(const auto* name : {"data.bin", "data.bin.rec"}) {
-            const auto maximum = std::string_view(name) == "data.bin" ? 256U * 1024U * 1024U : 16U * 1024U * 1024U;
+            const auto maximum =
+                std::string_view(name) == "data.bin" ? maximum_resource_database_bytes : 16U * 1024U * 1024U;
             const auto copied = store.snapshot_file(request.capture_id, request.project_directory + '/' + name, writer,
                                                     std::string("raw/input/") + name, maximum, deadline);
             inputs[name] = {{"bytes", copied.bytes},

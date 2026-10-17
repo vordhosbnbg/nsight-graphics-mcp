@@ -49,6 +49,18 @@ int main(int argc, char** argv) {
         require(ngm::read_regular_file(root / "probe.out", 4096) == "confined\n", "probe completed all checks");
         require(ngm::read_regular_file(root / "outside", 4096) == "sentinel", "outside input unchanged");
         require(ngm::read_regular_file(root / "input/data.bin", 4096) == "allowed", "allowed input immutable");
+        std::filesystem::resize_file(root / "input/data.bin", 333587928);
+        const auto large = run("probe-large");
+        require(large.cleanup_confirmed && !large.timed_out && large.exit_code == 0 &&
+                    ngm::read_regular_file(root / "probe-large.out", 4096) == "confined\n",
+                "large sparse database admitted with all memory and syscall restrictions intact");
+        std::filesystem::resize_file(root / "input/data.bin", 512U * 1024U * 1024U + 1U);
+        const auto too_large = run("probe-too-large");
+        require(too_large.cleanup_confirmed && !too_large.timed_out && too_large.exit_code == 1 &&
+                    ngm::read_regular_file(root / "probe-too-large.err", 4096).find("bounded regular input") !=
+                        std::string::npos,
+                "oversized database refused before parsing");
+        std::filesystem::resize_file(root / "input/data.bin", 7);
         const auto output = run("output");
         require(output.cleanup_confirmed && !output.timed_out && output.signal == SIGXFSZ,
                 "output limit terminates worker");

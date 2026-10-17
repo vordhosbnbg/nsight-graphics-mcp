@@ -119,7 +119,7 @@ void confine_resource_worker(const std::filesystem::path& database, const std::f
         LANDLOCK_ACCESS_FS_MAKE_SYM | LANDLOCK_ACCESS_FS_REFER | LANDLOCK_ACCESS_FS_TRUNCATE;
     Descriptor descriptor{static_cast<int>(syscall(SYS_landlock_create_ruleset, &rules, sizeof(std::uint64_t), 0))};
     require(descriptor.value >= 0, "landlock_create_ruleset");
-    allow_file(descriptor.value, database, 256U * 1024U * 1024U);
+    allow_file(descriptor.value, database, maximum_resource_database_bytes);
     allow_file(descriptor.value, records, 16U * 1024U * 1024U);
     require(syscall(SYS_landlock_restrict_self, descriptor.value, 0) == 0, "landlock_restrict_self");
     syscall_filter();

@@ -79,7 +79,14 @@ sources or generated build scripts. --profile reports a worker's compiled identi
 Workers require Landlock ABI 3 and seccomp before database parsing, with bounded
 memory, CPU, file output and parent wall time. Unsupported confinement refuses.
 The parent validates the source-bound request, full response and cleanup.
-Input caps are 256 MiB database/16 MiB records; byte reads return at most 64 KiB.
+Input caps are 512 MiB database/16 MiB records; byte reads return at most 64 KiB.
+Database admission is independent of the unchanged 256 MiB worker address-space
+limit: the qualified helper pages data and reads selected blobs capped at 16 MiB.
+Parents stream hashes and immutable snapshots rather than loading whole databases.
+Recorded-state and replay-timing validation retain a 512 MiB aggregate fingerprint/
+read budget and existing query deadlines; larger files do not grant larger responses.
+Use an optimized build for large-capture inspection: Debug hashing can exhaust
+those deadlines even when the same inputs fit the Release budget.
 The build-required fingerprints/patch are part of the toolchain, not validation archives.
 
 For optional application SDK boundaries, select separately installed matching headers:

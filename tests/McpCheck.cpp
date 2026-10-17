@@ -320,6 +320,15 @@ Json successful_call(Client& client, const char* name, Json arguments = Json::ob
 // Check closed objects and discriminants against the actual advertised schema.
 // This is deliberately narrower than a complete JSON Schema implementation.
 void require_schema_members(const Json& value, const Json& schema) {
+    if(value.is_number()) {
+        require(!schema.contains("minimum") || value >= schema.at("minimum"),
+                "result satisfies declared numeric minimum");
+        require(!schema.contains("maximum") || value <= schema.at("maximum"),
+                "result satisfies declared numeric maximum");
+    }
+    if(value.is_array())
+        require(!schema.contains("maxItems") || value.size() <= schema.at("maxItems").get<std::size_t>(),
+                "result array satisfies declared bound");
     if(schema.contains("enum")) {
         const auto& allowed = schema.at("enum");
         require(std::find(allowed.begin(), allowed.end(), value) != allowed.end(),
@@ -814,6 +823,11 @@ void workflow_check(const std::string& server, const std::string& standin, const
                 state_listing["captured_gpu_execution_correspondence"] == false &&
                 state_listing["full_effective_state_coverage"] == false,
             "typed recorded-state selection domain and limits");
+    validate_inspection("capture_draw_executions", state_listing);
+    auto large_input_identity = state_listing;
+    require(!large_input_identity.at("input_files").empty(), "retained input identities are present");
+    large_input_identity["input_files"][0]["bytes"] = 333587928;
+    validate_inspection("capture_draw_executions", large_input_identity);
     const auto state_ref = state_listing["executions"][0]["execution_ref"];
     const auto state_value =
         successful_call(client, "capture_draw_state", {{"capture_id", state_id}, {"execution_ref", state_ref}});

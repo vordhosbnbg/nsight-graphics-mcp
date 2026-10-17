@@ -1,8 +1,12 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 
 namespace ngm {
+// File admission is independent of the worker's smaller address-space limit:
+// the qualified helper pages the database and reads only selected bounded blobs.
+inline constexpr std::size_t maximum_resource_database_bytes = 512U * 1024U * 1024U;
 // Irreversible, single-threaded worker-only boundary. Call after exec, before
 // parsing untrusted data. Closes every inherited descriptor above stderr.
 // Allows read access only to the two regular files named below, stdout/stderr

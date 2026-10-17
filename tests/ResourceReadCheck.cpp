@@ -133,6 +133,22 @@ void snapshots(ngm::ArtifactStore& store, const fs::path& scratch) {
     fs::remove(scratch / "hardlink");
     store.publish_failure(tampered, "test finished");
 }
+void large_fingerprints(ngm::ArtifactStore& store) {
+    auto source = store.begin({{"test_only", true}});
+    write(source.raw_directory() / "database", "");
+    fs::resize_file(source.raw_directory() / "database", 257U * 1024U * 1024U);
+    write(source.raw_directory() / "over-limit", "");
+    fs::resize_file(source.raw_directory() / "over-limit", 512U * 1024U * 1024U + 1U);
+    store.publish_success(source);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    // Independent SHA-256 oracle for 257 MiB of zero bytes, crossing the former
+    // admission ceiling without constructing a database-sized test string.
+    require(store.fingerprint(source.id(), "raw/database", 512U * 1024U * 1024U, deadline) ==
+                "053eadfdec682cf16f3f8704c7609c57868dd75765e08dc5a7491f5d06bcb74d",
+            "large inventoried input is hashed as a stream");
+    rejected([&] { store.fingerprint(source.id(), "raw/over-limit", 512U * 1024U * 1024U, deadline); });
+    rejected([&] { store.fingerprint(source.id(), "raw/database", 512U * 1024U * 1024U + 1U, deadline); });
+}
 } // namespace
 int main(int argc, char** argv) {
     return ngm::check::run([&] {
@@ -192,6 +208,7 @@ int main(int argc, char** argv) {
             bad_helper.helper_profile["files"]["DllCommon.h"] = std::string(64, '0');
             rejected([&] { (void)ngm::read_cpp_resource(store, bad_helper); });
             snapshots(store, scratch.path);
+            large_fingerprints(store);
         }
         std::string quota_source;
         std::uint64_t baseline_bytes = 0;
