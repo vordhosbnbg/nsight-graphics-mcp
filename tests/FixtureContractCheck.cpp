@@ -84,7 +84,7 @@ void copy_bundle(const fs::path& source, const fs::path& destination) {
     for(const auto* name :
         {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert", "post.frag",
          "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp",
-         "performance-reference.comp", "performance-underfilled.comp", "state-constants.frag"}) {
+         "performance-reference.comp", "performance-underfilled.comp", "state-constants.frag", "shader-trace.frag"}) {
         fs::copy_file(source / name, destination / name);
         fs::copy_file(source / (std::string(name) + ".spv"), destination / (std::string(name) + ".spv"));
     }
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
         const auto rejected = Json::parse(ngm::read_regular_file(display.output / "result.json", 1024 * 1024));
         require(rejected.at("application").at("executable_sha256") == ngm::sha256_file(executable),
                 "standalone result identifies the running executable even when display prerequisites fail");
-        require(rejected.at("application").at("build").at("compile_commands").size() == 7,
+        require(rejected.at("application").at("build").at("compile_commands").size() == 8,
                 "application identity contains actual fixture/core compiler commands");
         require(rejected.at("provenance").at("kind") == "shader_bundle",
                 "shader provenance has a distinct identity kind");
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
                     sdk_report.at("application_context").at("application").at("build").at("nsight_sdk") ==
                         sdk_report.at("sdk_build") &&
                     sdk_report.at("application_context").at("inputs").at("scenario") == "reference" &&
-                    sdk_report.at("application_context").at("shader_bundle").at("shaders").size() == 13,
+                    sdk_report.at("application_context").at("shader_bundle").at("shaders").size() == 14,
                 "SDK report preserves build/workload/shader context before initialization or capture termination");
 
         for(const auto* value : {"-1", "1", "600", "4294967296", "1x"}) {
@@ -270,7 +270,7 @@ int main(int argc, char** argv) {
                         (bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"})
                                   : Json::array()),
                     "only bindless scenarios require the exact descriptor-indexing features");
-            require(record.at("provenance").at("shaders").size() == 13,
+            require(record.at("provenance").at("shaders").size() == 14,
                     "advanced artifacts retained before display check");
             require(record.at("device_support").empty(), "no device support claimed before a display was opened");
         }

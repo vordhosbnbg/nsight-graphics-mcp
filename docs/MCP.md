@@ -43,6 +43,7 @@ Use job_cancel explicitly; do not blindly retry a lost submission response.
 | `capture_cpp_resource` | Read qualified serialized bytes through an optional confined worker. |
 | `capture_cpp_descriptor_writes` | List/decode source-local descriptor writes. |
 | `capture_draw_values` | List supported draw occurrences and reconstruct selected typed uniform values. |
+| `capture_shader_trace` | Inspect bounded invocation values reported by an instrumented application. |
 | `job_status` | Inspect progress, terminal state, cleanup and reservation state. |
 | `job_cancel` | Request bounded cancellation of owned work. |
 | `artifact_list` | List managed bundles and expiration records. |
@@ -72,12 +73,64 @@ Use job_cancel explicitly; do not blindly retry a lost submission response.
 - Selected value queries share a 20-second deadline, 32 parent reads, 1 MiB of
   returned child payloads and 64 KiB shader/uniform-prefix reads. Pages are
   bounded to 256 KiB; larger proof reports use artifact_read's file-reference contract.
+- capture_shader_trace reads the optional application trace contract below.
+  It fingerprints retained trace/module bytes and reports application claims;
+  it does not read live registers or associate records with Nsight capture events.
 - Image tools accept bounded P6/PNG/BMP inputs (up to 16 MiB); previews have a
   maximum edge of 384. Comparisons require equal dimensions and caller-established
   workload equivalence. Transparent/unsupported formats fail explicitly.
 - GPU Trace .xls exports are UTF-8 TSV. Raw profile zeros remain zero; unavailable cells remain null with reasons.
   Duplicate labels/columns retain positions. Event time_ms establishes milliseconds;
   other units are unresolved unless the result explicitly establishes them.
+
+## Instrumented shader trace contract
+
+A source-owning application may write `shader-trace.json` and its instrumented
+SPIR-V module inside the directory supplied through `application_output_option`.
+The capture service retains these files under `raw/application/`. Instrumentation
+and producing this output are optional; ordinary capture needs neither.
+The query accepts complete native service Graphics Captures. C++ captures,
+imports and failed bundles remain available through the ordinary artifact tools.
+
+The trace is a JSON object with exactly these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version` | `1`, the current producer contract. |
+| `evidence_origin` | `application_reported_instrumented_shader_trace`. |
+| `original_execution`, `capture_event_correspondence` | Both must be `false`. |
+| `shader` | `path` relative to the application output directory, lowercase SHA-256 in `sha256`, `entry_point`, and `stage: "fragment"`. |
+| `extent` | `width` and `height`, each from 1 to 65536. |
+| `selection` | In-bounds `pixel_x` and `pixel_y`. |
+| `capacity`, `attempted_records`, `dropped_records` | Bounded record capacity and explicit collection counts, consistent with the retained records. |
+| `probes` | Unique numeric `id`, `name`, `type` (`float32`, `uint32` or `int32`) and `components` from 1 to 4. |
+| `records` | Application-declared unsigned 32-bit `frame`, `draw`, `pixel_x`, `pixel_y`, `sample`, nullable `primitive`, `probe` ID and component `bits` as unsigned 32-bit words. Every record belongs to the reported selected pixel. |
+
+The query accepts at most 1 MiB of trace JSON, nesting depth 16, 64 probes and
+4096 records/capacity. Duplicate or unexpected keys, invalid counts, unknown
+probes, invalid word types and paths outside the application output refuse.
+The retained module is capped at 16 MiB and must have a supported SPIR-V header
+and match the declared hash. That check establishes file
+identity, not that the application executed the declared module or invocation.
+
+Use `capture_shader_trace` with `capture_id`, `offset` (default 0) and `limit`
+(default 50, maximum 100). Optional `frame`, `draw`, `pixel_x`, `pixel_y`, `sample` and `probe`
+selectors filter application records. Raw bits preserve NaN, infinity and signed
+zero; nonfinite floating-point values have null numeric representations.
+`records_total` counts all reported rows and `matched_records` counts rows after
+filtering; `offset` and `next_offset` page that filtered sequence. Each returned
+row includes `probe_name`, `type`, `bits_hex` and decoded `values`.
+Results identify their origin as application-reported instrumentation and keep
+`producer_claims_verified`, `original_execution` and
+`capture_event_correspondence` false. Application frame/draw values do not become
+Nsight event identifiers. Instrumentation can change compilation and behavior;
+trace equality cannot establish values from an unchanged original shader.
+
+[ShaderTrace.hpp](../include/ngm/ShaderTrace.hpp) provides an optional C++
+producer helper, `make_shader_trace`, with a 32-byte header and 48-byte std430
+record layout. Applications still own shader probes, feature admission,
+descriptor binding, capacity/overflow handling, completed GPU readback and host
+memory visibility. The helper does not instrument or launch a shader.
 
 ## Artifacts
 

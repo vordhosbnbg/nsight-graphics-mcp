@@ -4,6 +4,7 @@
 
 #include "ngm/File.hpp"
 #include "ngm/Hash.hpp"
+#include "ngm/ShaderTrace.hpp"
 #include "ngm/Version.hpp"
 
 #include <nlohmann/json.hpp>
@@ -34,7 +35,8 @@ namespace {
 using Json = nlohmann::json;
 constexpr std::uint64_t gpu_timeout_ns = 10'000'000'000;
 constexpr std::uint32_t timing_draw_count = 6, timing_max_queries = 2 + 2 * timing_draw_count;
-constexpr std::array<std::string_view, 32> scenarios{"reference",
+constexpr std::array<std::string_view, 33> scenarios{"reference",
+                                                     "shader-trace",
                                                      "shader-error",
                                                      "binding-error",
                                                      "pipeline-error",
@@ -66,7 +68,8 @@ constexpr std::array<std::string_view, 32> scenarios{"reference",
                                                      "timing-reuse",
                                                      "timing-values",
                                                      "timing-values-error"};
-constexpr std::array<std::string_view, 13> shader_sources{"scene.vert",
+constexpr std::array<std::string_view, 14> shader_sources{"scene.vert",
+                                                          "shader-trace.frag",
                                                           "scene.frag",
                                                           "shader-error.frag",
                                                           "indirect.vert",
@@ -94,6 +97,7 @@ struct Workload {
     bool timing = false;
     bool value_history = false;
     bool value_error = false;
+    bool shader_trace = false;
     std::uint32_t channel_order = 0;
     std::uint32_t resource_xor = 0;
     std::uint32_t instance_count = 1;
@@ -110,6 +114,7 @@ Workload workload(std::string_view scenario) {
     result.timing = scenario.starts_with("timing-");
     result.value_history = scenario == "timing-values" || scenario == "timing-values-error";
     result.value_error = scenario == "timing-values-error";
+    result.shader_trace = scenario == "shader-trace";
     result.indexed = scenario == "state-indexed" || scenario == "timing-indexed" || scenario == "timing-reuse";
     result.dynamic_count = scenario == "state-count";
     result.constants = scenario.starts_with("state-constants");
@@ -130,6 +135,8 @@ Json workload_metadata(std::string_view scenario) {
         required.push_back("runtimeDescriptorArray");
         required.push_back("shaderStorageBufferArrayNonUniformIndexing");
     }
+    if(selected.shader_trace)
+        required.push_back("fragmentStoresAndAtomics");
     return {
         {"offscreen_render_target", selected.multipass},
         {"post_processing", selected.multipass},
@@ -424,7 +431,8 @@ public:
             {"presentation_completion", maintenance_extension_.empty() ? "device_wait_idle" : maintenance_extension_}};
         metadata["selected_shader_artifacts"] = {
             workload_.indirect ? "shaders/indirect.vert.spv" : "shaders/scene.vert.spv",
-            workload_.constants ? "shaders/state-constants.frag.spv"
+            workload_.shader_trace ? "shaders/shader-trace.frag.spv"
+            : workload_.constants  ? "shaders/state-constants.frag.spv"
             : workload_.bindless
                 ? "shaders/bindless.frag.spv"
                 : (options_.scenario == "shader-error" ? "shaders/shader-error.frag.spv" : "shaders/scene.frag.spv")};
@@ -434,6 +442,8 @@ public:
         }
         metadata["enabled_api_features"] = {{"runtimeDescriptorArray", workload_.bindless},
                                             {"shaderStorageBufferArrayNonUniformIndexing", workload_.bindless}};
+        if(workload_.shader_trace)
+            metadata["enabled_api_features"]["fragmentStoresAndAtomics"] = true;
         if(maintenance_extension_.empty()) {
             metadata["presentation_teardown_limit"] = "Without swapchain_maintenance1, device idle does not formally "
                                                       "prove completion of presentation-engine access";
@@ -449,6 +459,13 @@ public:
             sdk_.before_frame(frame, graphics_queue_);
             if(!workload_.value_history)
                 update_palettes(frame);
+            if(workload_.shader_trace) {
+                const ShaderTraceBufferHeader header{
+                    .capacity = 4, .pixel_x = extent_.width / 2, .pixel_y = extent_.height / 2, .frame = frame};
+                std::memset(trace_.mapped, 0, sizeof(header) + 4 * sizeof(ShaderTraceBufferRecord));
+                std::memcpy(trace_.mapped, &header, sizeof(header));
+                flush_buffer(trace_, "flushing optional trace buffer");
+            }
             std::uint32_t image_index = 0;
             const auto acquire =
                 vkAcquireNextImageKHR(device_, swapchain_, gpu_timeout_ns, acquired_, VK_NULL_HANDLE, &image_index);
@@ -503,6 +520,8 @@ public:
                     check(vkQueueWaitIdle(graphics_queue_), "completing the final value submission");
                 if(timing_queries_)
                     collect_timing(frame, occurrence, submitted_at, queue_label);
+                if(workload_.shader_trace)
+                    collect_shader_trace();
                 if(!options_.state_witness.empty()) {
                     state_witness_["submissions"].push_back({{"frame", frame},
                                                              {"label", "frame." + std::to_string(frame)},
@@ -718,6 +737,11 @@ private:
                 {"runtimeDescriptorArray", indexing.runtimeDescriptorArray == VK_TRUE},
                 {"shaderStorageBufferArrayNonUniformIndexing",
                  indexing.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE}};
+            if(workload_.shader_trace && !features.features.fragmentStoresAndAtomics)
+                evaluation["missing_requirements"].push_back("fragmentStoresAndAtomics");
+            if(workload_.shader_trace)
+                evaluation["queried_api_features"]["fragmentStoresAndAtomics"] =
+                    features.features.fragmentStoresAndAtomics == VK_TRUE;
             evaluation["limits"] = {
                 {"maxPerStageDescriptorStorageBuffers", properties.limits.maxPerStageDescriptorStorageBuffers},
                 {"maxDescriptorSetStorageBuffers", properties.limits.maxDescriptorSetStorageBuffers},
@@ -876,6 +900,9 @@ private:
         enabled.shaderStorageBufferArrayNonUniformIndexing = workload_.bindless ? VK_TRUE : VK_FALSE;
         enabled.pNext = maintenance_extension_.empty() ? nullptr : &maintenance;
         create.pNext = &enabled;
+        VkPhysicalDeviceFeatures core_features{};
+        core_features.fragmentStoresAndAtomics = workload_.shader_trace ? VK_TRUE : VK_FALSE;
+        create.pEnabledFeatures = &core_features;
         check(vkCreateDevice(physical_, &create, nullptr, &device_), "creating the graphics device");
         volkLoadDevice(device_);
         if(workload_.dynamic_state &&
@@ -1214,6 +1241,42 @@ private:
         }
     }
 
+    void collect_shader_trace() {
+        check(vkWaitForFences(device_, 1, &submit_fence_, VK_TRUE, gpu_timeout_ns),
+              "waiting for shader trace readback");
+        for(const auto* buffer : {&trace_, &readback_}) {
+            if(!buffer->coherent) {
+                auto range = vk_struct<VkMappedMemoryRange>(VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE);
+                range.memory = buffer->memory;
+                range.size = VK_WHOLE_SIZE;
+                check(vkInvalidateMappedMemoryRanges(device_, 1, &range), "invalidating shader trace readback");
+            }
+        }
+        ShaderTraceBufferHeader header;
+        std::memcpy(&header, trace_.mapped, sizeof(header));
+        if(header.capacity != 4)
+            throw std::runtime_error("instrumented shader trace changed its application-owned capacity");
+        std::array<ShaderTraceBufferRecord, 4> records{};
+        std::memcpy(records.data(), static_cast<const std::byte*>(trace_.mapped) + sizeof(header), sizeof(records));
+        if(trace_shader_sha256_.empty())
+            trace_shader_sha256_ = sha256_file(options_.output / "shaders/shader-trace.frag.spv");
+        auto payload =
+            make_shader_trace(header, std::span(records).first(std::min(header.capacity, header.attempted_records)),
+                              {{"path", "shaders/shader-trace.frag.spv"},
+                               {"sha256", trace_shader_sha256_},
+                               {"entry_point", "main"},
+                               {"stage", "fragment"}},
+                              extent_.width, extent_.height,
+                              {{{"id", 0}, {"name", "fragment_coordinate"}, {"type", "float32"}, {"components", 2}},
+                               {{"id", 1}, {"name", "interpolated_color"}, {"type", "float32"}, {"components", 3}},
+                               {{"id", 2}, {"name", "palette_tint"}, {"type", "float32"}, {"components", 4}},
+                               {{"id", 3}, {"name", "output_color"}, {"type", "float32"}, {"components", 4}}});
+        // Immutable per-frame image precedes atomic payload publication, so a
+        // capture termination cannot pair a previous payload with a newer image.
+        write_image(options_.output / ("shader-trace-image-" + std::to_string(header.frame) + ".ppm"));
+        write_json(options_.output / "shader-trace.json", payload);
+    }
+
     void create_buffers_and_descriptors() {
         if(workload_.indexed) {
             const std::array<std::uint32_t, 3> indices{0, 1, 2};
@@ -1231,6 +1294,9 @@ private:
             workload_.bindless ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         create_buffer(palettes_[0], sizeof(float) * 4, palette_usage, "fixture.palette.primary");
         create_buffer(palettes_[1], sizeof(float) * 4, palette_usage, "fixture.palette.secondary");
+        if(workload_.shader_trace)
+            create_buffer(trace_, sizeof(ShaderTraceBufferHeader) + 4 * sizeof(ShaderTraceBufferRecord),
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "fixture.instrumented_fragment_trace");
         const auto descriptor_type =
             workload_.bindless ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         VkDescriptorSetLayoutBinding binding{};
@@ -1238,18 +1304,23 @@ private:
         binding.descriptorType = descriptor_type;
         binding.descriptorCount = workload_.bindless ? 2u : 1u;
         binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings{binding, {}};
+        bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
         auto layout = vk_struct<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
-        layout.bindingCount = 1;
-        layout.pBindings = &binding;
+        layout.bindingCount = workload_.shader_trace ? 2u : 1u;
+        layout.pBindings = bindings.data();
         check(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
               "creating the palette layout");
         if(workload_.multipass) {
             binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             binding.descriptorCount = 1;
+            layout.pBindings = &binding;
             check(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &post_descriptor_layout_),
                   "creating the post-processing layout");
         }
         std::vector<VkDescriptorPoolSize> sizes{{descriptor_type, workload_.value_history ? 3u : 2u}};
+        if(workload_.shader_trace)
+            sizes.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2});
         if(workload_.multipass) {
             sizes.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1});
         }
@@ -1277,6 +1348,14 @@ private:
             write.descriptorType = descriptor_type;
             write.pBufferInfo = &buffers[i];
             vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+            if(workload_.shader_trace) {
+                const VkDescriptorBufferInfo trace_info{trace_.handle, 0, VK_WHOLE_SIZE};
+                write.dstBinding = 1;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                write.pBufferInfo = &trace_info;
+                vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+            }
             name(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptors_[i], "fixture.palette_set." + std::to_string(i));
         }
         if(workload_.value_history) {
@@ -1571,7 +1650,8 @@ private:
 
     void create_pipeline() {
         make_pipeline(workload_.indirect ? "indirect.vert.spv" : "scene.vert.spv",
-                      workload_.constants ? "state-constants.frag.spv"
+                      workload_.shader_trace ? "shader-trace.frag.spv"
+                      : workload_.constants  ? "state-constants.frag.spv"
                       : workload_.bindless
                           ? "bindless.frag.spv"
                           : (options_.scenario == "shader-error" ? "shader-error.frag.spv" : "scene.frag.spv"),
@@ -1921,7 +2001,7 @@ private:
         barrier.image = images_[image_index];
         barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         auto source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        if(frame == options_.frame || (workload_.value_history && timing_queries_)) {
+        if(frame == options_.frame || workload_.shader_trace || (workload_.value_history && timing_queries_)) {
             begin_label("application.readback");
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -1945,6 +2025,17 @@ private:
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             end_label();
+        }
+        if(workload_.shader_trace) {
+            auto trace_host = vk_struct<VkBufferMemoryBarrier>(VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER);
+            trace_host.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            trace_host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+            trace_host.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            trace_host.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            trace_host.buffer = trace_.handle;
+            trace_host.size = VK_WHOLE_SIZE;
+            vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
+                                 nullptr, 1, &trace_host, 0, nullptr);
         }
         barrier.dstAccessMask = 0;
         barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -2299,6 +2390,7 @@ private:
                 destroy_buffer(palette);
             }
             destroy_buffer(readback_);
+            destroy_buffer(trace_);
             destroy_buffer(indirect_);
             destroy_buffer(indices_);
             if(offscreen_framebuffer_) {
@@ -2417,6 +2509,8 @@ private:
     Buffer indirect_;
     Buffer indices_;
     Buffer readback_;
+    Buffer trace_;
+    std::string trace_shader_sha256_{};
     std::array<Buffer, 2> palettes_{};
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;

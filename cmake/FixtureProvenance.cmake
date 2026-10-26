@@ -61,7 +61,7 @@ set(shaders "[]")
 set(index 0)
 foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag
             compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp
-            performance-reference.comp performance-underfilled.comp state-constants.frag)
+            performance-reference.comp performance-underfilled.comp state-constants.frag shader-trace.frag)
     if(name MATCHES "\\.vert$")
         set(stage vertex)
     elseif(name MATCHES "\\.comp$")

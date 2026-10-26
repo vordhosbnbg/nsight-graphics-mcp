@@ -55,6 +55,47 @@ contains private expected diagnoses/oracles; never insert those answers into MCP
 inspection results or diagnosis prompts. A source repair must edit/rebuild and
 recapture the same workload.
 
+## Instrumented shader observations
+
+Source-owning applications can opt into the producer contract in
+[MCP reference](MCP.md#instrumented-shader-trace-contract). The trace parser
+validates bounded application JSON and decodes raw scalar/vector words.
+Inspection uses the existing complete capture loader, artifact lease and file
+inventory, then fingerprints the retained trace and declared module. Service
+launch provenance and application-declared shader/invocation associations stay
+distinct. This adds no debugger controller or reusable target session.
+
+The raster fixture demonstrates a selected non-helper fragment writing a storage
+buffer and publishing fenced host readback. Its tracing scenario explicitly
+requires `fragmentStoresAndAtomics`; ordinary scenarios do not enable this
+feature or allocate trace storage. Publish complete trace files atomically before
+presentation because capture can terminate the application immediately after its
+selected delimiter. An application's recorded frame is independent of that
+delimiter's ordinal.
+
+CPU checks cover malformed traces, bounds, selection, retained provenance and
+MCP transport. The separate hardware integration compares the fixture's GPU
+readback with an independent oracle. Its result qualifies that instrumented
+fixture only; generic application claims and original shader execution remain
+unverified. [Compatibility](COMPATIBILITY.md#interpretation-limits) records the
+public debugger-interface and compilation limits.
+
+Run the focused CPU checks and build the opt-in hardware check:
+
+```sh
+cmake --build --preset linux-gcc-debug \
+  --target ngm_shader_trace_check_run ngm_shader_trace_mcp_check_run \
+  ngm_shader_trace_integration --parallel 6
+build/linux-gcc-debug/tests/ngm_shader_trace_integration \
+  build/linux-gcc-debug/nsight-graphics-mcp \
+  build/linux-gcc-debug/ngm-vulkan-fixture \
+  build/linux-gcc-debug/shaders/fixture /absolute/NsightGraphics
+```
+
+The hardware check uses one fresh capture and one standalone same-frame
+reference. Supply an existing desktop and the qualified matching Nsight tools;
+this command does not configure the machine for hardware shader debugging.
+
 ## Optional Nsight helpers
 
 Default builds need no generated proprietary sources. For resource reads, obtain

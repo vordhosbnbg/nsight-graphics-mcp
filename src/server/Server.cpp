@@ -161,6 +161,14 @@ Json capability_report(const ServerOptions& options, const std::string& protocol
                        "exported-helper, database, shader, allocation and completion evidence. Unknown effects refuse "
                        "all values; reads/failures retain provenance under quota. This source model does not observe "
                        "live invocations/registers or establish numeric graphics-inventory event correspondence."}}},
+          {"shader_trace",
+           {{"available", storage},
+            {"status", storage ? "application_reported_instrumented_subset" : "missing_prerequisites"},
+            {"reason", "capture_shader_trace inspects optional application-reported instrumented fragment trace "
+                       "files from complete native captures with service-owned application output. Strict bounded "
+                       "schema, retained SPIR-V/hash and launch/output provenance are checked. Application shader, "
+                       "invocation and value claims remain unverified; original execution and capture-event "
+                       "correspondence are always false. No live debugger interface or automatic instrumentation."}}},
           {"profile_markers",
            {{"available", storage},
             {"status", storage ? "qualified_export_subset" : "missing_prerequisites"},
@@ -289,8 +297,9 @@ Json output_schema() {
             }
         }}
     })json");
-    for(const auto* operation : {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers",
-                                 "replay", "timing_collection", "draw_timings", "descriptor_writes", "draw_values"}) {
+    for(const auto* operation :
+        {"jobs", "artifacts", "resource_bytes", "recorded_draw_state", "profile_markers", "replay", "timing_collection",
+         "draw_timings", "descriptor_writes", "draw_values", "shader_trace"}) {
         schema["properties"]["operations"]["required"].push_back(operation);
         schema["properties"]["operations"]["properties"][operation] = {{"$ref", "#/$defs/operation"}};
     }

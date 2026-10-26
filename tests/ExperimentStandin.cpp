@@ -149,10 +149,10 @@ int main(int argc, char** argv) {
             {"shader_compiler", {{"version", "test-only"}, {"sha256", test_digest}, {"arguments", {"test-only"}}}},
             {"shaders", nlohmann::json::array()}};
         std::filesystem::create_directory(directory / "shaders");
-        for(const auto* name :
-            {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag", "post.vert",
-             "post.frag", "compute-reference.comp", "compute-index-error.comp", "compute-arithmetic-error.comp",
-             "performance-reference.comp", "performance-underfilled.comp", "state-constants.frag"}) {
+        for(const auto* name : {"scene.vert", "scene.frag", "shader-error.frag", "indirect.vert", "bindless.frag",
+                                "post.vert", "post.frag", "compute-reference.comp", "compute-index-error.comp",
+                                "compute-arithmetic-error.comp", "performance-reference.comp",
+                                "performance-underfilled.comp", "state-constants.frag", "shader-trace.frag"}) {
             const std::string source = name;
             std::ofstream(directory / "shaders" / source) << "test";
             std::ofstream(directory / "shaders" / (source + ".spv")) << "test";

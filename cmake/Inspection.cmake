@@ -1,4 +1,8 @@
 function(ngm_add_inspection)
+    add_library(ngm_shader_trace STATIC "${PROJECT_SOURCE_DIR}/src/inspection/ShaderTrace.cpp")
+    target_include_directories(ngm_shader_trace PUBLIC "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(ngm_shader_trace PUBLIC nlohmann_json::nlohmann_json)
+    ngm_first_party(ngm_shader_trace)
     add_library(ngm_inspection STATIC "${PROJECT_SOURCE_DIR}/src/inspection/Inspection.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ImageEvidence.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/CppEvidence.cpp"
@@ -17,12 +21,17 @@ function(ngm_add_inspection)
         "${PROJECT_SOURCE_DIR}/src/inspection/ProfileMarkers.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ReplayTiming.cpp"
         "${PROJECT_SOURCE_DIR}/src/inspection/ReplayTimingInspection.cpp")
-    target_link_libraries(ngm_inspection PUBLIC ngm_artifacts ngm_nsight)
+    target_link_libraries(ngm_inspection PUBLIC ngm_artifacts ngm_nsight ngm_shader_trace)
     target_include_directories(ngm_inspection SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/external/glslang/SPIRV")
     ngm_first_party(ngm_inspection)
 endfunction()
 
 function(ngm_add_inspection_checks)
+    ngm_add_check(ngm_shader_trace_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ShaderTraceCheck.cpp"
+        LIBRARIES ngm_inspection ngm_capture ARGS "$<TARGET_FILE:ngm_nsight_standin>" DEPENDS ngm_nsight_standin)
+    ngm_add_check(ngm_shader_trace_mcp_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ShaderTraceMcpCheck.cpp"
+        LIBRARIES ngm_inspection ARGS "$<TARGET_FILE:ngm_nsight_standin>" "$<TARGET_FILE:nsight-graphics-mcp>"
+        DEPENDS ngm_nsight_standin nsight-graphics-mcp)
     ngm_add_check(ngm_value_source_contract_check SOURCES "${PROJECT_SOURCE_DIR}/tests/ValueSourceContractCheck.cpp"
         LIBRARIES ngm_inspection)
     target_include_directories(ngm_value_source_contract_check PRIVATE "${PROJECT_SOURCE_DIR}/src/inspection")

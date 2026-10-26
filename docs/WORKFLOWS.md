@@ -70,6 +70,50 @@ relationships before decoding. Unknown effects discard provisional values.
 These are source-visible values, not invocation/register observations or numeric
 Graphics Capture event joins.
 
+## Instrumented fragment values
+
+For applications with source access, optional shader probes can publish their
+values using the [instrumented trace contract](MCP.md#instrumented-shader-trace-contract).
+The application owns instrumentation, buffer binding and synchronized readback.
+This workflow observes the instrumented shader; it cannot establish values from
+an unchanged shader whose failure disappears under instrumentation.
+
+Build the server and reference producer:
+
+```sh
+cmake --build --preset linux-gcc-debug \
+  --target nsight-graphics-mcp ngm-vulkan-fixture --parallel 6
+```
+
+Call `capture` with absolute paths:
+
+```json
+{
+  "executable": "/absolute/checkout/build/linux-gcc-debug/ngm-vulkan-fixture",
+  "working_directory": "/absolute/checkout",
+  "arguments": ["--scenario", "shader-trace", "--seed", "42", "--width", "192", "--height", "128", "--frame", "120", "--shader-dir", "/absolute/checkout/build/linux-gcc-debug/shaders/fixture"],
+  "capture_frame": 3,
+  "application_output_option": "--output",
+  "timeout_ms": 120000
+}
+```
+
+After successful capture and confirmed cleanup, call `capture_shader_trace`
+with the returned `artifact_id` as `capture_id`. Follow `next_offset` to page
+records, or filter by an application field such as `probe: 3` for output color.
+The fixture selects pixel `(width/2, height/2)` and publishes fragment coordinates,
+interpolated color, palette tint and output color. It checks
+`fragmentStoresAndAtomics`, waits for the submission fence and publishes before
+presentation. A `shader-trace-image-<application-frame>.ppm` file accompanies
+each completed frame; its frame number belongs to the application trace.
+
+For another producer, use [ShaderTrace.hpp](../include/ngm/ShaderTrace.hpp) and
+[the fixture shader](../shaders/fixture/shader-trace.frag) as the optional buffer
+example. Retain the instrumented module beside the trace, publish complete JSON
+atomically and account for dropped records. The query verifies retained file
+hashes and launch provenance; application-declared shader, frame, draw and value
+claims remain unverified. These identifiers do not select Nsight capture events.
+
 ## Compute
 
 The compute-reference, compute-index-error and compute-arithmetic-error fixture

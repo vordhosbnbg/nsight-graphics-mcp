@@ -7,6 +7,7 @@ All scenarios use valid Vulkan API operations and deterministic inputs.
 | Scenario | Expected visual symptom | Deliberate cause | Correct reference |
 | --- | --- | --- | --- |
 | `reference` | Interpolated red/green/blue triangle, dark background, seed/frame tint. | None. | Independent analytic image calculation in `FixtureIntegration.cpp`. |
+| `shader-trace` | Reference triangle plus four application-reported probes at the center fragment. | Optional instrumented shader writes a bounded storage buffer; this is not original-execution evidence. | `ShaderTraceIntegration.cpp`: exact coordinate/tint bits, independent interpolation/output oracle within 2e-6, and byte-exact same-frame `reference` image. |
 | `shader-error` | Red/blue spatial contributions exchanged within the triangle. | `shader-error.frag` swaps interpolated channels before multiplying by the tint. | `reference` with identical seed, dimensions, and selected frame. |
 | `binding-error` | Triangle tint differs despite the same geometry and shader calculation. | Descriptor set binds the alternate, valid uniform buffer. | `reference` with identical inputs. |
 | `pipeline-error` | Red writes are missing inside the triangle; clear red remains. | Pipeline color-write mask omits red. | `reference` with identical inputs. |

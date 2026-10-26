@@ -122,7 +122,8 @@ Json manifest_provenance(const Json& report) {
     }
     if(report.contains("application")) {
         const auto& app = report.at("application");
-        for(const auto* key : {"executable", "sha256_before_launch", "sha256_after_launch", "identity_scope"}) {
+        for(const auto* key : {"executable", "sha256_before_launch", "sha256_after_launch", "identity_scope",
+                               "output_option", "output_path", "output_evidence_origin"}) {
             if(app.contains(key)) {
                 result["application"][key] = app.at(key);
             }

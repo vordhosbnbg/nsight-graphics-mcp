@@ -14,6 +14,7 @@ about every workload or later tool release.
 | No-presentation VK_EXT_frame_boundary compute capture | Qualified | Unsupported on measured injection path |
 | Live GPU Trace and repeated profile comparison | Qualified measured workload | Qualified measured workload |
 | Recorded source state, descriptor hydration and typed uniform model | Qualified supported subset | Unqualified |
+| Application-reported instrumented fragment traces | Qualified fixture | Unqualified |
 | Standalone GPU replay and saved draw timing association | Qualified supported subset | Unqualified |
 
 The measured host is Linux x86-64, RTX 3080 Ti, driver 615.71.09 and KDE
@@ -59,9 +60,31 @@ and libstdc++; other hardware/driver/compiler combinations need their own checks
   raw counters but did not qualify their semantics or all-pass marker correspondence.
 - Compute numerical data comes from the application; Nsight inventories are
   separate. Application-side instrumentation remains optional.
+- `capture_shader_trace` reads optional application-reported instrumented fragment
+  values, with bounded raw-word decoding, selection and retained file/launch
+  provenance. A fresh 2026.3.1.0 capture on RTX 3080 Ti / driver 615.78.08 passes
+  the fixture's independent value oracle and byte-exact same-frame ordinary
+  reference comparison. Standalone Khronos synchronization validation reports no
+  errors. This qualifies the instrumented fixture; arbitrary producer claims,
+  original register values and capture-event correspondence remain unverified.
+  The [workflow](WORKFLOWS.md#instrumented-fragment-values) and
+  [focused checks](DEVELOPMENT.md#instrumented-shader-observations) describe use
+  and reproduction.
 - Live shader breakpoints, stepping and variable inspection have no qualified
-  public server interface. A single GPU also does not meet the reviewed local
-  shader-debugger setup. Fully headless capture and attachment are outside scope.
+  public server interface. On 2026.3.1.0, `ngfx --help-all`,
+  `ngfx-capture --help` and `ngfx-replay --help` expose no debugger-control or
+  invocation/register export operations. SDK 0.9.2's activity enum contains
+  Graphics Capture, GPU Trace and System Profiling, without a Shader Debugger API.
+  NVIDIA's documented [source-debug modes](https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-overview.html#debug-shaders)
+  compile shaders as debug at load time or replace selected pipelines with debug
+  versions. Their observations do not establish unchanged original shader code
+  or preservation of a failure that disappears under instrumentation. The
+  [debugger setup](https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-setup.html#system-setup)
+  requires two GPUs for local debugging or a separate host, and an enabled Linux
+  driver debugger interface. Revisit with documented public debugger controls
+  and evidence that the target failure survives the selected debug mode;
+  observing original optimized-code registers needs its own demonstrated support.
+  Fully headless capture and attachment are outside scope.
 
 ## Prerequisites and troubleshooting
 

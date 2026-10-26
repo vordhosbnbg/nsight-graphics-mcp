@@ -503,6 +503,60 @@ InspectionErrorCode InspectionError::code() const noexcept {
 InspectionService::InspectionService(ArtifactStore& artifacts, ResourceWorkers workers) :
     artifacts_(artifacts), workers_(std::move(workers)) {}
 
+Json InspectionService::shader_trace(const std::string& capture_id, const ShaderTraceSelection& selection,
+                                     std::size_t offset, std::size_t limit) const {
+    page_arguments(offset, limit);
+    auto capture = load_capture(artifacts_, capture_id);
+    const auto& application = member(capture.report, "application");
+    for(const auto* field : {"executable", "sha256_before_launch", "sha256_after_launch", "identity_scope",
+                             "output_option", "output_path", "output_evidence_origin"})
+        require(member(application, field) == member(member(capture.info.provenance, "application"), field),
+                "Shader trace launch/output fields differ between report and manifest");
+    require(member(application, "output_path") == "raw/application" &&
+                member(application, "output_evidence_origin") == "application_provided",
+            "Shader trace requires service-owned application output provenance");
+    const auto before = text(application, "sha256_before_launch", 64);
+    const auto after = text(application, "sha256_after_launch", 64);
+    require(before.size() == 64 && before == after &&
+                std::all_of(before.begin(), before.end(),
+                            [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }) &&
+                member(application, "identity_scope") ==
+                    "path contents before and after launch; running image unverified",
+            "Shader trace launch path-content identity is missing or inconsistent");
+    constexpr auto path = "raw/application/shader-trace.json";
+    inventoried(capture, path, shader_trace_maximum_bytes);
+    const auto raw = artifacts_.read(capture_id, path, shader_trace_maximum_bytes);
+    Json trace;
+    try {
+        trace = parse_shader_trace(raw);
+    } catch(const std::invalid_argument& error) {
+        fail(Error::InvalidExport, error.what());
+    }
+    const auto shader_path = "raw/application/" + trace.at("shader").at("path").get<std::string>();
+    constexpr std::size_t shader_limit = 16U * 1024U * 1024U;
+    const auto bytes = inventoried(capture, shader_path, shader_limit);
+    require(bytes >= 20 && bytes % 4 == 0, "Reported shader is not a bounded SPIR-V module");
+    const auto shader = artifacts_.read(capture_id, shader_path, shader_limit);
+    if(shader[0] != '\x03' || shader[1] != '\x02' || shader[2] != '\x23' || shader[3] != '\x07' ||
+       sha256(std::as_bytes(std::span(shader))) != trace.at("shader").at("sha256").get_ref<const std::string&>())
+        fail(Error::InvalidExport, "Reported instrumented shader bytes/hash differ from retained SPIR-V");
+    auto result = shader_trace_page(trace, selection, offset, limit);
+    result["capture_id"] = capture_id;
+    result["trace"] = {{"path", path}, {"bytes", raw.size()}, {"sha256", sha256(std::as_bytes(std::span(raw)))}};
+    result["shader"]["retained_path"] = shader_path;
+    result["shader"]["bytes"] = bytes;
+    result["shader"]["retained_content_matches_reported_hash"] = true;
+    result["launch"] = {{"sha256_before_launch", before},
+                        {"sha256_after_launch", after},
+                        {"identity_scope", application.at("identity_scope")}};
+    result["scope"] = "Application-reported instrumented fragment values; retained hashes and service-owned "
+                      "launch/output provenance do not establish shader execution, invocation identity, original "
+                      "register values or Graphics Capture event correspondence.";
+    if(!fits_response(result))
+        fail(Error::LimitExceeded, "Shader trace page exceeds the response budget");
+    return result;
+}
+
 Json InspectionService::metadata(const std::string& capture_id) const {
     auto capture = load_capture(artifacts_, capture_id);
     auto result = base_result(capture, "metadata", std::string(metadata_path));

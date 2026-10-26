@@ -166,8 +166,9 @@ void validate_workload(const Json& result) {
                                                     {"indirect_first_instance", 0}}}) {
         require(workload.at(key).is_number_integer() && workload.at(key) == expected, std::string("workload.") + key);
     }
-    const auto features =
-        bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"}) : Json::array();
+    const auto features = bindless ? Json({"runtimeDescriptorArray", "shaderStorageBufferArrayNonUniformIndexing"})
+                          : scenario == "shader-trace" ? Json({"fragmentStoresAndAtomics"})
+                                                       : Json::array();
     require(workload.at("required_api_features") == features, "workload.required_api_features");
     require(workload.at("minimum_api_version") == "1.3.0" &&
                 workload.at("required_device_extensions") == Json({"VK_KHR_swapchain"}),
@@ -204,6 +205,10 @@ void validate_workload(const Json& result) {
         require(selected->at("offscreen_rgba8_color_attachment_and_sampled_image") == true,
                 "device_support.offscreen_rgba8_color_attachment_and_sampled_image");
     }
+    if(scenario == "shader-trace")
+        require(result.at("rendering").at("enabled_api_features").at("fragmentStoresAndAtomics") == true &&
+                    selected->at("queried_api_features").at("fragmentStoresAndAtomics") == true,
+                "device_support.fragmentStoresAndAtomics");
     if(bindless || indirect) {
         const auto& limits = selected->at("limits");
         for(const auto& [key, minimum] :
@@ -277,7 +282,7 @@ void validate_metadata(const Json& result, const fs::path& directory) {
     for(const auto& argument : compiler.at("arguments")) {
         require(argument.is_string(), "provenance.shader_compiler.arguments");
     }
-    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 13, "provenance.shaders");
+    require(provenance.at("shaders").is_array() && provenance.at("shaders").size() == 14, "provenance.shaders");
     std::map<std::string, std::string> expected{{"scene.vert", "vertex"},
                                                 {"scene.frag", "fragment"},
                                                 {"shader-error.frag", "fragment"},
@@ -290,7 +295,8 @@ void validate_metadata(const Json& result, const fs::path& directory) {
                                                 {"compute-arithmetic-error.comp", "compute"},
                                                 {"performance-reference.comp", "compute"},
                                                 {"performance-underfilled.comp", "compute"},
-                                                {"state-constants.frag", "fragment"}};
+                                                {"state-constants.frag", "fragment"},
+                                                {"shader-trace.frag", "fragment"}};
     for(const auto& shader : provenance.at("shaders")) {
         const auto source = shader.at("source").get<std::string>();
         require(expected.contains(source) && shader.at("stage") == expected.at(source) &&

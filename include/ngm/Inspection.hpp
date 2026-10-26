@@ -2,6 +2,7 @@
 
 #include "ngm/Artifacts.hpp"
 #include "ngm/ResourceRead.hpp"
+#include "ngm/ShaderTrace.hpp"
 
 #include <cstddef>
 #include <stdexcept>
@@ -46,6 +47,10 @@ public:
     nlohmann::json metadata(const std::string& capture_id) const;
     nlohmann::json events(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
     nlohmann::json objects(const std::string& capture_id, std::size_t offset = 0, std::size_t limit = 50) const;
+    // Optional application-reported instrumented fragment observations. This
+    // validates retained content/launch provenance, not GPU execution claims.
+    nlohmann::json shader_trace(const std::string& capture_id, const ShaderTraceSelection& selection = {},
+                                std::size_t offset = 0, std::size_t limit = 50) const;
 
     // Generated C++ capture evidence uses a separate producer/index contract.
     nlohmann::json cpp_source(const std::string& capture_id, const std::string& source_path, std::size_t start_line = 1,

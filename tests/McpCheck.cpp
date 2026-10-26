@@ -111,6 +111,7 @@ Json query_capabilities(Client& client) {
                                                         "capture_draw_executions",
                                                         "capture_draw_state",
                                                         "capture_draw_values",
+                                                        "capture_shader_trace",
                                                         "capture_cpp_resources",
                                                         "capture_cpp_descriptor_writes",
                                                         "capture_cpp_resource",
@@ -141,7 +142,7 @@ void protocol_check(const std::string& server, const Scratch& scratch) {
     expect_error(client.request(0, "tools/list"), -32002);
     require(initialize(client)["protocolVersion"] == "2025-11-25", "current protocol negotiation");
     const auto listing = client.request(2, "tools/list")["result"]["tools"];
-    require(listing.size() == 34, "discover exactly the implemented tools");
+    require(listing.size() == 35, "discover exactly the implemented tools");
     for(const auto& tool : listing) {
         require(tool["inputSchema"]["additionalProperties"] == false, "closed input schema advertised");
         require(tool.contains("outputSchema"), "structured output schema advertised");

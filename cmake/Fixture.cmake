@@ -9,7 +9,7 @@ function(ngm_configure_fixture target)
     pkg_check_modules(NGM_XCB REQUIRED IMPORTED_TARGET xcb>=1.13)
     target_sources(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src/fixture/Fixture.cpp"
         "${PROJECT_SOURCE_DIR}/src/fixture/Compute.cpp")
-    target_link_libraries(${target} PRIVATE PkgConfig::NGM_XCB nlohmann_json::nlohmann_json)
+    target_link_libraries(${target} PRIVATE PkgConfig::NGM_XCB nlohmann_json::nlohmann_json ngm_shader_trace)
     target_compile_definitions(${target} PRIVATE VK_USE_PLATFORM_XCB_KHR)
 
     set(shader_dir "${CMAKE_CURRENT_BINARY_DIR}/shaders/fixture")
@@ -23,6 +23,7 @@ function(ngm_configure_fixture target)
     target_include_directories(${target} PRIVATE "${identity_dir}")
     set_property(TARGET ${target} PROPERTY EXPORT_COMPILE_COMMANDS ON)
     set_property(TARGET ngm_core PROPERTY EXPORT_COMPILE_COMMANDS ON)
+    set_property(TARGET ngm_shader_trace PROPERTY EXPORT_COMPILE_COMMANDS ON)
     string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type_upper)
     add_custom_target(ngm_fixture_identity
         COMMAND "${CMAKE_COMMAND}"
@@ -44,7 +45,7 @@ function(ngm_configure_fixture target)
     set(outputs)
     foreach(name IN ITEMS scene.vert scene.frag shader-error.frag indirect.vert bindless.frag post.vert post.frag
             compute-reference.comp compute-index-error.comp compute-arithmetic-error.comp
-            performance-reference.comp performance-underfilled.comp state-constants.frag)
+            performance-reference.comp performance-underfilled.comp state-constants.frag shader-trace.frag)
         set(source "${PROJECT_SOURCE_DIR}/shaders/fixture/${name}")
         set(spirv "${shader_dir}/${name}.spv")
         ngm_compile_shader("${source}" "${spirv}")

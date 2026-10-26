@@ -60,11 +60,12 @@ if(GIT AND EXISTS "${PROJECT_ROOT}/.git")
 endif()
 
 # These are the first-party translation units linked into this executable from
-# ngm_core. Unused objects from that static archive are deliberately excluded.
+# ngm_core/ngm_shader_trace. Unused archive objects are deliberately excluded.
 set(translation_units src/fixture/Main.cpp src/fixture/Fixture.cpp src/fixture/Compute.cpp src/fixture/SdkControl.cpp
-    src/core/Hash.cpp src/core/File.cpp src/core/Version.cpp)
+    src/core/Hash.cpp src/core/File.cpp src/core/Version.cpp src/inspection/ShaderTrace.cpp)
 set(inputs ${translation_units}
     src/fixture/Fixture.hpp src/fixture/SdkControl.hpp include/ngm/Hash.hpp include/ngm/File.hpp include/ngm/Version.hpp
+    include/ngm/ShaderTrace.hpp cmake/Inspection.cmake
     CMakeLists.txt CMakePresets.json cmake/Fixture.cmake cmake/FixtureBuildIdentity.cmake
     cmake/Version.hpp.in cmake/Dependencies.cmake cmake/NsightSdk.cmake)
 if(NOT DEFINED SDK_MANIFEST OR NOT EXISTS "${SDK_MANIFEST}")

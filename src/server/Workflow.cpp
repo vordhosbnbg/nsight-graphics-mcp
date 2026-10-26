@@ -638,6 +638,67 @@ Schema recorded_state_schema(bool selected) {
     }
     return result;
 }
+Schema shader_trace_selection_schema() {
+    Json fields = Json::object();
+    for(const auto* name : {"frame", "draw", "pixel_x", "pixel_y", "sample", "probe"})
+        fields[name] = integer_schema(0, UINT32_MAX);
+    return object_schema(std::move(fields));
+}
+Schema shader_trace_schema() {
+    auto required_object = [](Json fields) {
+        Json required = Json::array();
+        for(const auto& [name, unused] : fields.items()) {
+            (void)unused;
+            required.push_back(name);
+        }
+        return object_schema(std::move(fields), std::move(required));
+    };
+    const auto probe = required_object({{"id", integer_schema(0, UINT32_MAX)},
+                                        {"name", string_schema(128, 1)},
+                                        {"type", {{"type", "string"}, {"enum", {"float32", "int32", "uint32"}}}},
+                                        {"components", integer_schema(1, 4)}});
+    Json row_fields = shader_trace_selection_schema().at("properties");
+    row_fields["primitive"] = nullable(integer_schema(0, UINT32_MAX));
+    row_fields["bits"] = array_schema(integer_schema(0, UINT32_MAX), 4);
+    row_fields["bits_hex"] = array_schema(string_schema(10, 10), 4);
+    row_fields["values"] = array_schema({{"type", {"number", "null"}}}, 4);
+    row_fields["probe_name"] = string_schema(128, 1);
+    row_fields["type"] = probe.at("properties").at("type");
+    return required_object(
+        {{"capture_id", string_schema(39, 39)},
+         {"evidence_origin", {{"type", "string"}, {"enum", {shader_trace_origin}}}},
+         {"original_execution", {{"type", "boolean"}, {"const", false}}},
+         {"capture_event_correspondence", {{"type", "boolean"}, {"const", false}}},
+         {"producer_claims_verified", {{"type", "boolean"}, {"const", false}}},
+         {"scope", string_schema(512, 1)},
+         {"trace", required_object({{"path", string_schema(512, 1)},
+                                    {"bytes", integer_schema(0, shader_trace_maximum_bytes)},
+                                    {"sha256", string_schema(64, 64)}})},
+         {"shader",
+          required_object({{"path", string_schema(512, 1)},
+                           {"sha256", string_schema(64, 64)},
+                           {"entry_point", string_schema(128, 1)},
+                           {"stage", {{"type", "string"}, {"enum", {"fragment"}}}},
+                           {"retained_path", string_schema(528, 1)},
+                           {"bytes", integer_schema(20, 16U * 1024U * 1024U)},
+                           {"retained_content_matches_reported_hash", {{"type", "boolean"}, {"const", true}}}})},
+         {"launch", required_object({{"sha256_before_launch", string_schema(64, 64)},
+                                     {"sha256_after_launch", string_schema(64, 64)},
+                                     {"identity_scope", string_schema(128, 1)}})},
+         {"extent", required_object({{"width", integer_schema(1, 65536)}, {"height", integer_schema(1, 65536)}})},
+         {"reported_selection",
+          required_object({{"pixel_x", integer_schema(0, 65535)}, {"pixel_y", integer_schema(0, 65535)}})},
+         {"selection", shader_trace_selection_schema()},
+         {"capacity", integer_schema(1, shader_trace_maximum_records)},
+         {"attempted_records", integer_schema(0, UINT32_MAX)},
+         {"dropped_records", integer_schema(0, UINT32_MAX)},
+         {"probes", array_schema(probe, 64)},
+         {"records_total", integer_schema(0, shader_trace_maximum_records)},
+         {"matched_records", integer_schema(0, shader_trace_maximum_records)},
+         {"offset", integer_schema(0, 100000)},
+         {"next_offset", nullable(integer_schema(0, 100000))},
+         {"records", array_schema(required_object(std::move(row_fields)), 100)}});
+}
 Schema draw_values_schema() {
     const auto selection = object_schema({{"frame", integer_schema(0, 0)},
                                           {"submission_index", integer_schema(0, 10000)},
@@ -1089,6 +1150,7 @@ Json implemented_tool_names() {
                         "capture_draw_executions",
                         "capture_draw_state",
                         "capture_draw_values",
+                        "capture_shader_trace",
                         "capture_cpp_resources",
                         "capture_cpp_descriptor_writes",
                         "capture_cpp_resource",
@@ -2097,6 +2159,37 @@ void WorkflowTools::register_tools(fastmcpp::tools::ToolManager& tools) {
                 .cpp_resource(artifact_id(arguments, "capture_id"), arguments.at("resource_ref").get<std::string>(),
                               arguments.value("offset", std::size_t{0}), arguments.value("length", std::size_t{65536}),
                               arguments.value("pin", false));
+        });
+    auto trace_input = shader_trace_selection_schema();
+    trace_input["properties"]["capture_id"] = string_schema(39, 39);
+    trace_input["properties"]["offset"] = integer_schema(0, 100000);
+    trace_input["properties"]["limit"] = integer_schema(1, 100);
+    trace_input["required"] = {"capture_id"};
+    add_tool(
+        tools, "capture_shader_trace", std::move(trace_input), shader_trace_schema(),
+        "Inspect optional application-reported instrumented fragment traces retained by a complete native "
+        "Graphics Capture using application_output_option. Requires raw/application/shader-trace.json and its "
+        "same-bundle SPIR-V. Checks bounded strict schema, counts, module bytes/hash and service-owned launch/output "
+        "provenance. These checks do not attest that a reported shader, invocation or value executed. "
+        "original_execution, capture_event_correspondence and producer_claims_verified are always false. Raw "
+        "uint32/hex bits preserve NaN/Inf/signed zero; nonfinite numeric values are null. Optional frame/draw/pixel_x/"
+        "pixel_y/sample/probe selectors match exact application-reported fields. Defaults offset0/limit50; "
+        "max100 records/256KiB page. No shader modification or debugger launch occurs.",
+        false, false, [this](const Json& arguments) {
+            ShaderTraceSelection selection;
+            for(const auto& [name, target] :
+                std::initializer_list<std::pair<const char*, std::optional<std::uint32_t>*>>{
+                    {"frame", &selection.frame},
+                    {"draw", &selection.draw},
+                    {"pixel_x", &selection.pixel_x},
+                    {"pixel_y", &selection.pixel_y},
+                    {"sample", &selection.sample},
+                    {"probe", &selection.probe}})
+                if(arguments.contains(name))
+                    *target = arguments.at(name).get<std::uint32_t>();
+            return InspectionService(service().artifacts())
+                .shader_trace(artifact_id(arguments, "capture_id"), selection,
+                              arguments.value("offset", std::size_t{0}), arguments.value("limit", std::size_t{50}));
         });
     add_tool(
         tools, "capture_draw_values",
